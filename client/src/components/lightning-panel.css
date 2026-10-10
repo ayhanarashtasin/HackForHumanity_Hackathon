@@ -1,0 +1,125 @@
+/* Readable snapshot summaries, in the explorer's existing paper / olive palette. */
+.weather-app .right-stack.with-lightning {
+  width: min(330px, calc(100% - 32px));
+  bottom: 156px;
+  max-height: none;
+  overflow: hidden;
+}
+.weather-app .with-lightning .layer-menu { display: none; }
+.weather-app .lightning-panel { display: flex; flex-direction: column; flex: 0 1 auto; min-height: 0; padding: 0; border-radius: 18px; overflow: hidden; }
+.lightning-header { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--map-rule); flex: none; }
+.lightning-heading-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; color: var(--cream); background: var(--olive); flex: none; }
+.lightning-header > div { min-width: 0; flex: 1; }
+.lightning-header .map-eyebrow { font-size: .54rem; letter-spacing: .08em; }
+.weather-app .lightning-header h2 { font-size: .92rem; font-weight: 650; line-height: 1.3; letter-spacing: -.025em; margin-top: 3px; text-wrap: balance; }
+.weather-app .lightning-header .icon-button { border: 0; margin-right: -8px; }
+.lightning-content { padding: 16px; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--sage) transparent; overscroll-behavior: contain; }
+.lightning-content:focus-visible { outline-offset: -4px; border-radius: 0 0 18px 18px; }
+.lightning-content h3 { font-size: .81rem; font-weight: 650; line-height: 1.5; }
+.lightning-overview { padding: 14px; border: 1px solid var(--map-rule); border-radius: 13px; background: var(--sage-soft); }
+.lightning-campaign-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.lightning-campaign-state { display: inline-flex; align-items: center; gap: 6px; font-size: .67rem; font-weight: 650; line-height: 1.5; }
+.lightning-campaign-state > span { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--olive); }
+.lightning-campaign-state:not(.campaign-active) > span { background: transparent; border: 1px solid var(--olive); }
+.lightning-mode { border: 1px solid var(--map-rule); padding: 3px 6px; border-radius: 5px; font-size: .57rem; white-space: nowrap; }
+.lightning-coverage { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.lightning-coverage > strong { font-size: 2.4rem; line-height: 1; letter-spacing: -.06em; font-weight: 550; font-variant-numeric: tabular-nums; }
+.lightning-coverage > span { font-size: .78rem; font-weight: 600; line-height: 1.5; }
+.lightning-coverage small { display: block; color: var(--map-muted); font-size: .63rem; font-weight: 400; margin-top: 2px; }
+.lightning-collection-reason { margin-top: 12px; font-size: .73rem; line-height: 1.65; color: var(--map-muted); }
+.lightning-snapshot-note { display: flex; align-items: flex-start; gap: 8px; margin: 14px 0 18px; font-size: .75rem; line-height: 1.6; color: var(--map-muted); }
+.lightning-snapshot-note > svg { flex: none; margin-top: 2px; }
+.lightning-snapshot-note strong { color: var(--olive); font-weight: 600; }
+.lightning-snapshot-note small { display: block; font-size: .7rem; }
+.lightning-load-note { padding: 10px 12px; border-radius: 8px; border: 1px dashed var(--olive); font-size: .73rem; line-height: 1.6; margin-bottom: 16px; }
+.lightning-load-note button { display: block; border: 0; background: transparent; text-decoration: underline; min-height: 44px; font-size: .73rem; }
+.lightning-schedule > h3, .lightning-map-key > h3 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+.lightning-content h3 > span { font-size: .58rem; color: var(--map-muted); font-weight: 400; text-align: right; }
+.lightning-refresh-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.lightning-refresh { padding: 12px 10px; border: 1px solid var(--map-rule); border-radius: 11px; min-width: 0; }
+.lightning-refresh.is-upcoming { background: var(--map-surface); }
+.lightning-refresh dt { display: flex; align-items: center; gap: 5px; font-size: .7rem; color: var(--map-muted); }
+.lightning-refresh dt svg { flex: none; }
+.lightning-refresh dd { margin: 9px 0 0; }
+.lightning-refresh time { font-size: 1.24rem; letter-spacing: -.04em; font-weight: 550; font-variant-numeric: tabular-nums; display: block; }
+.lightning-refresh small { display: block; color: var(--map-muted); font-size: .65rem; margin-top: 4px; }
+.lightning-time-empty { font-size: .73rem; font-weight: 600; display: block; line-height: 1.6; }
+.lightning-slot-times { display: flex; gap: 7px; margin-top: 10px; }
+.lightning-slot-times > span { display: flex; justify-content: center; align-items: center; gap: 6px; flex: 1; padding: 6px 4px; border: 1px solid var(--map-rule); border-radius: 7px; font-size: .66rem; font-variant-numeric: tabular-nums; }
+.lightning-slot-times .next-slot { border-color: var(--olive); background: var(--sage-soft); font-weight: 600; }
+.lightning-slot-times small { font-size: .53rem; }
+.lightning-campaign-progress { margin: 14px 0 18px; }
+.lightning-campaign-progress > div { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: .61rem; color: var(--map-muted); }
+.lightning-campaign-progress strong { font-weight: 500; color: var(--olive); }
+.lightning-campaign-progress progress { display: block; width: 100%; height: 4px; margin-top: 8px; appearance: none; border: 0; border-radius: 99px; background: var(--olive-faint); overflow: hidden; }
+.lightning-campaign-progress progress::-webkit-progress-bar { background: var(--olive-faint); border-radius: 99px; }
+.lightning-campaign-progress progress::-webkit-progress-value { background: var(--olive); border-radius: 99px; }
+.lightning-campaign-progress progress::-moz-progress-bar { background: var(--olive); border-radius: 99px; }
+.lightning-map-key { margin-top: 18px; }
+.lightning-map-key ul { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.lightning-map-key li { display: flex; align-items: center; gap: 7px; border: 1px solid var(--map-rule); border-radius: 9px; padding: 10px 8px; font-size: .7rem; min-width: 0; }
+.lightning-map-key li:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.lightning-map-key li > span:not(.ring) { flex: 1; line-height: 1.5; }
+.lightning-map-key strong { font-size: .78rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.lightning-map-key .ring { width: 13px; height: 13px; border-width: 2px; }
+.lightning-map-key .ring-not-checked { border-style: dotted; }
+.lightning-map-hint { display: flex; align-items: flex-start; gap: 6px; margin: 10px 0 14px; font-size: .64rem; color: var(--map-muted); line-height: 1.6; }
+.lightning-map-hint svg { flex: none; margin-top: 2px; }
+.lightning-disclosure { border-top: 1px solid var(--map-rule); }
+.lightning-disclosure > summary { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 48px; padding: 12px 2px; font-size: .78rem; font-weight: 600; cursor: pointer; list-style: none; }
+.lightning-disclosure > summary::-webkit-details-marker { display: none; }
+.lightning-disclosure > summary > span { display: flex; align-items: center; gap: 8px; }
+.lightning-disclosure > summary svg { flex: none; }
+.lightning-disclosure[open] > summary > svg { transform: rotate(180deg); }
+.lightning-disclosure > summary:hover { background: rgba(169, 190, 135, .12); }
+.lightning-explanations { display: grid; gap: 12px; padding: 0 2px 16px 19px; list-style: disc; font-size: .78rem; color: var(--map-muted); line-height: 1.7; }
+.lightning-budget-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.lightning-budget-grid > div { border: 1px solid var(--map-rule); border-radius: 9px; padding: 12px 10px; min-width: 0; }
+.lightning-budget-grid dt { font-size: .6rem; color: var(--map-muted); line-height: 1.6; }
+.lightning-budget-grid dd { margin: 6px 0 0; font-size: 1.1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.lightning-budget-mode { display: flex; flex-direction: column; gap: 4px; font-size: .73rem; }
+.lightning-budget-mode strong { font-size: .61rem; font-weight: 500; color: var(--map-muted); }
+.lightning-mode-reason { font-size: .75rem; color: var(--map-muted); line-height: 1.75; margin: 12px 0 16px; }
+.lightning-selected { margin: 0 0 20px; padding: 14px; border: 1px solid var(--olive); border-radius: 13px; background: var(--map-surface); }
+.lightning-selected.state-reported { border-left: 3px solid #FFB800; }
+.lightning-selected > header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.lightning-selected h3 { font-size: .92rem; margin-top: 5px; overflow-wrap: anywhere; }
+.lightning-selected header small { display: block; font-size: .62rem; color: var(--map-muted); margin-top: 3px; }
+.weather-app .lightning-selected .icon-button { border: 0; margin-top: -7px; margin-right: -7px; }
+.lightning-selected-state { display: flex; align-items: center; gap: 7px; font-size: .69rem; font-weight: 600; margin-top: 14px; }
+.lightning-event-count { display: flex; gap: 12px; align-items: center; margin: 14px 0; }
+.lightning-event-count > strong { font-size: 2.5rem; font-weight: 550; letter-spacing: -.05em; line-height: 1; }
+.lightning-event-count > span { font-size: .76rem; }
+.lightning-event-count small { display: block; font-size: .6rem; color: var(--map-muted); margin-top: 4px; }
+.lightning-breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0; padding: 12px 0; border-top: 1px solid var(--map-rule); border-bottom: 1px solid var(--map-rule); }
+.lightning-breakdown dt { font-size: .61rem; color: var(--map-muted); }
+.lightning-breakdown dd { margin: 4px 0 0; font-size: .93rem; font-weight: 600; }
+.lightning-sample-times { display: grid; gap: 10px; }
+.lightning-sample-times dt { font-size: .61rem; color: var(--map-muted); margin-bottom: 3px; }
+.lightning-sample-times dd { margin: 0; font-size: .66rem; line-height: 1.7; }
+.lightning-sample-times dd span { display: block; }
+.lightning-selected-detail { font-size: .7rem; color: var(--map-muted); line-height: 1.7; margin-top: 12px; }
+.lightning-empty { padding: 20px 10px; text-align: center; }
+.lightning-empty > svg, .lightning-empty > .map-spinner { display: inline-block; margin-bottom: 12px; }
+.lightning-empty p { font-size: .76rem; color: var(--map-muted); line-height: 1.7; margin-top: 8px; }
+.weather-app .lightning-reopen { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; min-height: 48px; font-size: .77rem; font-weight: 600; }
+.lightning-reopen > span { display: flex; align-items: center; gap: 8px; }
+.has-lightning-panel .legend { display: none; }
+
+@media (max-width: 760px) {
+  .weather-app .right-stack.with-lightning { width: min(330px, calc(100% - 24px)); bottom: 156px; }
+  .lightning-overview { padding: 12px; }
+  .lightning-coverage { margin-top: 8px; }
+  .lightning-coverage > strong { font-size: 2.1rem; }
+  .lightning-coverage small { display: none; }
+  .lightning-snapshot-note { margin: 12px 0 14px; }
+}
+@media (max-width: 400px) {
+  .weather-app .right-stack.with-lightning { bottom: 180px; }
+  .lightning-header { padding: 12px 14px; gap: 8px; }
+  .lightning-content { padding: 14px; }
+  .lightning-heading-icon { width: 34px; height: 34px; }
+}
+@media (max-height: 600px) {
+  .weather-app .right-stack.with-lightning { top: 12px; bottom: 12px; z-index: 8; }
+}

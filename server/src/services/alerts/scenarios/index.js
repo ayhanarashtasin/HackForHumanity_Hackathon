@@ -1,0 +1,53 @@
+import { constructionScenarios } from './construction.js';
+import { farmerScenarios } from './farmer.js';
+import { fishermanScenarios } from './fisherman.js';
+import { matchAreas } from './helpers.js';
+import { rickshawScenarios } from './rickshaw.js';
+import { studentScenarios } from './student.js';
+import { vendorScenarios } from './vendor.js';
+
+// The catalogue's rule IDs (AkashSathi_Occupation_Based_Scenario_Catalogue.md) implemented as occupation scenarios.
+// A scenario turns one occupation-neutral hazard event into advice for one subscriber, or returns null when it does not apply.
+export const scenarios = [
+  ...farmerScenarios,
+  ...fishermanScenarios,
+  ...constructionScenarios,
+  ...vendorScenarios,
+  ...studentScenarios,
+  ...rickshawScenarios,
+];
+
+const byHazard = new Map();
+for (const scenario of scenarios) {
+  for (const hazard of scenario.hazards) {
+    if (!byHazard.has(hazard)) byHazard.set(hazard, []);
+    byHazard.get(hazard).push(scenario);
+  }
+}
+
+export const scenarioIds = scenarios.map((scenario) => scenario.id);
+
+export function scenariosFor(hazardType) {
+  return byHazard.get(hazardType) ?? [];
+}
+
+// Areas of the subscriber that this scenario cares about and the event covers (most specific role first).
+// Someone from another occupation who triggers a scenario through what they are doing now (CTX-01) has no site, market or field,
+// so they are matched through their work and home areas (`crossRoles`).
+export function matchFor(scenario, subscriber, event) {
+  if (scenario.match) return scenario.match(subscriber, event);
+  const cross = scenario.crossRoles && subscriber.occupation !== scenario.ownOccupation;
+  return matchAreas(subscriber, event, cross ? scenario.crossRoles : scenario.areaRoles);
+}
+
+// Runs every scenario for one hazard event and one subscriber. Returns [{ scenario, area, result }].
+export function evaluateSubscriber({ subscriber, event, nowMs, activity }) {
+  const out = [];
+  for (const scenario of scenariosFor(event.hazardType)) {
+    const areas = matchFor(scenario, subscriber, event);
+    if (!areas.length) continue;
+    const result = scenario.evaluate({ subscriber, event, nowMs, area: areas[0], areas, activity });
+    if (result) out.push({ scenario, area: areas[0], result });
+  }
+  return out;
+}

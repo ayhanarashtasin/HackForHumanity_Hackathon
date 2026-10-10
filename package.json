@@ -1,0 +1,29 @@
+{
+  "name": "environmental-hackathon",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "concurrently --kill-others --names server,client \"npm run dev --workspace server\" \"npm run dev --workspace client\"",
+    "dev:server": "npm run dev --workspace server",
+    "dev:client": "npm run dev --workspace client",
+    "build": "npm run build --workspace client",
+    "start": "npm run start --workspace server",
+    "preview": "npm run preview --workspace client",
+    "test": "npm run test --workspaces --if-present",
+    "test:db": "npm run test:db --workspace server",
+    "build:geo": "node scripts/build-geo.mjs",
+    "build:outline": "node scripts/build-outline.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6",
+    "fflate": "^0.8.3",
+    "mapshaper": "^0.7.83"
+  }
+}

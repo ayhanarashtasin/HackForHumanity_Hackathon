@@ -1,0 +1,24 @@
+/* Map container and MapLibre control overrides. MapLibre's own stylesheet loads together with the (lazy) map page, so these rules
+   are scoped under .app and imported after it (see MapView.jsx): they must win regardless of the order the stylesheets arrive in.
+   Without this, MapLibre's `.maplibregl-map { position: relative }` collapses the container to zero height. */
+.app > .map { position: absolute; inset: 0; }
+.weather-app .map-stage > .map { position: absolute; inset: 0; }
+
+.app .maplibregl-ctrl-bottom-right { bottom: 84px; z-index: 3; }
+.app .maplibregl-ctrl-group { background: var(--cream-strong); border-radius: 10px; box-shadow: var(--shadow); }
+.app .maplibregl-ctrl-group button + button { border-top: 1px solid var(--olive-faint); }
+.app .maplibregl-ctrl-attrib { background: rgba(232, 233, 223, 0.85); color: var(--olive); font-size: 11px; }
+.app .maplibregl-ctrl-attrib a { color: var(--olive); }
+
+@media (max-width: 720px) {
+  .app .maplibregl-ctrl-bottom-right { bottom: 120px; }
+}
+
+.weather-app .maplibregl-ctrl-bottom-right { bottom: 156px; right: 6px; z-index: 3; }
+.weather-app .maplibregl-ctrl-bottom-left { bottom: 2px; left: 2px; z-index: 3; max-width: calc(100% - 4px); }
+.weather-app .maplibregl-ctrl-group { border-radius: 12px; overflow: hidden; }
+.weather-app .maplibregl-ctrl-group button { width: 44px; height: 44px; }
+.weather-app .maplibregl-ctrl-attrib { max-width: calc(100% - 20px); font-size: 10px; border-radius: 8px; }
+@media (max-width: 400px) {
+  .weather-app .maplibregl-ctrl-bottom-right { bottom: 176px; }
+}

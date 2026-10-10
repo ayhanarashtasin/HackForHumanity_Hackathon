@@ -1,0 +1,88 @@
+# AkashSathi - Occupation-Based Scenario Catalogue
+
+**Version:** 1.0  
+**Date:** 10 October 2026  
+**Scope:** Occupation-based and user-context-based risk scenarios
+
+## Purpose
+
+The same weather event can pose different risks to people in different occupations. AkashSathi will first detect the underlying **weather hazard**, then determine the appropriate warning and recommended action based on the user's **location, occupation, current activity, work schedule, and vulnerability**. Every scenario below describes the problem, risk-engine conditions, action, and expected alert level.
+
+> **Important:** `ADVISORY`, `WARNING`, and `CRITICAL` are proposed **internal alert levels**, not replacements for official Bangladesh Meteorological Department (BMD) warning signals. Any numerical thresholds must be configured only after expert review and data testing. Observed lightning must not be presented as a guarantee or precise prediction of a future lightning strike at a particular location.
+
+## 1. Farmers
+
+| Specific scenario / Rule ID | Problem / Risk | Risk engine: Conditions -> Action -> Output |
+|---|---|---|
+| **FARM-01**<br>Rain during harvest | Harvested paddy may lose quality or become difficult to store if it gets wet. Rain probability alone does not establish the amount of expected damage. | **Conditions:** `crop_stage=harvesting`; evaluate `rain_probability`, `expected_rain_mm`, and `forecast_validity` together for the relevant period.<br>**Action:** Advise the farmer to prepare to protect harvested crops; communicate uncertainty about rain timing and amount.<br>**Output:** `ADVISORY / WARNING` |
+| **FARM-02**<br>Planting season vs. harvesting season | Sending the same warning during planting and harvesting can lead to inappropriate decisions, even under an identical forecast. | **Conditions:** When `crop_stage=planting`, consider soil-moisture needs and forecast suitability for planning; when `crop_stage=harvesting`, prioritize crop-protection advice.<br>**Action:** Generate stage-specific messages; avoid definitive recommendations if required data is missing.<br>**Output:** `ADVISORY` |
+| **FARM-03**<br>Consecutive dry days and irrigation | Five days without rain do not automatically mean drought. Soil conditions, crop type, and access to irrigation also matter. | **Conditions:** Review `dry_day_count`, temperature, `crop_stage`, and optional `soil_moisture`; provide limited advice if data is insufficient.<br>**Action:** Trigger an `irrigation_check` such as "Check the moisture level in your field"; do not automatically prescribe an irrigation volume.<br>**Output:** `ADVISORY` |
+| **FARM-04**<br>Lightning in an open field | Lightning can occur before the rain starts. Open fields and isolated trees are not safe shelters. | **Conditions:** Match fresh Xweather lightning observations or an active lightning threat, together with any applicable official warning, to the user's `location` or `work_area`.<br>**Action:** Send an urgent shelter warning; advise stopping fieldwork and moving to a substantial building or another appropriate safe shelter.<br>**Output:** `CRITICAL` |
+| **FARM-05**<br>Extreme midday heat during fieldwork | Long hours of physical work in a field can create heat stress that air temperature alone does not capture. | **Conditions:** Combine a heat-stress indicator (prefer WBGT if available; otherwise consider heat index), `workload`, `outdoor_hours`, and `forecast_peak_hour`.<br>**Action:** Recommend rest breaks, water, shade, and adjusting work hours; advise urgent medical attention for serious illness symptoms.<br>**Output:** `WARNING` |
+
+## 2. Fishermen
+
+| Specific scenario / Rule ID | Problem / Risk | Risk engine: Conditions -> Action -> Output |
+|---|---|---|
+| **FISH-01**<br>River warnings vs. marine warnings | A river-port warning and a marine warning do not necessarily apply to the same waters. Alerts for the wrong area can mislead users. | **Conditions:** Read `water_body=river/coastal/marine`; match `warning_area_polygon` and `warning_type` to the geographic coverage and meaning of the relevant official notice.<br>**Action:** Display the applicable official instructions only for the water body and area covered by the warning.<br>**Output:** `WARNING / CRITICAL` |
+| **FISH-02**<br>Lightning near a boat already on the water | Thunderstorms can be life-threatening for people on rivers or at sea. | **Conditions:** `activity=on_water` and a fresh lightning hazard; check the known route or operating area when available.<br>**Action:** Advise the user to leave the water safely and seek appropriate shelter; never issue a guarantee that travel is safe.<br>**Output:** `CRITICAL` |
+| **FISH-03**<br>After an official warning is withdrawn | Water conditions may remain hazardous after an official signal is withdrawn. However, a fixed 12-hour waiting period is not universally appropriate. | **Conditions:** Examine official warning updates or cancellations, new wind and thunderstorm information, and relevant local guidance.<br>**Action:** Issue `transition_caution`; recommend consulting the latest official forecast before deciding to depart.<br>**Output:** `ADVISORY / WARNING` |
+| **FISH-04**<br>Before departure vs. already on the water | "Postpone departure" and "return to safety" are very different actions, even when triggered by the same hazard. | **Conditions:** If `activity=pre_departure`, issue `departure_advisory`; if `activity=on_water`, use `immediate_shelter` or appropriate `return_guidance`.<br>**Action:** Prioritize the safety of users already on the water; do not make unsupported claims about routes, distances, or safe passages.<br>**Output:** `WARNING / CRITICAL` |
+| **FISH-05**<br>Moving location and loss of network coverage | Warnings based only on a fisherman's registered home village may miss a boat moving across rivers or coastal waters. | **Conditions:** Check `last_location_at`, `active_work_area`, and `location_age`; if location data is old, set `scope_uncertain`.<br>**Action:** Indicate that the last location is outdated; queue or log SMS attempts and recheck alert validity when connectivity returns.<br>**Output:** `UNKNOWN / WARNING` |
+
+## 3. Rickshaw Pullers and Day Labourers
+
+| Specific scenario / Rule ID | Problem / Risk | Risk engine: Conditions -> Action -> Output |
+|---|---|---|
+| **WORK-01**<br>Sudden increase in midday heat | Pleasant conditions in the morning may not reflect the day's peak heat stress. | **Conditions:** Combine `hourly_heat_forecast` with the user's `work_shift`; evaluate `elevated_heat_rule` during the predicted peak period.<br>**Action:** Send early guidance about rest, shade, and hydration before the hottest hours; issue an immediate warning when urgent conditions are detected.<br>**Output:** `ADVISORY / WARNING` |
+| **WORK-02**<br>Urban heat exposure in Dhaka | Concrete surfaces and direct sun can make heat exposure vary locally. A district-level forecast does not represent every street. | **Conditions:** Track `urban_exposure=true` as an additional exposure factor; do not lower alert thresholds by an arbitrary 1-2 degrees C without validation.<br>**Action:** Use precautionary messaging for exposed urban work; calibrate any local adjustment only after field validation.<br>**Output:** `ADVISORY` |
+| **WORK-03**<br>Thunderstorm while working on the road | Income pressure or waiting passengers may lead drivers to keep working during dangerous weather. | **Conditions:** `activity=on_road`, a lightning hazard or official warning, and the user's `current_area`.<br>**Action:** Advise stopping the rickshaw and entering suitable shelter; warn against taking shelter beneath trees.<br>**Output:** `CRITICAL` |
+| **WORK-04**<br>Heavy rain during busy work hours | Rain can cause delays and slippery roads, but rainfall does not prove that flooding has occurred. | **Conditions:** Check whether the rain forecast overlaps the user's shift or commute; if no verified flooding dataset is available, set `flood_claim=false`.<br>**Action:** Advise allowing extra travel time and checking local road conditions; do not claim confirmed waterlogging.<br>**Output:** `ADVISORY` |
+| **WORK-05**<br>Long and physically demanding shifts | Extended physical work and sun exposure can cause fatigue even when the temperature is not exceptionally high. | **Conditions:** Evaluate `shift_duration`, `workload`, and heat conditions; schedule well-timed reminders without repeated alert spam.<br>**Action:** Encourage rest, drinking water, and checking on coworkers; do not present the alert as a medical diagnosis.<br>**Output:** `ADVISORY` |
+
+## 4. Construction Workers
+
+| Specific scenario / Rule ID | Problem / Risk | Risk engine: Conditions -> Action -> Output |
+|---|---|---|
+| **CONS-01**<br>Lightning during rooftop or scaffolding work | Continuing exposed work at height during lightning is particularly dangerous. | **Conditions:** `activity=roof_work/scaffolding` together with fresh lightning observations or an applicable official storm warning.<br>**Action:** Advise stopping exposed elevated work and moving inside an appropriate safe building.<br>**Output:** `CRITICAL` |
+| **CONS-02**<br>Heavy physical work with protective equipment | Personal protective equipment (PPE), physical exertion, and sun exposure may increase heat stress. | **Conditions:** Combine `workload=heavy`, `ppe_heat_burden`, a heat-stress indicator, and the work shift for a tailored warning.<br>**Action:** Recommend reducing exertion, frequent breaks, shade or a cool resting area, and water; ask the site supervisor to review the work/rest plan.<br>**Output:** `WARNING` |
+| **CONS-03**<br>Strong winds during elevated construction work | Wind can endanger workers at height and destabilize unsecured objects or temporary structures. | **Conditions:** A verified wind forecast or official warning combined with `activity=elevated_work`.<br>**Action:** Warn about stopping unsafe elevated work according to site safety procedures; this does not replace an engineering safety assessment.<br>**Output:** `WARNING` |
+| **CONS-04**<br>Slippery construction site after rain | Stairways, walkways, and elevated surfaces may remain slippery after rainfall ends. | **Conditions:** Recent rainfall and `site_exposure`; require an actual site-condition check.<br>**Action:** Recommend site inspection; do not automatically declare the location safe without verification.<br>**Output:** `ADVISORY` |
+
+## 5. Street Vendors
+
+| Specific scenario / Rule ID | Problem / Risk | Risk engine: Conditions -> Action -> Output |
+|---|---|---|
+| **VEND-01**<br>Strong winds around temporary stalls | Lightweight roofs, temporary signs, and unsecured items can become hazards during storms. | **Conditions:** `activity=stall_outdoor` and a verified wind or storm warning.<br>**Action:** Recommend securing equipment in advance only when it is safe to do so; warn against going outside to retrieve items once a storm is underway.<br>**Output:** `WARNING` |
+| **VEND-02**<br>Extreme heat in an open-air market | Standing in the sun for long periods, especially with limited access to drinking water, can increase health risks. | **Conditions:** Assess `hours_outdoor`, `shelter_access`, and the relevant heat-stress indicator.<br>**Action:** Provide advice about shade, safe drinking water, breaks, warning signs of heat illness, and seeking medical attention when needed.<br>**Output:** `ADVISORY / WARNING` |
+| **VEND-03**<br>Working at multiple markets in one day | A vendor may work in one market in the morning and another in the afternoon. Home-upazila warnings alone may be irrelevant. | **Conditions:** Match the hazard to `active_area` or `saved_market_areas`; set an unknown location status if data is stale.<br>**Action:** Provide warnings for the next relevant market without unnecessarily resending the same hazard notification.<br>**Output:** `ADVISORY` |
+
+## 6. General Public and Students
+
+| Specific scenario / Rule ID | Problem / Risk | Risk engine: Conditions -> Action -> Output |
+|---|---|---|
+| **PUBLIC-01**<br>Morning commute (7-9 AM) and rain | Rain can delay school or office travel, but a forecast is not proof that roads are flooded. | **Conditions:** Check `commute_time`, `rain_forecast_window`, and `selected_upazila`.<br>**Action:** Suggest leaving early or making alternative arrangements and verifying road conditions locally.<br>**Output:** `ADVISORY` |
+| **PUBLIC-02**<br>Outdoor sports and lightning | Students may continue playing outside even before rain begins. | **Conditions:** `activity=outdoor_play` together with nearby observed lightning or an applicable thunderstorm warning.<br>**Action:** Tell users to leave the field and seek shelter in a safe building; as general safety guidance, wait at least 30 minutes after the last thunder before returning outdoors.<br>**Output:** `CRITICAL` |
+| **PUBLIC-03**<br>Children, older adults, and heat-sensitive users | Some people may experience heat-related problems under lower exposure levels than others. | **Conditions:** Voluntarily selected `is_heat_sensitive=true` and relevant heat conditions; no medical diagnosis information is required.<br>**Action:** Provide more precautionary guidance about resting, drinking water, and finding a cooler location; advise medical care if unwell.<br>**Output:** `ADVISORY / WARNING` |
+| **PUBLIC-04**<br>Home and workplace in different upazilas | Risks near a person's home may differ from those at their current location or workplace. | **Conditions:** Keep `home_area`, `work_area`, and `current_area` separate; target notifications using the selected active area.<br>**Action:** Clearly name the affected area in every alert; avoid urgent messages about unrelated locations.<br>**Output:** `ADVISORY / CRITICAL` |
+| **PUBLIC-05**<br>Map appears "green" when weather data is unavailable | Displaying a safe-looking map color when there is no data can mislead users. | **Conditions:** If `per_hazard_data_status=UNKNOWN/STALE`, do not assign a green overall risk status.<br>**Action:** Display grey or "Data unavailable" with the last update time; display relevant official BMD warnings separately.<br>**Output:** `UNKNOWN` |
+
+## 7. Cross-Occupation Contexts
+
+| Specific scenario / Rule ID | Problem / Risk | Risk engine: Conditions -> Action -> Output |
+|---|---|---|
+| **CTX-01**<br>One person with multiple occupations | A farmer may drive a rickshaw in the evening. Their default occupation alone cannot represent every situation. | **Conditions:** Combine `primary_occupation` with `active_activity`; evaluate exposure based on the activity currently being performed.<br>**Action:** Send activity-specific advice without forcing the user to permanently change their profile.<br>**Output:** `CONTEXT` |
+| **CTX-02**<br>GPS disabled or location unavailable | Relying on outdated GPS coordinates may cause irrelevant or incorrectly targeted emergency alerts. | **Conditions:** Support manual upazila selection; track `last_location_age` and `location_accuracy`.<br>**Action:** Clearly state when precise location is unavailable and show general warnings for the selected area.<br>**Output:** `UNKNOWN` |
+| **CTX-03**<br>Shared phone or child user | If several people use the same phone, a personal alert could reach the wrong person. | **Conditions:** Support a guardian- or owner-managed subscription where appropriate and minimize the profile information collected.<br>**Action:** Do not include unnecessary personal or sensitive information in SMS or WhatsApp notifications.<br>**Output:** `PRIVACY` |
+| **CTX-04**<br>Quiet hours vs. immediate danger | Non-urgent messages at night can be disruptive, but delaying an imminent safety warning may be inappropriate. | **Conditions:** Apply `quiet_hours` only to non-urgent advisories; allow urgent alerts to follow the user's consent preferences and messaging-channel policies.<br>**Action:** Avoid delaying time-critical safety information; routine advice can be delivered in the morning.<br>**Output:** `POLICY` |
+
+## Core Implementation Principles
+
+- **One hazard, multiple occupation-aware actions:** Detect hazards independently; customize advice to the user's occupation or current activity.
+- **Active activity takes precedence:** When the current activity is known, do not rely only on the user's primary occupation.
+- **Location first:** Match the affected district, upazila, river, or marine warning area before generating a location-specific personal alert.
+- **Transparent evidence:** Keep the source, publication time, forecast validity, and uncertainty for every decision, and display them when useful.
+- **Life safety first:** Prioritize immediate protective actions while preserving other important warnings rather than silently discarding them.
+- **No false certainty:** A rain forecast alone does not confirm waterlogging; a few dry days alone do not establish drought.
+
+**Note:** This document is limited to the occupation-based scenario catalogue. The complete specifications for system-level stale-data checks, notification deduplication, API failures, consent, permissions, database design, and notification architecture are not included here.
