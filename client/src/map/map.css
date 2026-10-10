@@ -18,7 +18,7 @@
 .weather-app .maplibregl-ctrl-bottom-left { bottom: 2px; left: 2px; z-index: 3; max-width: calc(100% - 4px); }
 .weather-app .maplibregl-ctrl-group { border-radius: 12px; overflow: hidden; }
 .weather-app .maplibregl-ctrl-group button { width: 44px; height: 44px; }
-.weather-app .maplibregl-ctrl-attrib { max-width: calc(100% - 20px); font-size: 10px; border-radius: 8px; }
+.weather-app .maplibregl-ctrl-attrib { max-width: calc(100% - 20px); font-size: 11px; border-radius: 8px; }
 @media (max-width: 400px) {
   .weather-app .maplibregl-ctrl-bottom-right { bottom: 176px; }
 }

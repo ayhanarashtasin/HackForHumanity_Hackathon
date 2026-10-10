@@ -140,6 +140,7 @@ function PhoneRow({ channel, info, onChange }) {
   const [consent, setConsent] = useState(false);
   const [code, setCode] = useState('');
   const [changing, setChanging] = useState(false);
+  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const name = tr(`channel.${channel}`);
@@ -165,6 +166,7 @@ function PhoneRow({ channel, info, onChange }) {
     return run(async () => {
       await alertApi.startChannel(channel, { phone, consent: true, lang });
       setChanging(false);
+      setOpen(false);
       setCode('');
       await refresh();
     });
@@ -221,12 +223,16 @@ function PhoneRow({ channel, info, onChange }) {
           />
           <div className="alert-channel-actions">
             <button type="submit" className="alert-button alert-button--primary" disabled={busy}>{busy ? tr('ch.working') : tr('ch.verify')}</button>
-            <button type="button" className="alert-link-button" onClick={() => { setChanging(true); setError(''); }} disabled={busy}>{tr('ch.different')}</button>
+            <button type="button" className="alert-link-button" onClick={() => { setChanging(true); setOpen(true); setError(''); }} disabled={busy}>{tr('ch.different')}</button>
           </div>
         </form>
       )}
 
-      {info.available && !connected && !awaitingCode && (
+      {info.available && !connected && !awaitingCode && !open && (
+        <button type="button" className="alert-button alert-button--primary" onClick={() => setOpen(true)}>{tr('ch.connect', { channel: name })}</button>
+      )}
+
+      {info.available && !connected && !awaitingCode && open && (
         <form className="alert-channel-flow" onSubmit={sendCode} noValidate>
           <label htmlFor={`${id}-phone`} className="alert-label">{tr('ch.phone')}</label>
           <input
@@ -245,7 +251,10 @@ function PhoneRow({ channel, info, onChange }) {
             <span>{tr('ch.consent')}</span>
           </label>
           <Receives minSeverity={info.minSeverity} />
-          <button type="submit" className="alert-button alert-button--primary" disabled={busy}>{busy ? tr('ch.working') : tr('ch.sendCode')}</button>
+          <div className="alert-channel-actions">
+            <button type="submit" className="alert-button alert-button--primary" disabled={busy}>{busy ? tr('ch.working') : tr('ch.sendCode')}</button>
+            <button type="button" className="alert-link-button" onClick={() => { setOpen(false); setChanging(false); setError(''); }} disabled={busy}>{tr('btn.cancel')}</button>
+          </div>
         </form>
       )}
 

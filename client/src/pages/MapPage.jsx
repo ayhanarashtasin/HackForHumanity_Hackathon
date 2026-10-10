@@ -320,7 +320,7 @@ export default function MapPage() {
               />
             ) : <LocationAccess location={location} onLocate={goToMyLocation} onSearch={focusSearch} />}
           </div>
-          <div className="sidebar-footer"><span className={`dot dot-${baseStatus}`} aria-hidden="true" /><span>{baseStatus === 'ok' ? `${snapshot?.baseLabel ?? 'Weather'} forecast available` : baseStatus === 'stale' ? 'Forecast is stale' : snapshotState.loading ? 'Loading forecast…' : 'Forecast data unavailable'}</span><button type="button" onClick={() => setStatusOpen((open) => !open)}>Details <Icon name="arrow" size={14} /></button></div>
+          <div className="sidebar-footer"><span className={`dot dot-${baseStatus}`} aria-hidden="true" /><span>{baseStatus === 'ok' ? `${snapshot?.baseLabel ?? 'Weather forecast'} available` : baseStatus === 'stale' ? 'Forecast is stale' : snapshotState.loading ? 'Loading forecast…' : 'Forecast data unavailable'}</span><button type="button" onClick={() => setStatusOpen((open) => !open)}>Details <Icon name="arrow" size={14} /></button></div>
         </aside>
 
         <section className={`map-stage${showLightningPanel ? ' has-lightning-panel' : ''}`} aria-label="Bangladesh weather explorer">

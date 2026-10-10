@@ -6,7 +6,7 @@
   --olive: #2E3D28;
 
   --cream-strong: rgba(232, 233, 223, 0.97);
-  --olive-soft: rgba(46, 61, 40, 0.7);
+  --olive-soft: rgba(46, 61, 40, 0.78);
   --olive-faint: rgba(46, 61, 40, 0.12);
   --sage-soft: rgba(169, 190, 135, 0.35);
   --shadow: 0 6px 24px rgba(20, 28, 18, 0.35);
@@ -154,9 +154,9 @@ a.brand:hover { background: color-mix(in srgb, var(--olive) 88%, var(--sage)); }
 .timebar-modes { display: flex; gap: 4px; flex: none; }
 .tab { padding: 6px 12px; font-weight: 600; font-size: 0.85rem; }
 .timebar-track { position: relative; flex: 1; min-width: 120px; }
-.timebar-track input[type='range'] { width: 100%; margin: 0; accent-color: var(--olive); height: 22px; }
+.timebar-track input[type='range'] { width: 100%; margin: -11px 0; accent-color: var(--olive); height: 44px; }
 .ticks { position: absolute; left: 0; right: 0; top: 24px; height: 16px; pointer-events: none; }
-.tick-label { position: absolute; transform: translateX(-50%); font-size: 0.68rem; color: var(--olive-soft); white-space: nowrap; }
+.tick-label { position: absolute; transform: translateX(-50%); font-size: 0.6875rem; color: var(--olive-soft); white-space: nowrap; }
 .tick-now { position: absolute; top: -26px; width: 3px; height: 14px; background: var(--olive); border-radius: 2px; transform: translateX(-50%); }
 .timebar-readout { display: flex; flex-direction: column; flex: none; min-width: 190px; font-size: 0.85rem; }
 .timebar-readout span { font-size: 0.74rem; color: var(--olive-soft); }
@@ -182,7 +182,7 @@ a.brand:hover { background: color-mix(in srgb, var(--olive) 88%, var(--sage)); }
 .chart .axis { stroke: var(--olive); stroke-opacity: 0.45; }
 .chart .grid { stroke: var(--olive); stroke-opacity: 0.12; }
 .chart .day-line { stroke: var(--olive); stroke-opacity: 0.2; stroke-dasharray: 2 3; }
-.chart .axis-text { fill: var(--olive); fill-opacity: 0.7; font-size: 8px; }
+.chart .axis-text { fill: var(--olive); fill-opacity: 0.7; font-size: 11px; }
 .chart .selected-step { fill: var(--sage); fill-opacity: 0.4; }
 
 .table-scroll { overflow-x: auto; }

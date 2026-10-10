@@ -40,6 +40,23 @@ Last verified: **11 October 2026**. This document says what is built against [`A
 5. User-facing 5xx messages (for example "SMS is not set up on this server") were masked as "Internal server error". They can now be marked as exposed.
 6. `ADMIN_AUTH=off` now prints a warning at start-up, as the plan required.
 
+## UI review (11 October 2026)
+
+Method: the real server with mock Telegram, WhatsApp and SMS providers on a throwaway database, driven in headless Edge at 1440×900 and 375×812. Every page (landing, map, alert form, inbox, admin sign-in and overview) was screenshotted and audited in the page for touch-target size, labels, duplicate ids, contrast, tiny text, horizontal overflow, keyboard focus indicators (tabbing through each page) and reduced motion. The channels panel was driven through every state in English and Bangla. The UI/UX Pro Max guidance for forms (visible labels, input types, inline errors tied with `aria-describedby`) was checked against the new panel. Palette and typography were left as defined in `design.md`.
+
+Fixed:
+
+- **Contrast.** The shared muted-text token was 4.1:1 on Soft White (map ticks, legend notes, status chips); it is now 5.2:1. Landing index numbers raised to match.
+- **Text size.** 68 declarations below 11px (down to 8px on mobile landing) now have an 11px floor. Checked on both widths: no wrapping or overflow regressions.
+- **Targets.** Map Live/Forecast tabs, layer button, Details button, "About this layer" and the brand link reach 44px; the time slider has a 44px hit area with the same footprint; short footer links got a wider hit area without moving.
+- **Map footer.** The attribution overlapped the time bar; the bar and legend moved up 6px.
+- **Copy bug.** "BMD WRF forecast forecast available".
+- **Channels panel.** WhatsApp and SMS now show a Connect button and open their number form on demand, like Telegram, instead of two long forms.
+
+Result: no page overflows at 375px; no control lacks an accessible name; every focusable control shows an indicator; no animations run with reduced motion; no text under 11px. What the audit still lists is understood: disabled controls (exempt from contrast), checkboxes whose 44px label is the target, the MapLibre attribution toggle (library control, 24px), and the "Data"/"Map" footer links whose widened hit area is a pseudo-element the audit cannot measure.
+
+Not done: the site has no dark theme; nothing was tested on a physical phone or with a screen reader; the Bangla strings are unreviewed.
+
 ## Known gaps (not fixed, so nobody mistakes them for done)
 
 Plan requirements that the code does not meet, with where they live:
