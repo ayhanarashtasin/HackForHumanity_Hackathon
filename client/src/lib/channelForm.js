@@ -4,11 +4,12 @@ export const CHANNELS = ['telegram', 'whatsapp', 'sms'];
 export const PHONE_CHANNELS = ['whatsapp', 'sms'];
 
 const BN_DIGITS = '০১২৩৪৫৬৭৮৯';
+export const latinDigits = (text) => String(text ?? '').replace(/[০-৯]/g, (digit) => String(BN_DIGITS.indexOf(digit)));
 
 // "0171 234 5678", "+8801712345678" and Bangla digits all mean the same number. Returns +8801XXXXXXXXX, or null when it is not a Bangladeshi mobile.
 export function normalizeBdMobile(input) {
   if (typeof input !== 'string' || input.length > 40) return null;
-  const compact = input.replace(/[০-৯]/g, (digit) => String(BN_DIGITS.indexOf(digit))).replace(/[\s\-().]/g, '');
+  const compact = latinDigits(input).replace(/[\s\-().]/g, '');
   const match = /^(?:\+?880|0)(1[3-9]\d{8})$/.exec(compact);
   return match ? `+880${match[1]}` : null;
 }
@@ -20,7 +21,7 @@ export function phoneFormProblem({ phone, consent }) {
   return null;
 }
 
-export const codeFormProblem = (code) => (/^\d{6}$/.test(String(code ?? '').trim()) ? null : 'ch.err.code');
+export const codeFormProblem = (code) => (/^\d{6}$/.test(latinDigits(code).trim()) ? null : 'ch.err.code');
 
 // The server's answers are in English; the page shows its own wording in the person's language.
 export function channelErrorKey(problem) {

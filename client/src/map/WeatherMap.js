@@ -4,6 +4,9 @@ import { registerIcons } from '../lib/icons.js';
 import { LABELS_ANCHOR, buildBaseStyle } from '../lib/mapStyle.js';
 import { BASEMAP, PALETTE, STATUS_COLORS } from '../lib/palette.js';
 import { SIGN_LAYERS, colorAt, dim, textOn } from '../lib/scales.js';
+import { translate } from '../i18n/index.js';
+import { MAP } from '../i18n/map.js';
+import { getLanguage } from '../i18n/language.js';
 import workerUrl from './maplibreWorker.js?worker&url';
 
 setWorkerUrl(workerUrl);
@@ -103,10 +106,27 @@ export class WeatherMap {
       ],
     }), 'bottom-left');
     this.map.addControl(new NavigationControl({ showCompass: false }), 'bottom-right');
+    this.setLanguage(getLanguage());
 
     this.map.on('load', () => this.setup().catch((error) => console.error('Map setup failed.', error)));
     this.map.on('resize', () => this.limitZoomOut());
     this.map.on('moveend', () => handlers.onMoveEnd?.(this.view()));
+  }
+
+  // MapLibre has no public runtime locale setter. Relabel its HTML controls without rebuilding the map or using private fields.
+  setLanguage(lang) {
+    const container = this.map.getContainer();
+    for (const [selector, text] of [
+      ['.maplibregl-ctrl-zoom-in', 'Zoom in'], ['.maplibregl-ctrl-zoom-out', 'Zoom out'],
+      ['.maplibregl-ctrl-attrib-button', 'Toggle attribution'],
+    ]) {
+      const button = container.querySelector(selector);
+      if (!button) continue;
+      const label = translate(lang, text, {}, MAP);
+      button.title = label;
+      button.setAttribute('aria-label', label);
+    }
+    this.map.getCanvas().setAttribute('aria-label', translate(lang, 'Interactive weather map of Bangladesh', {}, MAP));
   }
 
   // Zooming out stops just past the zoom that fits Bangladesh in the free part of the screen, so the country can never shrink to a speck.

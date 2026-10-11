@@ -45,6 +45,7 @@ const campaignSchema = new mongoose.Schema(
     // Locked at creation: never switched after any spend.
     mode: { type: String, enum: ['A', 'B'], required: true },
     modeReason: { type: String, required: true },
+    modeReasonBn: { type: String, default: null },
     locations: [locationSchema],
     slots: [slotSchema],
     budget: {

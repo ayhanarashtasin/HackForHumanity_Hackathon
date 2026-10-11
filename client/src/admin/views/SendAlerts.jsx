@@ -1,4 +1,6 @@
 import { useRef, useState } from 'react';
+import { useLanguage } from '../../i18n/index.js';
+import { ADMIN } from '../../i18n/admin.js';
 import { DeclareTab } from './DeclareTab.jsx';
 import { MessageTab } from './MessageTab.jsx';
 import { WeatherTab } from './WeatherTab.jsx';
@@ -11,6 +13,7 @@ const TABS = [
 
 // Three tabs, each with its own form and preview state. Panels stay mounted so a half-written message is not lost when switching tabs.
 export function SendAlerts({ onOpenHistory }) {
+  const { tr } = useLanguage(ADMIN);
   const [active, setActive] = useState('weather');
   const refs = useRef({});
 
@@ -30,11 +33,11 @@ export function SendAlerts({ onOpenHistory }) {
   return (
     <div className="adm-view">
       <header className="adm-view-head">
-        <h1>Send alerts</h1>
-        <p className="adm-muted">The engine sends automatically when a threshold is met. These tools send on demand, as the administrator.</p>
+        <h1>{tr('Send alerts')}</h1>
+        <p className="adm-muted">{tr('The engine sends automatically when a threshold is met. These tools send on demand, as the administrator.')}</p>
       </header>
 
-      <div className="adm-tabs" role="tablist" aria-label="Kind of send" onKeyDown={onKeyDown}>
+      <div className="adm-tabs" role="tablist" aria-label={tr('Kind of send')} onKeyDown={onKeyDown}>
         {TABS.map((tab) => (
           <button
             key={tab.id}
@@ -48,7 +51,7 @@ export function SendAlerts({ onOpenHistory }) {
             className={`adm-tab${active === tab.id ? ' is-active' : ''}`}
             onClick={() => setActive(tab.id)}
           >
-            {tab.label}
+            {tr(tab.label)}
           </button>
         ))}
       </div>

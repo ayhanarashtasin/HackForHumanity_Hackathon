@@ -1,4 +1,5 @@
 import { Icon } from './Icon.jsx';
+import { useLanguage } from '../i18n/index.js';
 
 // The alert level as a word + an icon + a colour (design.md "Alert severity"): never colour alone.
 export const SEVERITY_LABELS = {
@@ -9,8 +10,9 @@ export const SEVERITY_LABELS = {
 
 const ICONS = { ADVISORY: 'info', WARNING: 'warning', CRITICAL: 'critical' };
 
-export function SeverityChip({ severity, lang = 'en', size = 'md' }) {
-  const label = SEVERITY_LABELS[severity]?.[lang] ?? severity;
+export function SeverityChip({ severity, lang, size = 'md' }) {
+  const { lang: pageLang } = useLanguage();
+  const label = SEVERITY_LABELS[severity]?.[lang ?? pageLang] ?? severity;
   return (
     <span className={`sev sev-${String(severity).toLowerCase()} sev-${size}`} data-severity={severity}>
       <Icon name={ICONS[severity] ?? 'info'} size={size === 'sm' ? 14 : 16} />

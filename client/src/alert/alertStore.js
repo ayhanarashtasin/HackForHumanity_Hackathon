@@ -5,7 +5,7 @@ import { useSyncExternalStore } from 'react';
 //     decides whether the navbar may poll. Visitors who never completed the form never make a request.
 //   - the unread count, and whether the alert page is open (it polls the inbox itself, so the navbar stands down).
 export const HINT_KEY = 'akashsathi.alert';
-export const LANGUAGE_KEY = 'akashsathi.alert.language';
+export { LANGUAGE_KEY, readLanguage, writeLanguage } from '../i18n/language.js';
 
 const listeners = new Set();
 let unread = 0;
@@ -42,23 +42,6 @@ export function clearHint() {
   unread = 0;
   hintVersion += 1;
   emit();
-}
-
-export function readLanguage() {
-  try {
-    const value = window.localStorage.getItem(LANGUAGE_KEY);
-    return value === 'en' || value === 'bn' ? value : null;
-  } catch {
-    return null;
-  }
-}
-
-export function writeLanguage(language) {
-  try {
-    window.localStorage.setItem(LANGUAGE_KEY, language);
-  } catch {
-    // ignore
-  }
 }
 
 export function setUnread(count) {

@@ -2,11 +2,14 @@ import { useState } from 'react';
 import { describeError } from '../../lib/adminForm.js';
 import { ErrorNote } from './Parts.jsx';
 import { Modal } from './Modal.jsx';
+import { useLanguage } from '../../i18n/index.js';
+import { ADMIN } from '../../i18n/admin.js';
 
 // A small "are you sure?" dialog for settings changes and deletions. `onConfirm` may reject; its message is shown and the dialog stays open.
 export function ConfirmDialog({
   title, children, confirmLabel = 'Confirm', tone = 'default', onConfirm, onClose,
 }) {
+  const { tr } = useLanguage(ADMIN);
   const [state, setState] = useState({ busy: false, error: null });
 
   const confirm = async () => {
@@ -26,9 +29,9 @@ export function ConfirmDialog({
       onClose={onClose}
       footer={(
         <>
-          <button type="button" className="adm-btn" onClick={onClose} disabled={state.busy} data-autofocus>Cancel</button>
+          <button type="button" className="adm-btn" onClick={onClose} disabled={state.busy} data-autofocus>{tr('Cancel')}</button>
           <button type="button" className={`adm-btn ${tone === 'critical' ? 'adm-btn-critical' : 'adm-btn-primary'}`} onClick={confirm} disabled={state.busy}>
-            {state.busy ? 'Working…' : confirmLabel}
+            {tr(state.busy ? 'Working…' : confirmLabel)}
           </button>
         </>
       )}

@@ -1,3 +1,5 @@
+import { getLanguage } from '../i18n/language.js';
+import { digits, formatDhaka } from '../alert/format.js';
 // All times are shown in Bangladesh Standard Time ("BST" on BMD products), regardless of the viewer's own time zone.
 const TIME_ZONE = 'Asia/Dhaka';
 
@@ -10,18 +12,23 @@ const dayKeyFormat = new Intl.DateTimeFormat('en-CA', { timeZone: TIME_ZONE, yea
 const hourFormat = new Intl.DateTimeFormat('en-GB', { timeZone: TIME_ZONE, hour: 'numeric', hour12: false });
 
 export const toMs = (iso) => new Date(iso).getTime();
-export const formatBst = (ms) => `${longFormat.format(ms).replace(',', '')} BST`;
+export const formatBst = (ms, lang = getLanguage()) => lang === 'bn' ? `${formatDhaka(new Date(ms), 'bn')} বাংলাদেশ সময়` : `${longFormat.format(ms).replace(',', '')} BST`;
 export const STEP_MS = 3 * 3_600_000;
-export const formatRange = (start, end) => `${longFormat.format(start).replace(',', '')} – ${clockFormat.format(end)} BST`;
-export const formatClock = (ms) => clockFormat.format(ms).replace(' ', '').toLowerCase();
-export const formatDay = (ms) => dayFormat.format(ms).replace(',', '');
+export const formatRange = (start, end, lang = getLanguage()) => lang === 'bn' ? `${formatDhaka(new Date(start), 'bn')} – ${formatDhaka(new Date(end), 'bn', { withDate: false })} বাংলাদেশ সময়` : `${longFormat.format(start).replace(',', '')} – ${clockFormat.format(end)} BST`;
+export const formatClock = (ms, lang = getLanguage()) => lang === 'bn' ? formatDhaka(new Date(ms), 'bn', { withDate: false }) : clockFormat.format(ms).replace(' ', '').toLowerCase();
+const bnDayFormat = new Intl.DateTimeFormat('bn-BD', { timeZone: TIME_ZONE, weekday: 'short', day: 'numeric', month: 'short' });
+export const formatDay = (ms, lang = getLanguage()) => (lang === 'bn' ? bnDayFormat : dayFormat).format(ms).replace(',', '');
 export const dayKey = (ms) => dayKeyFormat.format(ms);
 export const hourOf = (ms) => Number(hourFormat.format(ms)) % 24;
 
-export function relativeLabel(ms, now = Date.now()) {
+export function relativeLabel(ms, now = Date.now(), lang = getLanguage()) {
   const minutes = Math.round((ms - now) / 60_000);
   const abs = Math.abs(minutes);
-  if (abs < 5) return 'now';
+  if (abs < 5) return lang === 'bn' ? 'এখন' : 'now';
+  if (lang === 'bn') {
+    const text = abs < 90 ? `${digits(abs, lang)} মিনিট` : abs < 36 * 60 ? `${digits(Math.round(abs / 60), lang)} ঘণ্টা` : `${digits(Math.round(abs / 1440), lang)} দিন`;
+    return minutes > 0 ? `${text} পরে` : `${text} আগে`;
+  }
 
   const text = abs < 90 ? `${abs} min` : abs < 36 * 60 ? `${Math.round(abs / 60)} h` : `${Math.round(abs / 1440)} d`;
   return minutes > 0 ? `in ${text}` : `${text} ago`;

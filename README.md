@@ -40,6 +40,7 @@ AkashSathi, meaning "sky companion," helps people understand how local weather m
 | Optional external delivery | Telegram, WhatsApp, and SMS copies of inbox alerts, with verified connections, quiet hours, delivery limits, and retries. |
 | Telegram weather reports | English and Bangla weather commands, interactive report buttons, and a scheduled morning forecast for connected profiles. |
 | Administrator dashboard | Alert previews, manual declarations, messages, withdrawals, severity holds, hazard switches, delivery health, and isolated demo audiences. |
+| Bilingual interface | Persistent বাংলা / English switching across public and admin screens, localized dates and numbers, and a self-hosted Bengali font with responsive text layouts. |
 | Cached forecasts and history | Background collection, persisted snapshots, per-source freshness indicators, and compact district-level forecast history. |
 
 ## Technology stack
@@ -202,6 +203,7 @@ For a demonstration, use **Settings** to create a demo audience in a selected up
 - **Satellite:** Himawari-9 infrared and visible imagery via NASA GIBS; imagery is delayed, not instantaneous.
 - **Timeline:** switch between imagery playback and three-hourly forecasts for approximately four days.
 - **Search and sharing:** search in English or Bangla; the URL hash preserves the map view and selected layers. Legacy `/#view=...` links redirect to `/map`.
+- **Language:** search, controls, tooltips, and area details support Bangla. Map canvas labels remain English because the hosted glyphs and WebGL text shaping do not support Bengali reliably. Delivered messages and official quotations retain their original language; Bengali copy still needs fluent-human review.
 - **Data interpretation:** grey means no data. Forecasts are not station observations, thunderstorm potential is not a detected strike, and computed heat index is not an on-site WBGT measurement.
 
 ## Architecture

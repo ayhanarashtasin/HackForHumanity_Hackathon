@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { STRINGS, t } from '../src/alert/i18n.js';
 import {
-  channelErrorKey, codeFormProblem, normalizeBdMobile, phoneFormProblem, receivesKey,
+  channelErrorKey, codeFormProblem, latinDigits, normalizeBdMobile, phoneFormProblem, receivesKey,
 } from '../src/lib/channelForm.js';
 
 test('a Bangladeshi mobile number is recognised in any common spelling, and nothing else is', () => {
@@ -22,6 +22,9 @@ test('the phone form needs a valid number and the consent tick, and says which i
   assert.equal(codeFormProblem('12345'), 'ch.err.code');
   assert.equal(codeFormProblem('12345a'), 'ch.err.code');
   assert.equal(codeFormProblem(' 123456 '), null);
+  assert.equal(codeFormProblem(' ১২৩৪৫৬ '), null);
+  assert.equal(codeFormProblem('১২৩৪৫ক'), 'ch.err.code');
+  assert.equal(latinDigits('১২৩৪৫৬'), '123456');
 });
 
 test('the server\'s English answers are shown as the page\'s own wording in the person\'s language', () => {

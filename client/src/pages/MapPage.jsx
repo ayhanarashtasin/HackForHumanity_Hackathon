@@ -19,6 +19,9 @@ import { resolveSelection } from '../lib/series.js';
 import { nearestIndex, stepIndexAt, toMs } from '../lib/time.js';
 import { readHash, writeHash } from '../lib/urlState.js';
 import { loadCatalogue, weatherApi } from '../services/weatherApi.js';
+import { useLanguage } from '../i18n/index.js';
+import { MAP } from '../i18n/map.js';
+import { LanguageToggle } from '../components/LanguageToggle.jsx';
 import './map-page.css';
 
 const MINUTE = 60_000;
@@ -49,6 +52,7 @@ function nearestFrame(frames, time, maxGap, getTime) {
 }
 
 export default function MapPage() {
+  const { lang, tr, number } = useLanguage(MAP);
   const initial = useMemo(() => readHash(), []);
   const [catalogue, setCatalogue] = useState(null);
   const [catalogueError, setCatalogueError] = useState('');
@@ -166,7 +170,7 @@ export default function MapPage() {
   else if (snapshot.sources.bmd.status !== 'not-checked' || snapshot.sources.openMeteo.status !== 'not-checked') baseStatus = 'unavailable';
 
   // ---------- selection ----------
-  const resolved = useMemo(() => resolveSelection(selection, snapshot, catalogue), [selection, snapshot, catalogue]);
+  const resolved = useMemo(() => resolveSelection(selection, snapshot, catalogue, lang), [selection, snapshot, catalogue, lang]);
   const dailyState = usePolled(weatherApi.daily, 30 * MINUTE, { enabled: Boolean(resolved?.dailyPcode) });
 
   const dailyPcode = resolved?.dailyPcode ?? null;
@@ -275,34 +279,35 @@ export default function MapPage() {
   return (
     <div className={`app weather-app mobile-view-${mobileView}`}>
       <header className="topbar">
-        <Link to="/" className="brand" aria-label="AkashSathi home" title="Back to the AkashSathi home page">
+        <Link to="/" className="brand" aria-label={tr('AkashSathi home')} title={tr('Back to the AkashSathi home page')}>
           <LogoMark size={34} />
           <div>
-            <strong>AkashSathi</strong>
-            <span>A little closer to your sky</span>
+            <strong>{tr('AkashSathi')}</strong>
+            <span>{tr('A little closer to your sky')}</span>
           </div>
         </Link>
         <span className="map-header-divider" aria-hidden="true" />
-        <div className="map-header-title"><Icon name="map" size={18} /><h1>Weather explorer</h1></div>
+        <div className="map-header-title"><Icon name="map" size={18} /><h1>{tr('Weather explorer')}</h1></div>
         <SearchBox catalogue={catalogue} onPick={pickResult} />
-        <button type="button" className="header-location-button" onClick={goToMyLocation} disabled={!catalogue || locating}><Icon name="locate" size={18} /><span>{locating ? 'Locating…' : 'My weather'}</span></button>
-        <Link to="/alert" className="header-alert-link" aria-label={unreadAlerts > 0 ? `Alerts, ${unreadAlerts} unread` : 'Alerts'} title="Alerts for your work and area">
-          <Icon name="bell" size={18} /><span>Alert</span>
-          {unreadAlerts > 0 && <b className="header-alert-badge" aria-hidden="true">{unreadAlerts > 9 ? '9+' : unreadAlerts}</b>}
+        <button type="button" className="header-location-button" onClick={goToMyLocation} disabled={!catalogue || locating}><Icon name="locate" size={18} /><span>{tr(locating ? 'Locating…' : 'My weather')}</span></button>
+        <LanguageToggle />
+        <Link to="/alert" className="header-alert-link" aria-label={unreadAlerts > 0 ? tr('Alerts, {n} unread', { n: unreadAlerts }) : tr('Alerts')} title={tr('Alerts for your work and area')}>
+          <Icon name="bell" size={18} /><span>{tr('Alert')}</span>
+          {unreadAlerts > 0 && <b className="header-alert-badge" aria-hidden="true">{number(unreadAlerts > 9 ? '9+' : unreadAlerts)}</b>}
         </Link>
         <StatusPanel open={statusOpen} onToggle={() => setStatusOpen((open) => !open)} statuses={statuses} base={snapshot?.base} />
       </header>
 
-      <nav className="mobile-view-switch" aria-label="Explorer view">
-        <button type="button" aria-pressed={mobileView === 'weather'} onClick={() => setMobileView('weather')}><Icon name="cloud" size={18} /> Local weather</button>
-        <button type="button" aria-pressed={mobileView === 'map'} onClick={() => setMobileView('map')}><Icon name="map" size={18} /> Explore map</button>
+      <nav className="mobile-view-switch" aria-label={tr('Explorer view')}>
+        <button type="button" aria-pressed={mobileView === 'weather'} onClick={() => setMobileView('weather')}><Icon name="cloud" size={18} /> {tr('Local weather')}</button>
+        <button type="button" aria-pressed={mobileView === 'map'} onClick={() => setMobileView('map')}><Icon name="map" size={18} /> {tr('Explore map')}</button>
       </nav>
 
       <main className="map-workspace">
-        <aside className="weather-sidebar" aria-label="Local weather">
-          <div className="sidebar-heading"><span><Icon name="cloud" size={18} /> Local weather</span><small>Bangladesh · BST</small></div>
+        <aside className="weather-sidebar" aria-label={tr('Local weather')}>
+          <div className="sidebar-heading"><span><Icon name="cloud" size={18} /> {tr('Local weather')}</span><small>{tr('Bangladesh · BST')}</small></div>
           <div className="sidebar-content" ref={sidebarRef}>
-            {resolved && locationIntentRef.current && location.message && <p className="sidebar-location-message note-warning" role="status">{location.message}</p>}
+            {resolved && locationIntentRef.current && location.message && <p className="sidebar-location-message note-warning" role="status">{tr(location.message)}</p>}
             {resolved ? (
               <LocationPanel
                 key={`${resolved.level}-${resolved.id}`}
@@ -320,10 +325,10 @@ export default function MapPage() {
               />
             ) : <LocationAccess location={location} onLocate={goToMyLocation} onSearch={focusSearch} />}
           </div>
-          <div className="sidebar-footer"><span className={`dot dot-${baseStatus}`} aria-hidden="true" /><span>{baseStatus === 'ok' ? `${snapshot?.baseLabel ?? 'Weather forecast'} available` : baseStatus === 'stale' ? 'Forecast is stale' : snapshotState.loading ? 'Loading forecast…' : 'Forecast data unavailable'}</span><button type="button" onClick={() => setStatusOpen((open) => !open)}>Details <Icon name="arrow" size={14} /></button></div>
+          <div className="sidebar-footer"><span className={`dot dot-${baseStatus}`} aria-hidden="true" /><span>{baseStatus === 'ok' ? tr('{source} available', { source: tr(snapshot?.baseLabel ?? 'Weather forecast') }) : tr(baseStatus === 'stale' ? 'Forecast is stale' : snapshotState.loading ? 'Loading forecast…' : 'Forecast data unavailable')}</span><button type="button" onClick={() => setStatusOpen((open) => !open)}>{tr('Details')} <Icon name="arrow" size={14} /></button></div>
         </aside>
 
-        <section className={`map-stage${showLightningPanel ? ' has-lightning-panel' : ''}`} aria-label="Bangladesh weather explorer">
+        <section className={`map-stage${showLightningPanel ? ' has-lightning-panel' : menuOpen ? ' has-layer-menu' : ''}`} aria-label={tr('Bangladesh weather explorer')}>
           {catalogue ? (
             <MapView
               catalogue={catalogue}
@@ -340,17 +345,17 @@ export default function MapPage() {
               userPosition={location.match ? location.position : null}
               handlers={mapHandlers}
             />
-          ) : <div className="splash" role="status">{catalogueError || 'Preparing your weather map…'}</div>}
+          ) : <div className="splash" role="status">{tr(catalogueError || 'Preparing your weather map…')}</div>}
 
           <div className="map-toolbar">
-            <div className="map-context panel"><Icon name="pin" size={19} /><div><strong>{resolved?.name ?? 'Explore Bangladesh'}</strong><span>{resolved ? `${resolved.kind} · ${isUserLocation ? 'Your area' : 'Selected area'}` : 'Select an area to see its weather'}</span></div></div>
+            <div className="map-context panel"><Icon name="pin" size={19} /><div><strong>{resolved?.name ?? tr('Explore Bangladesh')}</strong><span>{resolved ? `${tr(resolved.kind)} · ${tr(isUserLocation ? 'Your area' : 'Selected area')}` : tr('Select an area to see its weather')}</span></div></div>
             <div className="map-actions">
-              <button type="button" className="panel icon-button" aria-label="Show my location and weather" title="My location" onClick={goToMyLocation} disabled={!catalogue || locating}><Icon name="locate" size={21} /></button>
-              <button type="button" className="panel icon-button" aria-label="Show all of Bangladesh" title="Show Bangladesh" onClick={() => { setFlyRequest({ fit: true }); setHover(null); }}><Icon name="map" size={21} /></button>
+              <button type="button" className="panel icon-button" aria-label={tr('Show my location and weather')} title={tr('My location')} onClick={goToMyLocation} disabled={!catalogue || locating}><Icon name="locate" size={21} /></button>
+              <button type="button" className="panel icon-button" aria-label={tr('Show all of Bangladesh')} title={tr('Show Bangladesh')} onClick={() => { setFlyRequest({ fit: true }); setHover(null); }}><Icon name="map" size={21} /></button>
             </div>
           </div>
 
-          {bannerText && <p className="banner" role="status">{bannerText}</p>}
+          {bannerText && <p className="banner" role="status">{tr(bannerText)}</p>}
           <div className={`right-stack${showLightningPanel ? ' with-lightning' : ''}`}>
             <LayerMenu
               open={menuOpen}
@@ -383,7 +388,7 @@ export default function MapPage() {
                 setLightningPanelOpen(true);
                 setMenuOpen(false);
                 requestAnimationFrame(() => document.querySelector('.lightning-content')?.focus({ preventScroll: true }));
-              }} aria-label="Show lightning summaries"><span><Icon name="bolt" size={18} /> Lightning summaries</span><Icon name="arrow" size={16} /></button>
+              }} aria-label={tr('Show lightning summaries')}><span><Icon name="bolt" size={18} /> {tr('Lightning summaries')}</span><Icon name="arrow" size={16} /></button>
             )}
           </div>
 
@@ -398,7 +403,7 @@ export default function MapPage() {
             onPlay={() => setPlaying((value) => !value)}
             currentTime={currentTime}
             onNow={() => { setSelectedTime(null); setPlaying(false); }}
-            liveNote={liveNote}
+            liveNote={tr(liveNote)}
           />
           <Tooltip hover={hover} snapshot={snapshot} catalogue={catalogue} signLayer={signLayer} stepIndex={stepIndex} />
         </section>

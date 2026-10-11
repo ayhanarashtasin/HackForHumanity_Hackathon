@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useState } from 'react';
 import { Icon } from '../components/Icon.jsx';
 import {
-  channelErrorKey, codeFormProblem, phoneFormProblem, receivesKey,
+  channelErrorKey, codeFormProblem, latinDigits, phoneFormProblem, receivesKey,
 } from '../lib/channelForm.js';
 import { alertApi } from '../services/alertApi.js';
 import { useAlert } from './context.js';
@@ -81,7 +81,7 @@ function TelegramRow({ info, onChange, onReload }) {
     try {
       setLink(await alertApi.linkTelegram());
     } catch (problem) {
-      setError(tr(channelErrorKey(problem)));
+      setError(channelErrorKey(problem));
     } finally {
       setBusy(false);
     }
@@ -93,7 +93,7 @@ function TelegramRow({ info, onChange, onReload }) {
     try {
       onChange(await alertApi.removeChannel('telegram'));
     } catch (problem) {
-      setError(tr(channelErrorKey(problem)));
+      setError(channelErrorKey(problem));
     } finally {
       setBusy(false);
     }
@@ -128,7 +128,7 @@ function TelegramRow({ info, onChange, onReload }) {
         </div>
       )}
 
-      {error && <p className="alert-field-error" role="alert">{error}</p>}
+      {error && <p className="alert-field-error" role="alert">{tr(error)}</p>}
     </Row>
   );
 }
@@ -151,7 +151,7 @@ function PhoneRow({ channel, info, onChange }) {
     try {
       await task();
     } catch (problem) {
-      setError(tr(channelErrorKey(problem)));
+      setError(channelErrorKey(problem));
     } finally {
       setBusy(false);
     }
@@ -162,7 +162,7 @@ function PhoneRow({ channel, info, onChange }) {
   const sendCode = (event) => {
     event.preventDefault();
     const problem = phoneFormProblem({ phone, consent });
-    if (problem) return setError(tr(problem));
+    if (problem) return setError(problem);
     return run(async () => {
       await alertApi.startChannel(channel, { phone, consent: true, lang });
       setChanging(false);
@@ -175,7 +175,7 @@ function PhoneRow({ channel, info, onChange }) {
   const verify = (event) => {
     event.preventDefault();
     const problem = codeFormProblem(code);
-    if (problem) return setError(tr(problem));
+    if (problem) return setError(problem);
     return run(async () => {
       onChange(await alertApi.verifyChannel(channel, code.trim()));
       setCode('');
@@ -217,7 +217,7 @@ function PhoneRow({ channel, info, onChange }) {
             pattern="[0-9]*"
             maxLength={6}
             value={code}
-            onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))}
+            onChange={(event) => setCode(latinDigits(event.target.value).replace(/\D/g, ''))}
             aria-invalid={Boolean(error)}
             aria-describedby={error ? `${id}-error` : undefined}
           />
@@ -258,7 +258,7 @@ function PhoneRow({ channel, info, onChange }) {
         </form>
       )}
 
-      {error && <p className="alert-field-error" id={`${id}-error`} role="alert">{error}</p>}
+      {error && <p className="alert-field-error" id={`${id}-error`} role="alert">{tr(error)}</p>}
     </Row>
   );
 }

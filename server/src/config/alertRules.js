@@ -122,7 +122,7 @@ export const notifyRules = {
 };
 
 // ---------- the rules, as rows for the admin "Rules" screen ----------
-const row = (id, hazard, level, rule, basis) => ({ id, hazard, level, rule, basis, version: RULE_VERSION, status: RULE_STATUS });
+const row = (id, hazard, level, rule, basis, ruleBn) => ({ id, hazard, level, rule, ruleBn, basis, version: RULE_VERSION, status: RULE_STATUS });
 
 export function ruleCatalogue() {
   const rain = hazardRules.HEAVY_RAIN.levels;
@@ -134,27 +134,28 @@ export function ruleCatalogue() {
   const dry = hazardRules.DRY_SPELL;
 
   return [
-    row('HEAVY_RAIN.L1', 'HEAVY_RAIN', 1, `3 h rain >= ${rain[1].rain3hMm} mm and (probability >= ${rain[1].popMin}% or probability not available)`, ['M', 'P']),
-    row('HEAVY_RAIN.L2', 'HEAVY_RAIN', 2, `3 h rain >= ${rain[2].rain3hMm} mm or 24 h rain >= ${rain[2].rain24hMm} mm`, ['M', 'B']),
-    row('HEAVY_RAIN.L3', 'HEAVY_RAIN', 3, `24 h rain >= ${rain[3].rain24hMm} mm or 3 h rain >= ${rain[3].rain3hMm} mm`, ['B', 'P']),
-    row('HEAT_STRESS.WBGT', 'HEAT_STRESS', null, `Peak WBGT in the next 24 h: level 1 >= ${heat.wbgtC[1]}, level 2 >= ${heat.wbgtC[2]}, level 3 >= ${heat.wbgtC[3]} C (provider estimate)`, ['A']),
-    row('HEAT_STRESS.HEAT_INDEX', 'HEAT_STRESS', null, `Peak computed heat index: level 1 >= ${heat.heatIndexC[1]}, level 2 >= ${heat.heatIndexC[2]}, level 3 >= ${heat.heatIndexC[3]} C (fallback when no WBGT)`, ['M']),
-    row('HEAT_STRESS.AIR_TEMP', 'HEAT_STRESS', null, `BMD maximum air temperature, recorded as evidence: >= ${heat.airTempC[1]} / ${heat.airTempC[2]} / ${heat.airTempC[3]} C`, ['B']),
-    row('STRONG_WIND.GUST', 'STRONG_WIND', null, `Highest gust in the next 12 h: level 1 >= ${wind[1]}, level 2 >= ${wind[2]}, level 3 >= ${wind[3]} km/h`, ['P', 'B']),
-    row('OBSERVED_LIGHTNING.L2', 'OBSERVED_LIGHTNING', 2, `At least 1 strike within ${ltg.nearKm} km of the area point`, ['P']),
-    row('OBSERVED_LIGHTNING.L3', 'OBSERVED_LIGHTNING', 3, `At least 1 strike within ${ltg.closeKm} km, or at least ${ltg.manyStrikes} within ${ltg.nearKm} km`, ['M']),
-    row('OBSERVED_LIGHTNING.EPISODE', 'OBSERVED_LIGHTNING', null, `An episode closes ${ltg.episodeCloseMinutes} minutes after the last strike when no threat period is still ahead`, ['M']),
-    row('LIGHTNING_THREAT.L3', 'LIGHTNING_THREAT', 3, `A threat polygon covers the area point and starts within ${threat.imminentMinutes} minutes`, ['P']),
-    row('LIGHTNING_THREAT.L2', 'LIGHTNING_THREAT', 2, `A threat polygon covers the area point and starts within ${threat.horizonMinutes} minutes`, ['P']),
-    row('MARINE_WEATHER.WAVE', 'MARINE_WEATHER', null, `Significant wave height: level 1 >= ${marine.waveM[1]}, level 2 >= ${marine.waveM[2]}, level 3 >= ${marine.waveM[3]} m`, ['M']),
-    row('MARINE_WEATHER.GUST', 'MARINE_WEATHER', null, `Gust: level 1 >= ${marine.gustKph[1]}, level 2 >= ${marine.gustKph[2]}, level 3 >= ${marine.gustKph[3]} km/h`, ['B']),
-    row('DRY_SPELL', 'DRY_SPELL', 1, `At least ${dry.minDays} consecutive forecast days below ${dry.dryDayMm} mm and mean maximum >= ${dry.meanTmaxMinC} C`, ['M', 'P']),
+    row('HEAVY_RAIN.L1', 'HEAVY_RAIN', 1, `3 h rain >= ${rain[1].rain3hMm} mm and (probability >= ${rain[1].popMin}% or probability not available)`, ['M', 'P'], `৩ ঘণ্টায় বৃষ্টি অন্তত ${rain[1].rain3hMm} মিমি এবং বৃষ্টির সম্ভাবনা অন্তত ${rain[1].popMin}% (অথবা সম্ভাবনার তথ্য নেই)।`),
+    row('HEAVY_RAIN.L2', 'HEAVY_RAIN', 2, `3 h rain >= ${rain[2].rain3hMm} mm or 24 h rain >= ${rain[2].rain24hMm} mm`, ['M', 'B'], `৩ ঘণ্টায় বৃষ্টি অন্তত ${rain[2].rain3hMm} মিমি অথবা ২৪ ঘণ্টায় অন্তত ${rain[2].rain24hMm} মিমি।`),
+    row('HEAVY_RAIN.L3', 'HEAVY_RAIN', 3, `24 h rain >= ${rain[3].rain24hMm} mm or 3 h rain >= ${rain[3].rain3hMm} mm`, ['B', 'P'], `২৪ ঘণ্টায় বৃষ্টি অন্তত ${rain[3].rain24hMm} মিমি অথবা ৩ ঘণ্টায় অন্তত ${rain[3].rain3hMm} মিমি।`),
+    row('HEAT_STRESS.WBGT', 'HEAT_STRESS', null, `Peak WBGT in the next 24 h: level 1 >= ${heat.wbgtC[1]}, level 2 >= ${heat.wbgtC[2]}, level 3 >= ${heat.wbgtC[3]} C (provider estimate)`, ['A'], `আগামী ২৪ ঘণ্টার সর্বোচ্চ আনুমানিক WBGT: স্তর ১ ≥ ${heat.wbgtC[1]}°সে., স্তর ২ ≥ ${heat.wbgtC[2]}°সে., স্তর ৩ ≥ ${heat.wbgtC[3]}°সে.। সরাসরি মাপা নয়, সেবা প্রদানকারীর হিসাব।`),
+    row('HEAT_STRESS.HEAT_INDEX', 'HEAT_STRESS', null, `Peak computed heat index: level 1 >= ${heat.heatIndexC[1]}, level 2 >= ${heat.heatIndexC[2]}, level 3 >= ${heat.heatIndexC[3]} C (fallback when no WBGT)`, ['M'], `হিসাব করা সর্বোচ্চ অনুভূত তাপমাত্রা: স্তর ১ ≥ ${heat.heatIndexC[1]}°সে., স্তর ২ ≥ ${heat.heatIndexC[2]}°সে., স্তর ৩ ≥ ${heat.heatIndexC[3]}°সে.। WBGT না পেলে এই বিকল্প ব্যবহার হয়।`),
+    row('HEAT_STRESS.AIR_TEMP', 'HEAT_STRESS', null, `BMD maximum air temperature, recorded as evidence: >= ${heat.airTempC[1]} / ${heat.airTempC[2]} / ${heat.airTempC[3]} C`, ['B'], `সহায়ক তথ্য হিসেবে বিএমডির সর্বোচ্চ তাপমাত্রা রাখা হয়: ≥ ${heat.airTempC[1]} / ${heat.airTempC[2]} / ${heat.airTempC[3]}°সে.।`),
+    row('STRONG_WIND.GUST', 'STRONG_WIND', null, `Highest gust in the next 12 h: level 1 >= ${wind[1]}, level 2 >= ${wind[2]}, level 3 >= ${wind[3]} km/h`, ['P', 'B'], `আগামী ১২ ঘণ্টার সর্বোচ্চ দমকা হাওয়া: স্তর ১ ≥ ${wind[1]}, স্তর ২ ≥ ${wind[2]}, স্তর ৩ ≥ ${wind[3]} কিমি/ঘণ্টা।`),
+    row('OBSERVED_LIGHTNING.L2', 'OBSERVED_LIGHTNING', 2, `At least 1 strike within ${ltg.nearKm} km of the area point`, ['P'], `এলাকার নির্ধারিত বিন্দুর ${ltg.nearKm} কিমির মধ্যে অন্তত একটি বজ্রপাতের রেকর্ড।`),
+    row('OBSERVED_LIGHTNING.L3', 'OBSERVED_LIGHTNING', 3, `At least 1 strike within ${ltg.closeKm} km, or at least ${ltg.manyStrikes} within ${ltg.nearKm} km`, ['M'], `${ltg.closeKm} কিমির মধ্যে অন্তত একটি অথবা ${ltg.nearKm} কিমির মধ্যে অন্তত ${ltg.manyStrikes}টি বজ্রপাতের রেকর্ড।`),
+    row('OBSERVED_LIGHTNING.EPISODE', 'OBSERVED_LIGHTNING', null, `An episode closes ${ltg.episodeCloseMinutes} minutes after the last strike when no threat period is still ahead`, ['M'], `সর্বশেষ বজ্রপাতের ${ltg.episodeCloseMinutes} মিনিট পরে ঘটনাপর্ব শেষ হয়, যদি সামনে আর কোনো আশঙ্কার সময়সীমা না থাকে।`),
+    row('LIGHTNING_THREAT.L3', 'LIGHTNING_THREAT', 3, `A threat polygon covers the area point and starts within ${threat.imminentMinutes} minutes`, ['P'], `বজ্রপাতের আশঙ্কার বহুভুজ এলাকাটির নির্ধারিত বিন্দুকে ঘিরে আছে এবং আগামী ${threat.imminentMinutes} মিনিটের মধ্যে প্রযোজ্য হবে।`),
+    row('LIGHTNING_THREAT.L2', 'LIGHTNING_THREAT', 2, `A threat polygon covers the area point and starts within ${threat.horizonMinutes} minutes`, ['P'], `বজ্রপাতের আশঙ্কার বহুভুজ এলাকাটির নির্ধারিত বিন্দুকে ঘিরে আছে এবং আগামী ${threat.horizonMinutes} মিনিটের মধ্যে প্রযোজ্য হবে।`),
+    row('MARINE_WEATHER.WAVE', 'MARINE_WEATHER', null, `Significant wave height: level 1 >= ${marine.waveM[1]}, level 2 >= ${marine.waveM[2]}, level 3 >= ${marine.waveM[3]} m`, ['M'], `উল্লেখযোগ্য ঢেউয়ের উচ্চতা: স্তর ১ ≥ ${marine.waveM[1]}, স্তর ২ ≥ ${marine.waveM[2]}, স্তর ৩ ≥ ${marine.waveM[3]} মিটার।`),
+    row('MARINE_WEATHER.GUST', 'MARINE_WEATHER', null, `Gust: level 1 >= ${marine.gustKph[1]}, level 2 >= ${marine.gustKph[2]}, level 3 >= ${marine.gustKph[3]} km/h`, ['B'], `সমুদ্র এলাকায় দমকা হাওয়া: স্তর ১ ≥ ${marine.gustKph[1]}, স্তর ২ ≥ ${marine.gustKph[2]}, স্তর ৩ ≥ ${marine.gustKph[3]} কিমি/ঘণ্টা।`),
+    row('DRY_SPELL', 'DRY_SPELL', 1, `At least ${dry.minDays} consecutive forecast days below ${dry.dryDayMm} mm and mean maximum >= ${dry.meanTmaxMinC} C`, ['M', 'P'], `পূর্বাভাসে টানা অন্তত ${dry.minDays} দিন দৈনিক বৃষ্টি ${dry.dryDayMm} মিমির কম এবং গড় সর্বোচ্চ তাপমাত্রা অন্তত ${dry.meanTmaxMinC}°সে.।`),
     ...Object.entries(heatClasses).map(([name, lines]) => row(
       `HEAT_CLASS.${name.toUpperCase()}`,
       'HEAT_STRESS',
       null,
       `${name} work: WBGT advisory >= ${lines.wbgtC.advisory} / warning >= ${lines.wbgtC.warning} C; heat index advisory >= ${lines.heatIndexC.advisory} / warning >= ${lines.heatIndexC.warning} C`,
       name === 'heavy' ? ['A', 'P'] : ['A'],
+      `${({ light: 'হালকা', moderate: 'মাঝারি', heavy: 'ভারী' })[name] ?? name} পরিশ্রমের কাজ: WBGT-তে পরামর্শ ≥ ${lines.wbgtC.advisory}°সে. ও সতর্কতা ≥ ${lines.wbgtC.warning}°সে.; অনুভূত তাপমাত্রায় পরামর্শ ≥ ${lines.heatIndexC.advisory}°সে. ও সতর্কতা ≥ ${lines.heatIndexC.warning}°সে.।`,
     )),
   ];
 }

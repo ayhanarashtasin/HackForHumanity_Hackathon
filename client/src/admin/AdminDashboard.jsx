@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useLanguage } from '../i18n/index.js';
+import { ADMIN } from '../i18n/admin.js';
+import { LanguageToggle } from '../components/LanguageToggle.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { LogoMark } from '../components/Logo.jsx';
 import { describeError } from '../lib/adminForm.js';
@@ -27,6 +30,7 @@ const fromHash = () => {
 };
 
 function Shell() {
+  const { tr } = useLanguage(ADMIN);
   const { devBypass, signOut } = useAdmin();
   const [section, setSection] = useState(fromHash);
 
@@ -47,19 +51,20 @@ function Shell() {
 
   return (
     <div className="admin">
-      <a className="adm-skip" href="#adm-main">Skip to content</a>
+      <a className="adm-skip" href="#adm-main">{tr('Skip to content')}</a>
       <header className="adm-top">
-        <span className="adm-brand"><LogoMark size={30} /><strong>AkashSathi</strong></span>
-        <span className="adm-role-badge"><Icon name="shield" size={16} /> Administrator</span>
-        <button type="button" className="adm-btn adm-btn-small adm-top-out" onClick={signOut}><Icon name="logout" size={16} /> Sign out</button>
+        <span className="adm-brand"><LogoMark size={30} /><strong>{tr('AkashSathi')}</strong></span>
+        <span className="adm-role-badge"><Icon name="shield" size={16} /> {tr('Administrator')}</span>
+        <LanguageToggle />
+        <button type="button" className="adm-btn adm-btn-small adm-top-out" onClick={signOut}><Icon name="logout" size={16} /> {tr('Sign out')}</button>
       </header>
       {devBypass && (
         <div className="adm-banner" role="status">
-          <Icon name="warning" size={16} /> Sign-in is switched off for local use (ADMIN_AUTH=off).
+          <Icon name="warning" size={16} /> {tr('Sign-in is switched off for local use (ADMIN_AUTH=off).')}
         </div>
       )}
       <div className="adm-body">
-        <nav className="adm-nav" aria-label="Administrator sections">
+        <nav className="adm-nav" aria-label={tr('Administrator sections')}>
           {SECTIONS.map((item) => (
             <button
               key={item.id}
@@ -68,7 +73,7 @@ function Shell() {
               aria-current={section === item.id ? 'page' : undefined}
               onClick={() => go(item.id)}
             >
-              <Icon name={item.icon} size={18} /> {item.label}
+              <Icon name={item.icon} size={18} /> {tr(item.label)}
             </button>
           ))}
         </nav>
@@ -82,6 +87,7 @@ function Shell() {
 
 // Loads what every view needs (form options and the place catalogue) once, then shows the dashboard.
 export function AdminDashboard({ devBypass }) {
+  const { tr } = useLanguage(ADMIN);
   const [state, setState] = useState({ loading: true, options: null, catalogue: null, error: null });
   const [attempt, setAttempt] = useState(0);
 
@@ -106,8 +112,9 @@ export function AdminDashboard({ devBypass }) {
     return (
       <main className="adm-login" id="adm-main">
         <div className="adm-login-card">
+          <LanguageToggle />
           <ErrorNote onRetry={() => setAttempt((value) => value + 1)}>{state.error}</ErrorNote>
-          <Notice>Check that the API is running, then try again.</Notice>
+          <Notice>{tr('Check that the API is running, then try again.')}</Notice>
         </div>
       </main>
     );

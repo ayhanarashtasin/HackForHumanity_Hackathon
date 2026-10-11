@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import { pick } from '../lib/alertForm.js';
 import { alertApi } from '../services/alertApi.js';
 import { useAlert } from './context.js';
+import { errorText } from '../i18n/index.js';
 import { formatDhaka } from './format.js';
 
 // "Right now I am…" (CTX-01): what the person is doing now overrides their usual work for a while, then it expires on its own.
@@ -60,7 +61,7 @@ export function ActivityControl({ profile, onChange }) {
         </label>
         <button type="button" className="alert-button alert-button--primary" disabled={!key || busy} onClick={() => send({ key, hours })}>{tr('act.set')}</button>
       </div>
-      {error && <p className="alert-field-error" role="alert">{error}</p>}
+      {error && <p className="alert-field-error" role="alert">{errorText(error, lang)}</p>}
     </section>
   );
 }

@@ -4,6 +4,8 @@ import {
   STEPS, buildPayload, fieldDomId, firstErrorPath, firstErrorStep, validateAll, validateStep,
 } from '../lib/alertForm.js';
 import { useAlert } from './context.js';
+import { errorText } from '../i18n/index.js';
+import { digits } from './format.js';
 import { ReviewStep } from './ReviewStep.jsx';
 import { StepPrefs, StepWhere, StepWho, StepWork } from './WizardSteps.jsx';
 
@@ -18,7 +20,7 @@ function focusField(path) {
 // The five-step form. `answers` start from the schema defaults (create) or from the saved profile (edit). Navigation, validation and
 // the submit live here; each step only draws its questions.
 export function Wizard({ initialAnswers, onSubmit, onCancel, mode = 'create' }) {
-  const { tr, lang, schema } = useAlert();
+  const { tr, lang, schema, languageBusy } = useAlert();
   const [step, setStep] = useState('who');
   const [answers, setAnswers] = useState(initialAnswers);
   const [errors, setErrors] = useState({});
@@ -62,11 +64,12 @@ export function Wizard({ initialAnswers, onSubmit, onCancel, mode = 'create' }) 
   const back = () => { setErrors({}); go(STEPS[at - 1]); };
 
   const submit = async () => {
+    if (busy || languageBusy) return;
     const found = validateAll(answers, def);
     if (Object.keys(found).length) {
       const target = firstErrorStep(found);
       setErrors(found);
-      setProblem(tr('error.fix'));
+      setProblem({ key: 'error.fix' });
       go(target, firstErrorPath(found, target, def, answers));
       return;
     }
@@ -79,10 +82,10 @@ export function Wizard({ initialAnswers, onSubmit, onCancel, mode = 'create' }) 
       if (error.details && Object.keys(error.details).length) {
         const target = firstErrorStep(error.details) ?? 'review';
         setErrors(error.details);
-        setProblem(tr('error.fix'));
+        setProblem({ key: 'error.fix' });
         go(target, firstErrorPath(error.details, target, def, answers));
       } else {
-        setProblem(error.message || tr('error.save'));
+        setProblem(error.message ? { error: error.message } : { key: 'error.save' });
       }
     }
   };
@@ -107,7 +110,7 @@ export function Wizard({ initialAnswers, onSubmit, onCancel, mode = 'create' }) 
         <ol>
           {STEPS.map((id, i) => (
             <li key={id} className={i < at ? 'is-done' : i === at ? 'is-current' : ''} aria-current={i === at ? 'step' : undefined}>
-              <span className="alert-step-number" aria-hidden="true">{i < at ? <Icon name="check" size={14} /> : i + 1}</span>
+              <span className="alert-step-number" aria-hidden="true">{i < at ? <Icon name="check" size={14} /> : digits(i + 1, lang)}</span>
               <span className="alert-step-name">{tr(`step.${id}`)}</span>
             </li>
           ))}
@@ -120,14 +123,14 @@ export function Wizard({ initialAnswers, onSubmit, onCancel, mode = 'create' }) 
 
       <div className="alert-step">{body}</div>
 
-      {problem && <p className="alert-banner alert-banner--problem" role="alert">{problem}</p>}
+      {problem && <p className="alert-banner alert-banner--problem" role="alert">{problem.key ? tr(problem.key) : errorText(problem.error, lang)}</p>}
 
       <div className="alert-actions">
         {onCancel && step === 'who' && <button type="button" className="alert-button alert-button--ghost" onClick={onCancel}>{tr('btn.cancel')}</button>}
         {at > 0 && <button type="button" className="alert-button alert-button--ghost" onClick={back} disabled={busy}>{tr('btn.back')}</button>}
         {step !== 'review'
           ? <button type="submit" className="alert-button alert-button--primary">{tr('btn.next')}<Icon name="arrow" size={18} /></button>
-          : <button type="submit" className="alert-button alert-button--primary" disabled={busy}>{busy ? tr('btn.saving') : tr(mode === 'edit' ? 'btn.save' : 'btn.start')}</button>}
+          : <button type="submit" className="alert-button alert-button--primary" disabled={busy || languageBusy}>{busy || languageBusy ? tr('btn.saving') : tr(mode === 'edit' ? 'btn.save' : 'btn.start')}</button>}
       </div>
     </form>
   );

@@ -229,7 +229,11 @@ dbTest('the job waits when no forecast is stored, says so once, and always gives
   const lines = [];
   const job = startMorningDigestJob({ channels: { telegram }, log: { log: (line) => lines.push(line), error: (line) => lines.push(line) } });
   try {
-    await new Promise((resolve) => { setTimeout(resolve, 600); });
+    // Wait for the actual tick and lease release, not an assumed database response time.
+    for (let attempt = 0; attempt < 100; attempt++) {
+      if (lines.length > 1 && (await JobState.findOne({ key: 'morning-digest' }).lean())?.leaseUntil === null) break;
+      await new Promise((resolve) => { setTimeout(resolve, 100); });
+    }
   } finally {
     job.stop();
   }

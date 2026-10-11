@@ -1,5 +1,6 @@
 import { Suspense, lazy, useLayoutEffect, useMemo } from 'react';
 import { useRoute } from './lib/router.js';
+import { useLanguage } from './i18n/index.js';
 import { LandingPage } from './pages/LandingPage.jsx';
 import { isLazyPage, loadedPage, preloadPage } from './pages/pageLoader.js';
 
@@ -20,11 +21,13 @@ const LOADING = { map: 'Loading map…', alert: 'Loading alerts…', admin: 'Loa
 
 export default function App() {
   const route = useRoute();
+  const { lang, tr } = useLanguage();
 
   // The map page is a fixed full-screen app; the landing, alert and admin pages scroll like normal documents (see landing.css and styles.css).
   useLayoutEffect(() => {
     document.documentElement.dataset.page = route === 'home' ? 'landing' : route;
-    document.title = TITLES[route];
+    document.documentElement.lang = lang;
+    document.title = tr(TITLES[route]);
     // Same colours as index.html: the browser's own bar is olive only over the map.
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', route === 'map' ? '#2E3D28' : '#E8E9DF');
 
@@ -41,13 +44,13 @@ export default function App() {
     } else if (robots) {
       robots.remove();
     }
-  }, [route]);
+  }, [route, lang, tr]);
 
   // Chosen once per screen: switching between the loaded component and its lazy twin mid-visit would remount the page and lose its state.
   const Page = useMemo(() => (isLazyPage(route) ? (loadedPage(route) ?? LAZY[route]) : null), [route]);
   if (Page) {
     return (
-      <Suspense fallback={<div className="splash" role="status">{LOADING[route]}</div>}>
+      <Suspense fallback={<div className="splash" role="status">{tr(LOADING[route])}</div>}>
         <Page />
       </Suspense>
     );

@@ -1,3 +1,8 @@
+import { translate } from '../i18n/index.js';
+import { getLanguage } from '../i18n/language.js';
+import { digits, formatDhaka } from '../alert/format.js';
+import { ADMIN } from '../i18n/admin.js';
+const tr = (text, params, lang = getLanguage()) => translate(lang, text, params, ADMIN);
 // Pure logic behind the administrator page (no React, no DOM, so node --test can cover it): request bodies for the three kinds of send,
 // validation before a preview, "is this still the previewed send?", grouping of a preview, confirmation rules, area helpers and wording.
 // The server stays the authority (it re-validates everything and refuses a send that was not previewed); this file only keeps the page honest.
@@ -44,12 +49,12 @@ export const ACTION_NAMES = {
   discard: 'Held alerts discarded',
 };
 
-export const roleLabel = (options, value) => options?.roles?.find((role) => role.value === value)?.label?.en ?? ROLE_NAMES[value] ?? value;
+export const roleLabel = (options, value, lang = getLanguage()) => options?.roles?.find((role) => role.value === value)?.label?.[lang] ?? tr(ROLE_NAMES[value] ?? value, {}, lang);
 
 // Capitalised, and observed lightning is told apart from a lightning threat (the server's own labels are sentence fragments: both say "lightning").
-export function hazardLabel(type, options) {
-  if (HAZARD_NAMES[type]) return HAZARD_NAMES[type];
-  const label = options?.hazards?.find((hazard) => hazard.type === type)?.label?.en ?? type;
+export function hazardLabel(type, options, lang = getLanguage()) {
+  if (HAZARD_NAMES[type]) return tr(HAZARD_NAMES[type], {}, lang);
+  const label = options?.hazards?.find((hazard) => hazard.type === type)?.label?.[lang] ?? type;
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
@@ -61,7 +66,7 @@ export const NOTHING_REASONS = {
   'source-unavailable': 'The forecast sources are unavailable, so nothing can be created from them.',
 };
 
-export const reasonText = (reason) => NOTHING_REASONS[reason] ?? 'Nothing to send.';
+export const reasonText = (reason) => tr(NOTHING_REASONS[reason] ?? 'Nothing to send.');
 
 // ---------- areas: { all: true } or { all: false, districts: [4-digit], upazilas: [6-digit] } ----------
 export const emptyAreas = () => ({ all: true, districts: [], upazilas: [] });
@@ -77,12 +82,13 @@ export function areasPayload(areas, { required = false } = {}) {
 export function buildAreaIndex(catalogue) {
   if (!catalogue) return [];
   const districtName = new Map(catalogue.districts.map((district) => [district.pcode, district.name]));
+  const districtBn = new Map(catalogue.districts.map((district) => [district.pcode, district.nameBn || district.name]));
   const index = [
     ...catalogue.districts.map((district) => ({
-      level: 'district', code: district.pcode, name: district.name, nameBn: district.nameBn ?? '', parent: district.division, kind: 'District',
+      level: 'district', code: district.pcode, name: district.name, nameBn: district.nameBn ?? '', parent: district.division, parentBn: tr(district.division, {}, 'bn'), kind: 'District',
     })),
     ...catalogue.locations.map((location) => ({
-      level: 'upazila', code: location.pcode, name: location.name, nameBn: location.nameBn ?? '', parent: districtName.get(location.district) ?? '', kind: location.kind === 'thana' ? 'City thana' : 'Upazila',
+      level: 'upazila', code: location.pcode, name: location.name, nameBn: location.nameBn ?? '', parent: districtName.get(location.district) ?? '', parentBn: districtBn.get(location.district) ?? '', kind: location.kind === 'thana' ? 'City thana' : 'Upazila',
     })),
   ];
   return index.map((item) => ({ ...item, haystack: `${item.name} ${item.nameBn}`.toLowerCase() }));
@@ -112,18 +118,26 @@ export function removeArea(areas, level, code) {
 }
 
 export function areaSummary(areas, index) {
-  if (!areas || areas.all) return 'All Bangladesh';
-  const names = new Map(index.map((item) => [`${item.level}:${item.code}`, item.name]));
+  if (!areas || areas.all) return tr('All Bangladesh');
+  const lang = getLanguage();
+  const names = new Map(index.map((item) => [`${item.level}:${item.code}`, lang === 'bn' ? item.nameBn || item.name : item.name]));
   return [
-    ...areas.districts.map((code) => `${names.get(`district:${code}`) ?? code} district`),
+    ...areas.districts.map((code) => `${names.get(`district:${code}`) ?? code} ${lang === 'bn' ? 'জেলা' : 'district'}`),
     ...areas.upazilas.map((code) => names.get(`upazila:${code}`) ?? code),
   ].join(', ');
 }
 
 // History stores what was sent as 'all', null or { districts, upazilas }.
 export function describeStoredAreas(value, index) {
-  if (!value || value === 'all') return 'All Bangladesh';
+  if (!value || value === 'all') return tr('All Bangladesh');
   return areaSummary({ all: false, districts: value.districts ?? [], upazilas: value.upazilas ?? [] }, index);
+}
+
+// Older audit entries keep an English name rather than an area code; resolve it against the same bilingual catalogue as the pickers.
+export function areaName(value, index = [], lang = getLanguage()) {
+  if (lang !== 'bn' || !value) return value;
+  const area = index.find((item) => item.name === value || item.nameBn === value);
+  return area?.nameBn || tr(value, {}, lang);
 }
 
 // ---------- request bodies ----------
@@ -195,7 +209,7 @@ export function validateForm(mode, form, options) {
 
   const hours = Number(form.hours);
   const checkHours = () => {
-    if (!Number.isFinite(hours) || hours < 1 || hours > limits.maxHours) problems.push({ field: 'hours', message: `Validity must be 1 to ${limits.maxHours} hours.` });
+    if (!Number.isFinite(hours) || hours < 1 || hours > limits.maxHours) problems.push({ field: 'hours', message: tr('Validity must be 1 to {max} hours.', { max: limits.maxHours }) });
   };
   const checkAreas = () => {
     if (!form.areas?.all && !areaCount(form.areas)) problems.push({ field: 'areas', message: 'Choose where this applies, or all of Bangladesh.' });
@@ -206,7 +220,7 @@ export function validateForm(mode, form, options) {
     if (!hazard) problems.push({ field: 'hazardType', message: 'Choose a hazard to declare.' });
     else {
       const level = Number(form.level);
-      if (!Number.isInteger(level) || level < hazard.minLevel || level > hazard.maxLevel) problems.push({ field: 'level', message: `Level must be ${hazard.minLevel} to ${hazard.maxLevel} for this hazard.` });
+      if (!Number.isInteger(level) || level < hazard.minLevel || level > hazard.maxLevel) problems.push({ field: 'level', message: tr('Level must be {min} to {max} for this hazard.', { min: hazard.minLevel, max: hazard.maxLevel }) });
       if (hazard.needsArea !== false) checkAreas();
     }
     checkHours();
@@ -216,16 +230,16 @@ export function validateForm(mode, form, options) {
     if (!SEVERITIES.includes(form.severity)) problems.push({ field: 'severity', message: 'Choose a severity.' });
     const en = trimmed(form.textEn);
     if (!en) problems.push({ field: 'textEn', message: 'The English text is required.' });
-    if (en.length > limits.textMax) problems.push({ field: 'textEn', message: `The English text must be at most ${limits.textMax} characters.` });
-    if (trimmed(form.textBn).length > limits.textMax) problems.push({ field: 'textBn', message: `The Bangla text must be at most ${limits.textMax} characters.` });
-    if (trimmed(form.titleEn).length > limits.titleMax) problems.push({ field: 'titleEn', message: `The English title must be at most ${limits.titleMax} characters.` });
-    if (trimmed(form.titleBn).length > limits.titleMax) problems.push({ field: 'titleBn', message: `The Bangla title must be at most ${limits.titleMax} characters.` });
+    if (en.length > limits.textMax) problems.push({ field: 'textEn', message: tr('The English text must be at most {max} characters.', { max: limits.textMax }) });
+    if (trimmed(form.textBn).length > limits.textMax) problems.push({ field: 'textBn', message: tr('The Bangla text must be at most {max} characters.', { max: limits.textMax }) });
+    if (trimmed(form.titleEn).length > limits.titleMax) problems.push({ field: 'titleEn', message: tr('The English title must be at most {max} characters.', { max: limits.titleMax }) });
+    if (trimmed(form.titleBn).length > limits.titleMax) problems.push({ field: 'titleBn', message: tr('The Bangla title must be at most {max} characters.', { max: limits.titleMax }) });
     const link = trimmed(form.referenceUrl);
     if (link && (!isWebUrl(link) || link.length > 300)) problems.push({ field: 'referenceUrl', message: 'The reference link must be a web address starting with http:// or https://.' });
     checkAreas();
     checkHours();
   }
-  return problems;
+  return problems.map((problem) => ({ ...problem, message: tr(problem.message) }));
 }
 
 export const defaultHours = (options) => options?.limits?.defaultHours ?? 6;
@@ -255,7 +269,7 @@ export function sendableRoles(preview) {
   return sorted((preview?.groups ?? []).filter((group) => group.newCount > 0 || (group.released ?? 0) > 0).map((group) => group.occupation));
 }
 
-export function recipientBreakdown(preview, options) {
+export function recipientBreakdown(preview, options, index = []) {
   const byRole = new Map();
   const byArea = new Map();
   for (const group of preview?.groups ?? []) {
@@ -266,7 +280,7 @@ export function recipientBreakdown(preview, options) {
     byArea.set(area, (byArea.get(area) ?? 0) + count);
   }
   const list = (map, label) => [...map].map(([key, count]) => ({ key, label: label(key), count })).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
-  return { byRole: list(byRole, (key) => roleLabel(options, key)), byArea: list(byArea, (key) => key) };
+  return { byRole: list(byRole, (key) => roleLabel(options, key)), byArea: list(byArea, (key) => areaName(key, index)) };
 }
 
 // ---------- confirmation ----------
@@ -316,6 +330,7 @@ export function isPreviewExpired(error) {
 }
 
 export function describeError(error, fallback = 'Something went wrong. Please try again.') {
+  // Keep the source message in state; ErrorNote translates it when rendered so switching languages also updates existing errors.
   return error?.message || fallback;
 }
 
@@ -323,11 +338,11 @@ export function describeResult(mode, response) {
   const result = response?.result ?? {};
   const parts = [];
   if (mode === 'weather') {
-    parts.push(`${result.sent ?? 0} sent`, `${result.released ?? 0} released`, `${result.alreadySent ?? 0} already sent`);
+    parts.push(tr('{n} sent', { n: result.sent ?? 0 }), tr('{n} released', { n: result.released ?? 0 }), tr('{n} already sent', { n: result.alreadySent ?? 0 }));
   } else if (mode === 'declare') {
-    parts.push(`${result.sent ?? 0} sent`, `${result.updated ?? 0} updated`, `${result.alreadySent ?? 0} already sent`);
+    parts.push(tr('{n} sent', { n: result.sent ?? 0 }), tr('{n} updated', { n: result.updated ?? 0 }), tr('{n} already sent', { n: result.alreadySent ?? 0 }));
   } else {
-    parts.push(`${result.sent ?? 0} sent`, `${result.alreadySent ?? 0} already sent`);
+    parts.push(tr('{n} sent', { n: result.sent ?? 0 }), tr('{n} already sent', { n: result.alreadySent ?? 0 }));
   }
   return parts.join(' · ');
 }
@@ -335,11 +350,11 @@ export function describeResult(mode, response) {
 // ---------- time (always Bangladesh time) ----------
 const dateTime = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Dhaka', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
 
-export function bdDateTime(value) {
+export function bdDateTime(value, lang = getLanguage()) {
   if (!value) return '—';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '—';
-  return `${dateTime.format(date)} BST`;
+  return lang === 'bn' ? `${formatDhaka(date, lang)} বাংলাদেশ সময়` : `${dateTime.format(date)} BST`;
 }
 
 export function minutesSince(value, nowMs = Date.now()) {
@@ -350,6 +365,12 @@ export function minutesSince(value, nowMs = Date.now()) {
 
 export function ageLabel(minutes) {
   if (minutes === null || minutes === undefined) return '—';
+  const lang = getLanguage();
+  if (lang === 'bn') {
+    if (minutes < 1) return 'এক মিনিটের কম';
+    if (minutes < 60) return `${digits(minutes, lang)} মিনিট`;
+    return `${digits(Math.floor(minutes / 60), lang)} ঘণ্টা${minutes % 60 ? ` ${digits(minutes % 60, lang)} মিনিট` : ''}`;
+  }
   if (minutes < 1) return 'under a minute';
   if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
@@ -378,7 +399,7 @@ export function automaticMatrix(rows, options) {
   }));
 }
 
-export const formatNumber = (value) => (Number.isFinite(value) ? Math.round(value).toLocaleString('en') : '—');
+export const formatNumber = (value) => (Number.isFinite(value) ? Math.round(value).toLocaleString(getLanguage() === 'bn' ? 'bn-BD' : 'en') : '—');
 
 export const BASIS_LEGEND = {
   B: 'BMD figure, as published or quoted in reports of BMD statements',

@@ -1,4 +1,6 @@
 import { distanceKm } from './geometry.js';
+import { translate } from '../i18n/index.js';
+import { MAP } from '../i18n/map.js';
 
 // Boundary edges count as inside; holes and disconnected islands are respected.
 function inRing(lon, lat, ring) {
@@ -44,6 +46,9 @@ export function locateUpazila({ lon, lat }, boundaries, catalogue) {
   return {
     selection: { level: 'upazila', id: nearest.pcode },
     area: polygon.name,
+    noteBn: translate('bn', 'You are in {area}. {nearest} is the nearest forecast thana; separate thana boundaries are not available.', {
+      area: polygon.nameBn || translate('bn', polygon.name, {}, MAP), nearest: nearest.nameBn || nearest.name,
+    }, MAP),
     note: `You are in ${polygon.name}. ${nearest.name} is the nearest forecast thana; separate thana boundaries are not available.`,
   };
 }

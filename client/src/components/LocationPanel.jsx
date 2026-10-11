@@ -3,6 +3,10 @@ import { WMO_LABELS } from '../lib/scales.js';
 import { STEP_MS, formatBst, formatClock, formatDay, formatRange, toMs } from '../lib/time.js';
 import { Chart } from './Chart.jsx';
 import { Icon } from './Icon.jsx';
+import { useLanguage, translate } from '../i18n/index.js';
+import { getLanguage } from '../i18n/language.js';
+import { digits as localDigits } from '../alert/format.js';
+import { MAP } from '../i18n/map.js';
 
 const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 const compass = (degrees) => (Number.isFinite(degrees) ? COMPASS[Math.round(degrees / 45) % 8] : null);
@@ -15,7 +19,8 @@ const LIGHTNING_STATE = {
   'not-checked': 'Not checked yet',
 };
 
-const fmt = (value, digits = 0, suffix = '') => (Number.isFinite(value) ? `${value.toFixed(digits)}${suffix}` : '–');
+const fmt = (value, places = 0, suffix = '') => Number.isFinite(value)
+  ? localDigits(`${value.toFixed(places)}${suffix.startsWith(' ') ? ' ' : ''}${translate(getLanguage(), suffix.trim(), {}, MAP)}`, getLanguage()) : '–';
 
 function weatherIcon(code) {
   if (code >= 95) return 'bolt';
@@ -35,21 +40,22 @@ function Stat({ icon, label, value, sub }) {
 }
 
 function DailyTable({ daily, pcode, loading, error }) {
+  const { tr } = useLanguage(MAP);
   const data = daily?.locations?.[pcode];
   if (!data || !daily.days?.length) {
-    return <p className="forecast-empty" role="status">{loading ? 'Loading the 10-day forecast…' : error ? 'The 10-day forecast could not be loaded. Please try again later.' : 'A 10-day forecast is not available for this area right now.'}</p>;
+    return <p className="forecast-empty" role="status">{tr(loading ? 'Loading the 10-day forecast…' : error ? 'The 10-day forecast could not be loaded. Please try again later.' : 'A 10-day forecast is not available for this area right now.')}</p>;
   }
 
   return (
     <section className="daily-outlook">
-      <h3>The days ahead</h3>
-      <p className="section-description">Daily temperature range, rainfall and wind.</p>
-      {daily.sources?.bmd?.status === 'stale' && <p className="note-warning">This daily forecast is stale.</p>}
+      <h3>{tr('The days ahead')}</h3>
+      <p className="section-description">{tr('Daily temperature range, rainfall and wind.')}</p>
+      {daily.sources?.bmd?.status === 'stale' && <p className="note-warning">{tr('This daily forecast is stale.')}</p>}
       <div className="table-scroll">
         <table>
-          <caption className="sr-only">10-day weather forecast</caption>
+          <caption className="sr-only">{tr('10-day weather forecast')}</caption>
           <thead>
-            <tr><th>Day</th><th>Min</th><th>Max</th><th>Rain</th><th>Wind</th></tr>
+            <tr>{['Day', 'Min', 'Max', 'Rain', 'Wind'].map((label) => <th key={label}>{tr(label)}</th>)}</tr>
           </thead>
           <tbody>
             {daily.days.map((day, i) => (
@@ -64,33 +70,36 @@ function DailyTable({ daily, pcode, loading, error }) {
           </tbody>
         </table>
       </div>
-      <small className="muted">BMD daily values cover 00:00–24:00 UTC (06:00–06:00 BST).</small>
+      <small className="muted">{tr('BMD daily values cover 00:00–24:00 UTC (06:00–06:00 BST).')}</small>
     </section>
   );
 }
 
 function LightningBlock({ info }) {
+  const { tr, lang, number } = useLanguage(MAP);
   if (!info) return null;
+  const note = lang === 'bn' && info.noteBn ? number(info.noteBn) : tr(info.note);
 
   return (
     <section className="panel-section">
-      <h3>Lightning near this location</h3>
-      {info.items.length === 0 && <p className="muted">{info.note}</p>}
+      <h3>{tr('Lightning near this location')}</h3>
+      {info.items.length === 0 && <p className="muted">{note}</p>}
       {info.items.map((item) => (
         <div key={item.id} className={`lightning-item state-${item.state}`}>
-          <strong>{item.kind === 'circle' ? `Circle ${item.id} (${item.radiusKm} km radius)` : `Lightning near this upazila (${item.radiusKm} km)`}</strong>
-          <span>{LIGHTNING_STATE[item.state]}</span>
-          {item.count !== null && item.count !== undefined && <span>Count in the 5-minute window: {item.count}</span>}
-          {item.window && <small>Window {formatBst(toMs(item.window.from))} to {formatBst(toMs(item.window.to))}</small>}
-          {item.detail && <small>{item.detail}</small>}
+          <strong>{item.kind === 'circle' ? tr('Circle {id} ({radius} km radius)', { id: item.id, radius: item.radiusKm }) : tr('Lightning near this upazila ({radius} km)', { radius: item.radiusKm })}</strong>
+          <span>{tr(LIGHTNING_STATE[item.state])}</span>
+          {item.count !== null && item.count !== undefined && <span>{tr('Count in the 5-minute window: {n}', { n: item.count })}</span>}
+          {item.window && <small>{tr('Window {from} to {to}', { from: formatBst(toMs(item.window.from)), to: formatBst(toMs(item.window.to)) })}</small>}
+            {item.detail && <small>{lang === 'bn' && tr(item.detail) === item.detail ? tr('A source or collection warning was recorded. Check the sample time and data status; these records are not live monitoring.') : tr(item.detail)}</small>}
         </div>
       ))}
-      {info.items.length > 0 && <small className="muted">{info.note}</small>}
+      {info.items.length > 0 && <small className="muted">{note}</small>}
     </section>
   );
 }
 
 export function LocationPanel({ resolved, snapshot, stepIndex, dailyState, lightningInfo, onClose, isUserLocation, location, onStep, baseStatus, loading }) {
+  const { tr, lang } = useLanguage(MAP);
   const [tab, setTab] = useState('overview');
   if (!resolved) return null;
 
@@ -111,55 +120,55 @@ export function LocationPanel({ resolved, snapshot, stepIndex, dailyState, light
   const accuracy = location?.position?.accuracy;
 
   return (
-    <section className="location-panel" aria-label={`Weather for ${resolved.name}`}>
+    <section className="location-panel" aria-label={tr('Weather for {name}', { name: resolved.name })}>
       <header className="panel-header">
         <div>
-          <p className="map-eyebrow"><Icon name="pin" size={14} />{isUserLocation ? 'Your location' : 'Selected area'}</p>
+          <p className="map-eyebrow"><Icon name="pin" size={14} />{tr(isUserLocation ? 'Your location' : 'Selected area')}</p>
           <h2>{resolved.name}</h2>
-          {resolved.nameBn && <p className="bn" lang="bn">{resolved.nameBn}</p>}
-          <p className="location-parent">{resolved.kind} · {resolved.parent}</p>
+          {lang === 'en' && resolved.nameBn && <p className="bn" lang="bn">{resolved.nameBn}</p>}
+          <p className="location-parent">{tr(resolved.kind)} · {resolved.parent}</p>
         </div>
-        <button type="button" className="icon-button" onClick={onClose} aria-label="Close weather details"><Icon name="close" size={18} /></button>
+        <button type="button" className="icon-button" onClick={onClose} aria-label={tr('Close weather details')}><Icon name="close" size={18} /></button>
       </header>
 
-      {isUserLocation && <p className="location-confirmation" role="status"><Icon name="check" size={15} /> {location.match.note ? 'Area found · nearest local forecast' : `${resolved.name} upazila identified from your location`}</p>}
-      {isUserLocation && location.match.note && <p className="note">{location.match.note}</p>}
-      {isUserLocation && accuracy > 1000 && <p className="note">Your device’s location accuracy is about {fmt(accuracy / 1000, 1, ' km')}. Near a boundary, search to confirm your area.</p>}
+      {isUserLocation && <p className="location-confirmation" role="status"><Icon name="check" size={15} /> {location.match.note ? tr('Area found · nearest local forecast') : tr('{name} upazila identified from your location', { name: resolved.name })}</p>}
+      {isUserLocation && location.match.note && <p className="note">{lang === 'bn' && location.match.noteBn ? location.match.noteBn : tr(location.match.note)}</p>}
+      {isUserLocation && accuracy > 1000 && <p className="note">{tr('Your device’s location accuracy is about {km} km. Near a boundary, search to confirm your area.', { km: fmt(accuracy / 1000, 1) })}</p>}
       {resolved.note && <p className="note">{resolved.note}</p>}
-      {baseStatus === 'stale' && <p className="note-warning">This forecast is stale. Check the data status for its last update.</p>}
+      {baseStatus === 'stale' && <p className="note-warning">{tr('This forecast is stale. Check the data status for its last update.')}</p>}
 
       {!available ? (
-        <div className="forecast-empty" role="status"><Icon name="cloud" size={36} /><h3>{loading ? 'Loading your local weather…' : 'Weather is unavailable'}</h3><p>{loading ? 'Your area is ready. The latest forecast will appear here automatically.' : 'We have found this area, but its forecast is not available right now. Missing data does not mean calm weather.'}</p></div>
+        <div className="forecast-empty" role="status"><Icon name="cloud" size={36} /><h3>{tr(loading ? 'Loading your local weather…' : 'Weather is unavailable')}</h3><p>{tr(loading ? 'Your area is ready. The latest forecast will appear here automatically.' : 'We have found this area, but its forecast is not available right now. Missing data does not mean calm weather.')}</p></div>
       ) : (
         <section className="weather-hero">
-          <div className="weather-hero-main"><div><span className="weather-temperature">{fmt(temperature)}<span>°C</span></span><p>{WMO_LABELS[code] ?? 'Local forecast'}</p></div><span className="weather-symbol"><Icon name={weatherIcon(code)} size={60} /></span></div>
-          <div className="weather-hero-footer"><span><Icon name="clock" size={14} /> {formatRange(times[stepIndex], times[stepIndex] + STEP_MS)}</span><small>{snapshot?.baseLabel ?? 'Forecast'} · {baseStatus === 'stale' ? 'Stale forecast' : 'Model forecast'}</small></div>
+          <div className="weather-hero-main"><div><span className="weather-temperature">{fmt(temperature)}<span>°C</span></span><p>{tr(WMO_LABELS[code] ?? 'Local forecast')}</p></div><span className="weather-symbol"><Icon name={weatherIcon(code)} size={60} /></span></div>
+          <div className="weather-hero-footer"><span><Icon name="clock" size={14} /> {formatRange(times[stepIndex], times[stepIndex] + STEP_MS)}</span><small>{tr(snapshot?.baseLabel ?? 'Forecast')} · {tr(baseStatus === 'stale' ? 'Stale forecast' : 'Model forecast')}</small></div>
         </section>
       )}
 
-      <div className="weather-tabs" role="group" aria-label="Weather detail view">
-        {tabs.map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => setTab(id)} className={tab === id ? 'active' : ''}>{label}</button>)}
+      <div className="weather-tabs" role="group" aria-label={tr('Weather detail view')}>
+        {tabs.map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => setTab(id)} className={tab === id ? 'active' : ''}>{tr(label)}</button>)}
       </div>
 
       {tab === 'overview' && available && (
         <>
-          <div className="section-heading"><h3>Your forecast, at a glance</h3><span>Selected 3-hour step</span></div>
+          <div className="section-heading"><h3>{tr('Your forecast, at a glance')}</h3><span>{tr('Selected 3-hour step')}</span></div>
           <dl className="stats">
-            <Stat icon="thermometer" label="Temperature" value={fmt(temperature, 1, '°C')} sub={isDistrict ? `hottest ${fmt(at('tempMax'), 1, '°C')}` : 'Model forecast'} />
-            <Stat icon="sun" label="Heat index" value={fmt(at('hi'), 1, '°C')} sub={isDistrict ? `highest ${fmt(at('hiMax'), 1, '°C')}` : 'Computed from heat + humidity'} />
-            <Stat icon="rain" label="Rainfall" value={fmt(at('rf'), 1, ' mm')} sub={isDistrict ? `wettest ${fmt(at('rfMax'), 1, ' mm')}` : 'Over this 3-hour step'} />
-            <Stat icon="drop" label="Humidity" value={fmt(at('rh'), 0, '%')} sub="Relative humidity" />
-            <Stat icon="wind" label="Wind" value={fmt(speed, 0, ' km/h')} sub={`${direction ? `From ${direction}` : 'Direction unavailable'}${gust !== null && speed !== null && gust > speed ? ` · gusts ${fmt(gust, 0, ' km/h')}` : ''}`} />
-            <Stat icon="cloud" label="Cloud cover" value={fmt(at('cc'), 1, ' / 8')} sub="Sky covered in oktas" />
-            <Stat icon="bolt" label="Thunder potential" value={ts === null ? '–' : THUNDER[Math.round(ts)] ?? '–'} sub={snapshot.thunderSource ? 'Open-Meteo · not a strike report' : 'Data not available'} />
-            <Stat icon="rain" label="Rain chance" value={fmt(at('pop'), 0, '%')} sub="Open-Meteo probability" />
+            <Stat icon="thermometer" label={tr('Temperature')} value={fmt(temperature, 1, '°C')} sub={isDistrict ? tr('hottest {value}', { value: fmt(at('tempMax'), 1, '°C') }) : tr('Model forecast')} />
+            <Stat icon="sun" label={tr('Heat index')} value={fmt(at('hi'), 1, '°C')} sub={isDistrict ? tr('highest {value}', { value: fmt(at('hiMax'), 1, '°C') }) : tr('Computed from heat + humidity')} />
+            <Stat icon="rain" label={tr('Rainfall')} value={fmt(at('rf'), 1, ' mm')} sub={isDistrict ? tr('wettest {value}', { value: fmt(at('rfMax'), 1, ' mm') }) : tr('Over this 3-hour step')} />
+            <Stat icon="drop" label={tr('Humidity')} value={fmt(at('rh'), 0, '%')} sub={tr('Relative humidity')} />
+            <Stat icon="wind" label={tr('Wind')} value={fmt(speed, 0, ' km/h')} sub={`${direction ? tr('From {direction}', { direction: tr(direction) }) : tr('Direction unavailable')}${gust !== null && speed !== null && gust > speed ? ` · ${tr('gusts {value}', { value: fmt(gust, 0, ' km/h') })}` : ''}`} />
+            <Stat icon="cloud" label={tr('Cloud cover')} value={fmt(at('cc'), 1, ' / 8')} sub={tr('Sky covered in oktas')} />
+            <Stat icon="bolt" label={tr('Thunder potential')} value={ts === null ? '–' : tr(THUNDER[Math.round(ts)] ?? '–')} sub={tr(snapshot.thunderSource ? 'Open-Meteo · not a strike report' : 'Data not available')} />
+            <Stat icon="rain" label={tr('Rain chance')} value={fmt(at('pop'), 0, '%')} sub={tr('Open-Meteo probability')} />
           </dl>
           <section className="panel-section">
-            <div className="section-heading"><h3>The next 24 hours</h3><span>Every 3 hours</span></div>
-            <div className="hourly-strip" aria-label="Upcoming forecast steps">
+            <div className="section-heading"><h3>{tr('The next 24 hours')}</h3><span>{tr('Every 3 hours')}</span></div>
+            <div className="hourly-strip" aria-label={tr('Upcoming forecast steps')}>
               {times.slice(stepIndex, stepIndex + 8).map((time, i) => (
-                <button key={time} type="button" onClick={() => onStep(stepIndex + i)} aria-pressed={i === 0} aria-label={`${formatBst(time)}, ${fmt(s.temp?.[stepIndex + i], 0, ' degrees')}, rain ${fmt(s.rf?.[stepIndex + i], 1, ' millimetres')}`}>
-                  <small>{i === 0 ? 'Selected' : formatClock(time)}</small><Icon name={weatherIcon(s.wmo?.[stepIndex + i])} size={22} /><strong>{fmt(s.temp?.[stepIndex + i], 0, '°')}</strong><span>{fmt(s.rf?.[stepIndex + i], 1, ' mm')}</span>
+                <button key={time} type="button" onClick={() => onStep(stepIndex + i)} aria-pressed={i === 0} aria-label={tr('{time}, {temp} degrees, rain {rain} millimetres', { time: formatBst(time), temp: fmt(s.temp?.[stepIndex + i]), rain: fmt(s.rf?.[stepIndex + i], 1) })}>
+                  <small>{i === 0 ? tr('Selected') : formatClock(time)}</small><Icon name={weatherIcon(s.wmo?.[stepIndex + i])} size={22} /><strong>{fmt(s.temp?.[stepIndex + i], 0, '°')}</strong><span>{fmt(s.rf?.[stepIndex + i], 1, ' mm')}</span>
                 </button>
               ))}
             </div>
@@ -169,7 +178,7 @@ export function LocationPanel({ resolved, snapshot, stepIndex, dailyState, light
 
       {tab === 'trends' && available && (
           <section className="weather-trends">
-            <h3>A four-day view</h3><p className="section-description">Temperature, rainfall and wind in 3-hour steps.</p>
+            <h3>{tr('A four-day view')}</h3><p className="section-description">{tr('Temperature, rainfall and wind in 3-hour steps.')}</p>
             <Chart
               title="Temperature and heat index"
               unit="°C"
@@ -213,13 +222,13 @@ export function LocationPanel({ resolved, snapshot, stepIndex, dailyState, light
           </section>
       )}
 
-      {tab === 'daily' && (dailyPcode ? <DailyTable daily={dailyState.data} pcode={dailyPcode} loading={dailyState.loading} error={dailyState.error} /> : <p className="forecast-empty">Search for an individual upazila or city thana to see its 10-day forecast.</p>)}
+      {tab === 'daily' && (dailyPcode ? <DailyTable daily={dailyState.data} pcode={dailyPcode} loading={dailyState.loading} error={dailyState.error} /> : <p className="forecast-empty">{tr('Search for an individual upazila or city thana to see its 10-day forecast.')}</p>)}
       {dailyPcode && <LightningBlock info={lightningInfo} />}
 
       <footer className="panel-footer">
         <small>
-          {snapshot?.baseLabel ?? 'Forecast'}: model forecast, not an observation or an official warning.
-          {snapshot?.thunderSource ? ' Thunderstorm potential and weather text: Open-Meteo.' : ''}
+          {tr('{source}: model forecast, not an observation or an official warning.', { source: tr(snapshot?.baseLabel ?? 'Forecast') })}
+          {snapshot?.thunderSource ? ` ${tr('Thunderstorm potential and weather text: Open-Meteo.')}` : ''}
         </small>
       </footer>
     </section>

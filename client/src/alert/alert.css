@@ -6,7 +6,7 @@
   --alert-muted: rgba(46, 61, 40, 0.78);
   min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column;
 }
-.alert-page[data-lang='bn'] { font-size: 1.05rem; }
+.alert-page[data-lang='bn'] { font-size: 1rem; }
 .alert-page[data-lang='bn'] h1, .alert-page[data-lang='bn'] h2, .alert-page[data-lang='bn'] h3, .alert-page[data-lang='bn'] h4,
 .alert-page[data-lang='bn'] .eyebrow { letter-spacing: 0; text-transform: none; }
 .alert-main { flex: 1; padding-top: calc(var(--nav-h) + var(--nav-offset) + 36px); padding-bottom: 72px; }
@@ -242,3 +242,14 @@
 .alert-channel-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
 .alert-channel > .alert-button, .alert-channel-flow > .alert-button { margin-top: 6px; }
 .alert-channel a.alert-button { text-decoration: none; }
+
+/* Long translated labels must grow their controls, not the surrounding layout. */
+.alert-page :is(.alert-panel, .alert-saved-head > div, .alert-channel-flow, .alert-step-body, .alert-col-main, .alert-col-side) { min-width: 0; overflow-wrap: anywhere; }
+.alert-page :is(.alert-button, .alert-choice, .alert-link-button) { max-width: 100%; padding-block: 8px; }
+.alert-page :is(.alert-button, .alert-chip, .alert-card-meta) svg { flex-shrink: 0; }
+.alert-page .alert-channel-flow { justify-items: stretch; }
+.alert-page .alert-step-title { line-height: 1.4; }
+html:lang(bn) .alert-page :is(.alert-intro h1, .alert-head h1, .alert-saved-head h1) { font-size: clamp(1.6rem, 1.3rem + 1.4vw, 2.4rem); }
+html:lang(bn) .alert-page .alert-step-title { font-size: clamp(1.25rem, 1.1rem + 1vw, 1.7rem); }
+html:lang(bn) .alert-page .alert-saved > .alert-panel > p { font-size: .94rem; line-height: 1.7; }
+html:lang(bn) .alert-page :is(.alert-tag, .alert-channel-badge) { padding-block: 3px; }

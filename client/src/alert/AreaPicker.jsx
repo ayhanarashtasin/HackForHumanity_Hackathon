@@ -2,6 +2,7 @@ import { useId, useMemo, useState } from 'react';
 import { Icon } from '../components/Icon.jsx';
 import { areaLabel, searchAreas } from '../lib/alertForm.js';
 import { useAlert } from './context.js';
+import { translate } from '../i18n/index.js';
 
 // Picks one upazila or city thana: division -> district -> upazila selects, plus a search box (English or Bangla).
 // `value` is a six-digit location code or ''. With `allowEmpty` an unset value means "same as my home area".
@@ -64,7 +65,7 @@ export function AreaPicker({
             onChange={(event) => { setDivision(event.target.value); setDistrict(''); if (value) onChange(''); }}
           >
             <option value="">{tr('area.choose')}</option>
-            {index.divisions.map((item) => <option key={item} value={item}>{item}</option>)}
+            {index.divisions.map((item) => <option key={item} value={item}>{translate(lang, item)}</option>)}
           </select>
         </label>
         <label>

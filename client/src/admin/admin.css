@@ -2,12 +2,22 @@
    Deep Olive ink, Sage accents. The severity ramp is used only for severity (the .sev chips and the CRITICAL confirmation); data-status greys
    come from styles.css. Everything is scoped under .admin so it cannot leak into the public pages. */
 .admin-root { min-height: 100dvh; }
+.adm-top .language-toggle { margin-left: auto; }
+.adm-login-card > .language-toggle { margin-block: 12px; }
+html:lang(bn) .admin :is(.adm-hint, .adm-muted, .adm-note) { line-height: 1.7; }
+html:lang(bn) .admin :is(.adm-tabs, .adm-checks, .adm-view-tools) { flex-wrap: wrap; }
+@media (max-width: 600px) {
+  .admin .adm-top { flex-wrap: wrap; gap: 8px; }
+  .admin .adm-top .adm-role-badge { display: none; }
+  .admin .adm-top .adm-top-out { margin-left: 0; }
+  .adm-top .language-toggle button { padding-inline: 7px; }
+}
 .admin, .adm-login {
   --adm-line: rgba(46, 61, 40, 0.16);
   --adm-line-strong: rgba(46, 61, 40, 0.38);
   --adm-muted: rgba(46, 61, 40, 0.74);
   --adm-surface: color-mix(in srgb, var(--cream) 95%, var(--olive));
-  --adm-top: 62px;
+  --adm-top: 68px;
   color: var(--olive);
   background: var(--cream);
   font-size: 0.92rem;
@@ -21,8 +31,8 @@
 .adm-block { display: block; }
 .adm-hint { margin: 6px 0 0; color: var(--adm-muted); font-size: 0.82rem; line-height: 1.5; }
 
-.adm-skip { position: fixed; left: 12px; top: -64px; z-index: 200; padding: 12px 16px; background: var(--olive); color: var(--cream); font-weight: 700; border-radius: 8px; }
-.adm-skip:focus { top: 12px; }
+.adm-skip { position: fixed; left: 12px; top: 12px; z-index: 200; padding: 12px 16px; max-width: calc(100% - 24px); background: var(--olive); color: var(--cream); font-weight: 700; border-radius: 8px; transform: translateY(calc(-100% - 24px)); }
+.adm-skip:focus { transform: none; }
 
 /* ---------- shell ---------- */
 .adm-top {
@@ -281,6 +291,19 @@ body.adm-modal-open { overflow: hidden; }
 .adm-login-card { inline-size: min(420px, 100%); display: grid; gap: 14px; padding: 28px 26px; border: 1px solid var(--adm-line); border-radius: 18px; background: var(--adm-surface); }
 .adm-login-card h1 { font-size: 1.35rem; }
 .adm-login-card p { margin: 0; }
+.adm-login-card, .adm-password, .adm-password input { min-width: 0; }
+.adm-login-card { overflow-wrap: anywhere; }
+.adm-password .adm-btn { flex-shrink: 0; }
+
+.admin :is(.adm-card, .adm-field, .adm-note > div, .adm-note p, .adm-switches li > div, .adm-sample, .adm-inbox-item) { min-width: 0; overflow-wrap: anywhere; }
+.admin :is(.adm-btn, .adm-check), .adm-login .adm-btn { max-width: 100%; padding-block: 8px; }
+.admin :is(.adm-btn, .adm-nav button, .adm-check, .adm-sender, .adm-banner) > svg { flex-shrink: 0; }
+.adm-check input { flex-shrink: 0; }
+.adm-note { flex-wrap: wrap; }
+.adm-note > div, .adm-note > p { flex: 1; min-width: min(160px, 100%); }
+.adm-preview-head, .adm-confirm-count, .adm-result-actions { flex-wrap: wrap; }
+html:lang(bn) .admin :is(.adm-role-badge, .adm-sample-lang, .adm-group > h4, .adm-badge-prototype, .adm-breakdown h3, th, td::before) { letter-spacing: normal; }
+html:lang(bn) .admin :is(.adm-kv, .adm-table, .adm-sample, .adm-confirm-mode) { line-height: 1.6; }
 
 /* ---------- phones and tablets ---------- */
 @media (max-width: 860px) {
@@ -292,6 +315,14 @@ body.adm-modal-open { overflow: hidden; }
   .adm-nav button { inline-size: auto; flex: none; white-space: nowrap; padding: 0 12px; }
   .adm-main { padding-top: 18px; }
   .adm-role-badge { display: none; }
+}
+
+@media (max-width: 600px) {
+  /* A naturally wrapping header scrolls away; only navigation stays sticky, so its offset never guesses the translated header height. */
+  .admin .adm-top { position: static; }
+  .admin .adm-nav { top: 0; }
+  .adm-top-out { flex-basis: 100%; }
+  .adm-top-out .adm-btn { font-size: .8rem; }
 }
 
 @media (max-width: 720px) {

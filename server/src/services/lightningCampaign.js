@@ -70,7 +70,10 @@ export function chooseMode({ upazilaCount, slots, costPerRequest, remaining, res
   const reason = fitsA
     ? `Mode A (upazila-location summaries): ${format(upazilaCount)} locations × ${slots} slots × ${costPerRequest} = ${format(requiredA)} accesses fits within the ${format(available)} available after the ${format(reserve)}-access reserve.`
     : `Mode B (regional-circle summaries): Mode A would need ${format(upazilaCount)} locations × ${slots} slots × ${costPerRequest} = ${format(requiredA)} accesses, but only ${format(available)} are available after the ${format(reserve)}-access reserve.`;
-  return { mode: fitsA ? 'A' : 'B', requiredA, available, reason };
+  const reasonBn = fitsA
+    ? `পদ্ধতি A (উপজেলার অবস্থানভিত্তিক সারসংক্ষেপ): ${format(upazilaCount)}টি স্থান × ${slots} বার সংগ্রহ × ${costPerRequest} = ${format(requiredA)} বার API ব্যবহার প্রয়োজন। সংরক্ষিত ${format(reserve)} বার ব্যবহারের বরাদ্দ বাদ দিয়েও অবশিষ্ট ${format(available)} বার ব্যবহারের মধ্যে এটি সম্ভব।`
+    : `পদ্ধতি B (আঞ্চলিক বৃত্তের সারসংক্ষেপ): পদ্ধতি A-তে ${format(upazilaCount)}টি স্থান × ${slots} বার সংগ্রহ × ${costPerRequest} = ${format(requiredA)} বার API ব্যবহার লাগত। সংরক্ষিত ${format(reserve)} বার ব্যবহারের বরাদ্দ বাদ দিলে মাত্র ${format(available)} বার ব্যবহারের সুযোগ থাকে।`;
+  return { mode: fitsA ? 'A' : 'B', requiredA, available, reason, reasonBn };
 }
 
 // The first slot is the initial population refresh unless a wall-clock slot is already due, in which case that slot is slot #1.
@@ -130,6 +133,7 @@ export async function buildStatus({ config = env, now = () => new Date(), geo = 
 
   let state;
   let reason = null;
+  let reasonBn = null;
   if (!config.lightning.enabled) {
     state = 'disabled';
     reason = 'Lightning collection is turned off.';
@@ -143,6 +147,7 @@ export async function buildStatus({ config = env, now = () => new Date(), geo = 
     state = 'not-started';
     const start = config.lightning.campaignStart;
     reason = start && start > dhakaDate(nowDate) ? `The campaign starts on ${start}.` : 'The first refresh has not run yet.';
+    if (start && start > dhakaDate(nowDate)) reasonBn = `নির্ধারিত তথ্য সংগ্রহ শুরু হবে ${start} তারিখে।`;
   } else if (isEnded(campaign, nowDate)) {
     state = 'ended';
     reason = 'The campaign has finished; scheduled collection has stopped.';
@@ -161,9 +166,11 @@ export async function buildStatus({ config = env, now = () => new Date(), geo = 
     return {
       state,
       reason,
+      reasonBn,
       mode: plan.mode,
       modeLabel: modeLabel(plan.mode),
       modeReason: plan.reason,
+      modeReasonBn: plan.reasonBn,
       campaign: null,
       budget: {
         remaining: config.xweather.budgetRemaining,
@@ -193,6 +200,7 @@ export async function buildStatus({ config = env, now = () => new Date(), geo = 
     mode: campaign.mode,
     modeLabel: modeLabel(campaign.mode),
     modeReason: campaign.modeReason,
+    modeReasonBn: campaign.modeReasonBn ?? null,
     campaign: {
       id: String(campaign._id),
       startDate: campaign.startDate,
@@ -289,7 +297,7 @@ export async function buildSummaries({ config = env, now = () => new Date(), geo
 
   return {
     mode: campaign ? campaign.mode : plan.mode,
-    items: locations.map((l) => summaryItem(l, good.get(l.id), bad.get(l.id), nowDate.getTime(), staleAfterMinutes * 60_000)),
+    items: locations.map((l) => ({ ...summaryItem(l, good.get(l.id), bad.get(l.id), nowDate.getTime(), staleAfterMinutes * 60_000), nameBn: geo.locationsByPcode.get(l.id)?.nameBn ?? null })),
     latestRefreshAt: dhakaIso(campaign?.lastRefreshAt),
     staleAfterMinutes,
   };
@@ -304,20 +312,27 @@ export async function buildUpazilaSummaries(pcode, options = {}) {
   const summaries = await buildSummaries({ ...options, geo });
   let items;
   let note;
+  let noteBn;
 
   if (summaries.mode === 'B') {
     items = summaries.items.filter((i) => haversineKm(location.lat, location.lon, i.lat, i.lon) <= i.radiusKm);
     note = items.length
       ? `Lightning near this location: the listed ${items[0].radiusKm} km-radius circle summaries are circle-wide totals, not counts inside ${location.name}. Overlapping circles can include the same events and must not be summed.`
       : `No ${geo.apiRadiusKm} km search circle is centred within range of ${location.name}.`;
+    noteBn = items.length
+      ? `এই এলাকার কাছাকাছি বজ্রপাতের তথ্য: তালিকার ${items[0].radiusKm} কিমি ব্যাসার্ধের বৃত্তগুলোর সংখ্যা পুরো বৃত্তের জন্য, ${location.nameBn || location.name}-এর সীমানার ভেতরের জন্য নয়। বৃত্তের মিল থাকা অংশে একই বজ্রপাত একাধিকবার ধরা হতে পারে, তাই সংখ্যাগুলো যোগ করবেন না।`
+      : `${location.nameBn || location.name}-এর জন্য ${geo.apiRadiusKm} কিমি ব্যাসার্ধের কোনো অনুসন্ধান বৃত্তের কেন্দ্র নাগালের মধ্যে নেই।`;
   } else {
     items = location.pid ? summaries.items.filter((i) => i.id === location.pid) : [];
     note = items.length
       ? `Lightning near this upazila: a ${items[0].radiusKm} km-radius summary around its representative point, not a count inside its boundary.`
       : `${location.name} has no upazila-location summary (it is a city thana or has no upazila point), so nothing is attached to it.`;
+    noteBn = items.length
+      ? `এই উপজেলার কাছাকাছি বজ্রপাতের তথ্য: প্রতিনিধিত্বকারী বিন্দুর চারদিকে ${items[0].radiusKm} কিমি ব্যাসার্ধের সারসংক্ষেপ। এটি উপজেলার সীমানার ভেতরে বজ্রপাতের সংখ্যা নয়।`
+      : `${location.nameBn || location.name}-এর অবস্থানভিত্তিক উপজেলা সারসংক্ষেপ নেই। এটি শহরের থানা অথবা এর জন্য উপজেলার বিন্দু নেই, তাই আলাদা বজ্রপাতের তথ্য যোগ করা হয়নি।`;
   }
 
-  return { pcode, name: location.name, mode: summaries.mode, items, note };
+  return { pcode, name: location.name, mode: summaries.mode, items, note, noteBn };
 }
 
 // ---------- collection (job side) ----------
@@ -432,6 +447,7 @@ export function createLightningService({
         graceMinutes: config.lightning.graceMinutes,
         mode: choice.mode,
         modeReason: choice.reason,
+        modeReasonBn: choice.reasonBn,
         locations: choice.mode === 'A' ? upazilaLocations(geo) : circleLocations(geo),
         slots,
         budget: {

@@ -5,6 +5,8 @@ import { prefetchPage } from '../pages/pageLoader.js';
 import { Icon } from './Icon.jsx';
 import { Link } from './Link.jsx';
 import { LogoMark } from './Logo.jsx';
+import { LanguageToggle } from './LanguageToggle.jsx';
+import { useLanguage } from '../i18n/index.js';
 
 const prefetchMap = prefetchPage('map');
 const prefetchAlert = prefetchPage('alert');
@@ -54,7 +56,8 @@ function useNavState(headerRef) {
   return state;
 }
 
-export function Navbar() {
+export function Navbar({ onLanguageChange, languageDisabled = false }) {
+  const { tr, number } = useLanguage();
   const headerRef = useRef(null);
   const toggleRef = useRef(null);
   const [open, setOpen] = useState(false);
@@ -87,25 +90,25 @@ export function Navbar() {
   // On the landing page the links scroll to their section; from any other page they go back to it.
   const sectionLink = (link) => (
     <li key={link.id}>
-      <a href={onHome ? `#${link.id}` : `/#${link.id}`} aria-current={onHome && active === link.id ? 'location' : undefined} onClick={() => setOpen(false)}>{link.label}</a>
+      <a href={onHome ? `#${link.id}` : `/#${link.id}`} aria-current={onHome && active === link.id ? 'location' : undefined} onClick={() => setOpen(false)}>{tr(link.label)}</a>
     </li>
   );
 
   const mapProps = { to: '/map', onPointerEnter: prefetchMap, onFocus: prefetchMap };
   const alertProps = { to: '/alert', onPointerEnter: prefetchAlert, onFocus: prefetchAlert };
-  const badge = unread > 9 ? '9+' : String(unread);
-  const alertLabel = unread > 0 ? `Alerts, ${unread} unread` : 'Alerts';
+  const badge = number(unread > 9 ? '9+' : unread);
+  const alertLabel = unread > 0 ? tr('Alerts, {n} unread', { n: unread }) : tr('Alerts');
 
   return (
     <header ref={headerRef} className={`nav${scrolled ? ' is-scrolled' : ''}`} data-nav-tone={tone}>
-      <nav className="nav-inner" aria-label="Main">
+      <nav className="nav-inner" aria-label={tr('Main')}>
         <button
           ref={toggleRef}
           type="button"
           className="nav-toggle"
           aria-expanded={open}
           aria-controls="nav-menu"
-          aria-label={open ? 'Close menu' : 'Open menu'}
+          aria-label={tr(open ? 'Close menu' : 'Open menu')}
           onClick={() => setOpen((value) => !value)}
         >
           <Icon name={open ? 'close' : 'menu'} size={24} />
@@ -116,10 +119,10 @@ export function Navbar() {
             {[...SECTION_LINKS, ...MENU_ONLY_LINKS].map(sectionLink)}
             <li>
               <Link {...alertProps} aria-current={route === 'alert' ? 'page' : undefined} onClick={() => setOpen(false)}>
-                <Icon name="bell" size={18} />Alerts{unread > 0 ? <span className="nav-menu-count">{unread} unread</span> : null}
+                <Icon name="bell" size={18} />{tr('Alerts')}{unread > 0 ? <span className="nav-menu-count">{tr('{n} unread', { n: unread })}</span> : null}
               </Link>
             </li>
-            <li><Link {...mapProps} onClick={() => setOpen(false)}><Icon name="map" size={18} />Map</Link></li>
+            <li><Link {...mapProps} onClick={() => setOpen(false)}><Icon name="map" size={18} />{tr('Map')}</Link></li>
           </ul>
         )}
 
@@ -127,31 +130,32 @@ export function Navbar() {
           <a
             href="/"
             className="nav-logo"
-            aria-label="AkashSathi, back to top"
+            aria-label={tr('AkashSathi, back to top')}
             onClick={(event) => { event.preventDefault(); setOpen(false); window.scrollTo({ top: 0 }); }}
           >
             <LogoMark size={34} />
-            <span className="nav-logo-text">AkashSathi</span>
+            <span className="nav-logo-text">{tr('AkashSathi')}</span>
           </a>
         ) : (
-          <Link to="/" className="nav-logo" aria-label="AkashSathi home" onClick={() => setOpen(false)}>
+          <Link to="/" className="nav-logo" aria-label={tr('AkashSathi home')} onClick={() => setOpen(false)}>
             <LogoMark size={34} />
-            <span className="nav-logo-text">AkashSathi</span>
+            <span className="nav-logo-text">{tr('AkashSathi')}</span>
           </Link>
         )}
 
         <ul className="nav-links nav-links--left">{SECTION_LINKS.map(sectionLink)}</ul>
 
         <ul className="nav-links nav-links--right">
+          <li className="nav-language"><LanguageToggle onChange={onLanguageChange} disabled={languageDisabled} /></li>
           <li className="nav-cta-item">
             <Link {...alertProps} className="nav-cta nav-cta--outline nav-alert" aria-label={alertLabel} aria-current={route === 'alert' ? 'page' : undefined}>
               <Icon name="bell" size={18} />
-              <span className="nav-alert-label">Alert</span>
+              <span className="nav-alert-label">{tr('Alert')}</span>
               {unread > 0 && <span className="nav-badge" aria-hidden="true">{badge}</span>}
             </Link>
           </li>
           <li className="nav-cta-item">
-            <Link {...mapProps} className="nav-cta"><Icon name="map" size={18} />Map</Link>
+            <Link {...mapProps} className="nav-cta"><Icon name="map" size={18} />{tr('Map')}</Link>
           </li>
         </ul>
       </nav>

@@ -8,16 +8,16 @@ import { useAlert } from './context.js';
 // reports just that area code. The coordinates are never stored, sent or kept in state.
 export function GeoButton({ onFound }) {
   const { tr, lang, catalogue, index } = useAlert();
-  const [state, setState] = useState({ status: 'idle', message: '' });
+  const [state, setState] = useState({ status: 'idle', key: null });
   const request = useRef(0);
 
-  const fail = (key) => setState({ status: 'error', message: tr(key) });
+  const fail = (key) => setState({ status: 'error', key });
 
   const find = () => {
     if (!catalogue) return;
     const current = ++request.current;
     if (!window.isSecureContext || !navigator.geolocation) { fail('gps.unsupported'); return; }
-    setState({ status: 'busy', message: '' });
+    setState({ status: 'busy', key: null });
 
     navigator.geolocation.getCurrentPosition(async ({ coords }) => {
       try {
@@ -28,7 +28,7 @@ export function GeoButton({ onFound }) {
         const pcode = match ? pcodeFromSelection(match.selection, catalogue) : null;
         if (!pcode) { fail('gps.outside'); return; }
         onFound(pcode);
-        setState({ status: 'found', message: tr('gps.found', { name: areaLabel(index, pcode, lang) }) });
+        setState({ status: 'found', key: 'gps.found', pcode });
       } catch {
         if (current === request.current) fail('gps.load');
       }
@@ -44,7 +44,7 @@ export function GeoButton({ onFound }) {
         {state.status === 'busy' ? tr('gps.busy') : tr('gps.button')}
       </button>
       <p className="alert-help">{tr('gps.note')}</p>
-      {state.message && <p className={state.status === 'error' ? 'alert-field-error' : 'alert-note'} role={state.status === 'error' ? 'alert' : 'status'}>{state.message}</p>}
+      {state.key && <p className={state.status === 'error' ? 'alert-field-error' : 'alert-note'} role={state.status === 'error' ? 'alert' : 'status'}>{tr(state.key, { name: areaLabel(index, state.pcode, lang) })}</p>}
     </div>
   );
 }

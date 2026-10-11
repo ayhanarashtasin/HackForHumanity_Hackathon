@@ -6,10 +6,12 @@ import { areaLabel, pick } from '../lib/alertForm.js';
 import { alertApi } from '../services/alertApi.js';
 import { useAlert } from './context.js';
 import { ageText, formatDhaka } from './format.js';
+import { useLanguage } from '../i18n/index.js';
 
 // Shown right after sign-up: the plain facts about how these alerts work, so nobody is surprised later.
 export function SavedScreen({ profile, onContinue }) {
   const { tr, lang, index, schema } = useAlert();
+  const { tr: text } = useLanguage();
   const [status, setStatus] = useState(null);
   const [failed, setFailed] = useState(false);
 
@@ -60,7 +62,7 @@ export function SavedScreen({ profile, onContinue }) {
             <ul className="alert-sources">
               {status.sources.map((source) => (
                 <li key={source.key}>
-                  <div><strong>{source.label}</strong><DataStatus status={source.status} lang={lang} /></div>
+                  <div><strong>{text(source.label)}</strong><DataStatus status={source.status} lang={lang} /></div>
                   <p className="alert-coverage-meta">
                     {source.note === 'not-configured' ? tr('source.notConfigured') : (
                       <>
@@ -73,8 +75,7 @@ export function SavedScreen({ profile, onContinue }) {
               ))}
             </ul>
             <h3 className="alert-subhead">{tr('saved.lightning')}</h3>
-            <p className="alert-note">{status.monitoring.lightning}</p>
-            {lang === 'bn' && <p className="alert-note">{tr('note.lightning-window')}</p>}
+            <p className="alert-note">{text(status.monitoring.lightning)}</p>
           </>
         )}
       </section>

@@ -7,10 +7,11 @@ import { alertApi } from '../services/alertApi.js';
 import { ConfirmDialog } from './ConfirmDialog.jsx';
 import { useAlert } from './context.js';
 import { digits } from './format.js';
+import { errorText } from '../i18n/index.js';
 
 // The profile: the answers as saved, and the three things a person can do with it: edit, pause or resume, delete.
 export function ProfilePanel({ profile, onEdit, onProfile, onDeleted }) {
-  const { tr, lang, schema, index } = useAlert();
+  const { tr, lang, schema, index, languageBusy } = useAlert();
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -69,11 +70,11 @@ export function ProfilePanel({ profile, onEdit, onProfile, onDeleted }) {
       <p className="alert-help">{tr('profile.languageNote')}</p>
 
       <div className="alert-profile-actions">
-        <button type="button" className="alert-button alert-button--ghost" onClick={onEdit}><Icon name="edit" size={18} />{tr('profile.edit')}</button>
-        <button type="button" className="alert-button alert-button--ghost" onClick={togglePause} disabled={busy}>{paused ? tr('profile.resume') : tr('profile.pause')}</button>
-        <button type="button" className="alert-button alert-button--danger-ghost" onClick={() => setConfirming(true)} disabled={busy}><Icon name="trash" size={18} />{tr('profile.delete')}</button>
+        <button type="button" className="alert-button alert-button--ghost" onClick={onEdit} disabled={busy || languageBusy}><Icon name="edit" size={18} />{tr('profile.edit')}</button>
+        <button type="button" className="alert-button alert-button--ghost" onClick={togglePause} disabled={busy || languageBusy}>{paused ? tr('profile.resume') : tr('profile.pause')}</button>
+        <button type="button" className="alert-button alert-button--danger-ghost" onClick={() => setConfirming(true)} disabled={busy || languageBusy}><Icon name="trash" size={18} />{tr('profile.delete')}</button>
       </div>
-      {error && <p className="alert-field-error" role="alert">{error}</p>}
+      {error && <p className="alert-field-error" role="alert">{errorText(error, lang)}</p>}
 
       {confirming && (
         <ConfirmDialog

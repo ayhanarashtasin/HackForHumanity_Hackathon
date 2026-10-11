@@ -265,3 +265,55 @@
 @media (prefers-reduced-motion: reduce) {
   .weather-app *, .weather-app *::before, .weather-app *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* Keep language and search visible on narrow phones, without squeezing Bangla labels into icon-sized slots. */
+@media (max-width: 760px) {
+  .weather-app .topbar { grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; padding: 10px 12px; }
+  .weather-app .topbar .brand { grid-column: 1; grid-row: 1; min-width: 0; }
+  .weather-app .topbar > .language-toggle { grid-column: 2 / 4; grid-row: 1; justify-self: end; }
+  .weather-app .brand span { display: none; }
+  .weather-app .search { grid-column: 1 / -1; grid-row: 2; }
+  .weather-app .header-location-button { grid-column: 1; grid-row: 3; width: auto; justify-content: flex-start; }
+  .weather-app .header-location-button span { display: inline; }
+  .weather-app .header-alert-link { grid-column: 2; grid-row: 3; }
+  .weather-app .status { grid-column: 3; grid-row: 3; }
+  html:lang(bn) .timebar { flex-wrap: wrap; }
+  html:lang(bn) .timebar-readout { min-width: 0; white-space: normal; }
+}
+
+/* Translated names and labels can use another line without widening their cards. */
+.weather-app :is(.map-context > div, .status-popover li > div, .menu-label, .layer-title, .lightning-selected header > div) { min-width: 0; }
+.weather-app :is(.map-context, .panel-header, .stat, .lightning-content) { overflow-wrap: anywhere; }
+.weather-app :is(.panel-title, .layer-title, .menu-item) svg { flex-shrink: 0; }
+.weather-app .sub-choice { flex-wrap: wrap; }
+.weather-app .status > button { height: auto; min-height: 44px; }
+html:lang(bn) .weather-app :is(.weather-temperature, .stat dd, .brand strong, .location-access h2, .panel-header h2, .lightning-refresh time) { letter-spacing: normal; }
+html:lang(bn) .weather-app .location-access h2 { font-size: clamp(1.4rem, 1.1rem + 1vw, 1.75rem); }
+html:lang(bn) .weather-app .panel-header h2 { font-size: 1.5rem; }
+
+/* Reserve the timeline's natural height, including translated/wrapped dates, instead of guessing its clearance in pixels. */
+.weather-app .map-stage { display: grid; grid-template-rows: minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr); padding-bottom: 36px; }
+.weather-app .map-stage .timebar { position: relative; grid-row: 2; grid-column: 1; inset: auto; margin: 12px 16px 0; }
+.weather-app .map-stage .right-stack,
+.weather-app .map-stage .right-stack.with-lightning { grid-area: 1 / 1 / 2 / 2; bottom: 12px; max-height: none; }
+.weather-app .map-stage .legend { grid-area: 1 / 1 / 2 / 2; bottom: 12px; }
+@media (max-width: 760px) {
+  .weather-app .map-stage { padding-bottom: 34px; }
+  .weather-app .map-stage .timebar { margin-inline: 12px; }
+}
+@media (max-height: 600px) {
+  /* Closeable panels get the small landscape canvas; closing them restores the timeline unchanged. */
+  .weather-app :is(.has-lightning-panel, .has-layer-menu) .timebar { display: none; }
+  .weather-app .map-stage .right-stack { top: 12px; z-index: 8; }
+}
+
+/* Keep landscape phones usable: the language switch must not restore the portrait three-row header. */
+@media (max-height: 500px) and (max-width: 760px) {
+  .weather-app .topbar { grid-template-columns: auto minmax(0, 1fr) auto auto; padding: 6px 12px; gap: 6px; }
+  .weather-app .topbar .brand { grid-column: 1; grid-row: 1; }
+  .weather-app .brand div { display: none; }
+  .weather-app .search { grid-column: 2; grid-row: 1; min-width: 0; }
+  .weather-app .topbar > .language-toggle { grid-column: 3; grid-row: 1; }
+  .weather-app .status { grid-column: 4; grid-row: 1; }
+  .weather-app .header-location-button, .weather-app .header-alert-link { display: none; }
+}

@@ -1,3 +1,13 @@
+/* Self-hosted variable Bengali subset: consistent shaping and metrics on every OS, with no third-party font request. */
+@font-face {
+  font-family: 'AkashSathi Bengali';
+  src: url('/fonts/noto-sans-bengali.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  unicode-range: U+0951-0952, U+0964-0965, U+0980-09FE, U+1CD0, U+1CD2, U+1CD5-1CD6, U+1CD8, U+1CE1, U+1CEA, U+1CED, U+1CF2, U+1CF5-1CF7, U+200C-200D, U+20B9, U+25CC, U+A8F1, U+11DF0-11DF1;
+}
+
 /* design.md: Soft White #E8E9DF, Sage Green #A9BE87, Deep Olive #2E3D28. All UI colors are these or tints/alpha of them.
    Weather data ramps (scales.js) are the only other colors. */
 :root {
@@ -24,7 +34,9 @@
   --sev-critical: #B8312B;
   --sev-critical-ink: #E8E9DF;
 
-  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Bengali", sans-serif;
+  --font-ui: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-bn: 'AkashSathi Bengali', 'Noto Sans Bengali', 'Nirmala UI', sans-serif;
+  font-family: var(--font-ui), var(--font-bn);
   color: var(--olive);
   background: var(--olive);
   line-height: 1.45;
@@ -39,12 +51,24 @@ html[data-page='landing'], html[data-page='alert'], html[data-page='admin'] { ba
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
 body { margin: 0; overflow: hidden; background: var(--olive); }
-button, input { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 button:disabled, input:disabled { cursor: not-allowed; opacity: 0.5; }
 h1, h2, h3, p, ul, dl, figure { margin: 0; }
 ul { padding: 0; list-style: none; }
 :focus-visible { outline: 3px solid var(--sage); outline-offset: 2px; }
+.language-toggle { display: inline-flex; flex: none; gap: 2px; padding: 3px; border: 1px solid var(--olive-faint); border-radius: 999px; background: var(--cream); color: var(--olive); }
+.language-toggle button { min-height: 44px; min-width: 44px; padding: 5px 10px; border: 0; border-radius: 999px; background: transparent; color: inherit; font-size: 0.85rem; font-weight: 600; white-space: nowrap; }
+.language-toggle button[aria-pressed='true'] { background: var(--olive); color: var(--cream); }
+.language-toggle button:hover:not(:disabled):not([aria-pressed='true']) { background: var(--sage-soft); }
+/* Bengali conjuncts need room above/below the baseline, without English-style tracking or italics. */
+:lang(bn) { font-family: var(--font-bn); letter-spacing: normal; }
+html:lang(bn) { line-height: 1.6; }
+html:lang(bn) :is(h1, h2, h3, h4, legend, .eyebrow, .menu-heading) { letter-spacing: normal; line-height: 1.4; }
+html:lang(bn) :is(h1, h2) em { font-style: normal; }
+html:lang(bn) :is(button, input, select, textarea) { line-height: 1.5; letter-spacing: normal; }
+html:lang(bn) :is(.sev, .data-chip) { line-height: 1.6; }
+:lang(en) { font-family: var(--font-ui), var(--font-bn); }
 
 .app { position: relative; height: 100dvh; overflow: hidden; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }

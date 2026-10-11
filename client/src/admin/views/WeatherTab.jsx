@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { useLanguage } from '../../i18n/index.js';
+import { ADMIN } from '../../i18n/admin.js';
 import {
   buildBody, initialForm, sendableRoles, validateForm,
 } from '../../lib/adminForm.js';
@@ -11,10 +13,11 @@ import { useSendFlow } from '../hooks/useSendFlow.js';
 
 // Send now from weather: the engine's own rules, run against the cached data right now, for the roles and areas chosen here.
 export function WeatherTab({ onOpenHistory }) {
+  const { tr, lang } = useLanguage(ADMIN);
   const { options } = useAdmin();
   const [form, setForm] = useState(() => initialForm('weather', options));
   const body = useMemo(() => buildBody('weather', form), [form]);
-  const problems = useMemo(() => validateForm('weather', form, options), [form, options]);
+  const problems = useMemo(() => validateForm('weather', form, options), [form, options, lang]);
   const flow = useSendFlow({ mode: 'weather', currentBody: body });
   const update = (patch) => setForm((current) => ({ ...current, ...patch }));
 
@@ -29,15 +32,15 @@ export function WeatherTab({ onOpenHistory }) {
       mode="weather"
       flow={flow}
       problems={problems}
-      previewLabel="Check current weather"
+      previewLabel={tr('Check current weather')}
       onOpenHistory={onOpenHistory}
       roleButtons={{ roles: flow.usable ? sendableRoles(flow.preview) : [], onRole: onlyRole }}
     >
       <Notice tone="info">
-        The engine already sends automatically every few minutes. This checks the cached weather <strong>now</strong>, shows what would go out, and lets you send it without waiting.
+        {tr('The engine already sends automatically every few minutes. This checks the cached weather now, shows what would go out, and lets you send it without waiting.')}
       </Notice>
       <RolePicker value={form.roles} onChange={(roles) => update({ roles })} />
-      <AreaPicker value={form.areas} onChange={(areas) => update({ areas })} legend="Narrow the area (optional)" />
+      <AreaPicker value={form.areas} onChange={(areas) => update({ areas })} legend={tr('Narrow the area (optional)')} />
       <AudiencePicker value={form.audience} onChange={(audience) => update({ audience })} />
     </SendSurface>
   );

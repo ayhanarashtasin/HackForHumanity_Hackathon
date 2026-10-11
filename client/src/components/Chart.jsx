@@ -1,4 +1,6 @@
 import { dayKey, formatDay, formatBst } from '../lib/time.js';
+import { useLanguage } from '../i18n/index.js';
+import { MAP } from '../i18n/map.js';
 
 const W = 320;
 const H = 112;
@@ -17,6 +19,7 @@ function linePath(values, x, y) {
 
 // Small dependency-free SVG chart for 3-hourly series: lines and/or bars, day separators, and the selected step highlighted.
 export function Chart({ title, unit, times, series, selectedIndex, zeroBase = false, maxFloor = 0, decimals = 0 }) {
+  const { tr, number } = useLanguage(MAP);
   const n = times.length;
   const values = series.flatMap((s) => s.values.filter((v) => v !== null && v !== undefined));
   if (!n || !values.length) return null;
@@ -32,22 +35,22 @@ export function Chart({ title, unit, times, series, selectedIndex, zeroBase = fa
   const cellX = (i) => PAD.l + (i / n) * innerW;
   const y = (v) => PAD.t + (1 - (v - min) / (max - min)) * innerH;
   const barWidth = Math.max(1.5, (innerW / n) * 0.7);
-  const format = (v) => Number(v).toFixed(decimals);
+  const format = (v) => number(Number(v).toFixed(decimals));
 
   const dayStarts = times.map((time, i) => (i === 0 || dayKey(time) !== dayKey(times[i - 1]) ? i : null)).filter((i) => i !== null);
 
   return (
     <figure className="chart">
       <figcaption>
-        <strong>{title}</strong>
+        <strong>{tr(title)}</strong>
         <span className="chart-legend">
           {series.map((s) => (
-            <span key={s.label}><i style={{ background: s.color }} />{s.label}</span>
+            <span key={s.label}><i style={{ background: s.color }} />{tr(s.label)}</span>
           ))}
-          {unit && <em>{unit}</em>}
+          {unit && <em>{number(tr(unit))}</em>}
         </span>
       </figcaption>
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${title}, ${n} steps from ${formatBst(times[0])} to ${formatBst(times[n - 1])}`}>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={tr('{title}, {n} steps from {from} to {to}', { title: tr(title), n, from: formatBst(times[0]), to: formatBst(times[n - 1]) })}>
         <line x1={PAD.l} x2={W - PAD.r} y1={y(min)} y2={y(min)} className="axis" />
         <line x1={PAD.l} x2={W - PAD.r} y1={y(max)} y2={y(max)} className="grid" />
         <text x={PAD.l - 4} y={y(max) + 3} className="axis-text" textAnchor="end">{format(max)}</text>

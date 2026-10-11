@@ -128,6 +128,9 @@ test('Mode A needs 14,850 accesses, which does not fit 14,717 available, so Mode
   assert.equal(choice.mode, 'B');
   assert.match(choice.reason, /14,850/);
   assert.match(choice.reason, /14,717/);
+  assert.match(choice.reasonBn, /পদ্ধতি B/);
+  assert.match(choice.reasonBn, /14,850/);
+  assert.match(choice.reasonBn, /14,717/);
 });
 
 test('Mode A is chosen when it fits: a 9-day campaign, or a larger allowance', () => {
@@ -136,6 +139,7 @@ test('Mode A is chosen when it fits: a 9-day campaign, or a larger allowance', (
   const short = chooseMode({ upazilaCount: 495, slots: nineDays, costPerRequest: 1, remaining: 14817, reserve: 100 });
   assert.equal(short.mode, 'A');
   assert.equal(short.requiredA, 13860);
+  assert.match(short.reasonBn, /পদ্ধতি A/);
 
   assert.equal(chooseMode({ upazilaCount: 495, slots: 30, costPerRequest: 1, remaining: 20000, reserve: 100 }).mode, 'A');
   // A higher observed cost per request pushes Mode A out of budget again, and the setup cost counts too.

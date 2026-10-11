@@ -5,13 +5,14 @@ import { Link } from '../components/Link.jsx';
 import { LogoMark } from '../components/Logo.jsx';
 import { Navbar } from '../components/Navbar.jsx';
 import { STATUS_COLORS } from '../lib/palette.js';
+import { useLanguage } from '../i18n/index.js';
+import { LANDING } from '../i18n/landing.js';
 import { prefetchPage } from './pageLoader.js';
 import '../landing.css';
 
 const prefetchMap = prefetchPage('map');
 
-// Everything below describes what the map does today. Occupation-aware advice (the scenario catalogue) is not built yet,
-// and the page says so rather than implying it.
+// Describe shipped features without implying expert validation or continuous lightning monitoring.
 const FACTS = [
   { value: '64', label: 'districts' },
   { value: '544', label: 'upazilas and city thanas' },
@@ -128,55 +129,56 @@ function SkySculpture() {
 }
 
 export function LandingPage() {
+  const { tr, number } = useLanguage(LANDING);
   const [skyPaused, setSkyPaused] = useState(false);
 
   return (
-    <div className="landing">
-      <a className="skip-link" href="#main">Skip to content</a>
+    <div className="landing landing-home">
+      <a className="skip-link" href="#main">{tr('Skip to content')}</a>
       <Navbar />
 
       <main id="main">
         <section id="top" className="hero" data-tone="light" aria-labelledby="hero-title">
           <div className="hero-art" data-paused={skyPaused}><SkySculpture /></div>
           <div className="container hero-layout">
-            <p className="hero-edition"><span lang="bn">আকাশসাথী</span><span>Made for Bangladesh</span></p>
-            <p className="hero-note hero-note--left">A sky full of signals.<br />A little more clarity<br />for your everyday.</p>
+            <p className="hero-edition"><span lang="bn">আকাশসাথী</span><span>{tr('Made for Bangladesh')}</span></p>
+            <p className="hero-note hero-note--left">{tr('A sky full of signals.')}<br />{tr('A little more clarity')}<br />{tr('for your everyday.')}</p>
             <div className="hero-copy">
-              <p className="eyebrow" style={{ '--i': 0 }}>A clearer view of</p>
-              <h1 id="hero-title" style={{ '--i': 1 }}>Your <span>tomorrow.</span></h1>
+              <p className="eyebrow" style={{ '--i': 0 }}>{tr('A clearer view of')}</p>
+              <h1 id="hero-title" style={{ '--i': 1 }}>{tr('Your')} <span>{tr('tomorrow.')}</span></h1>
               <p className="lead" style={{ '--i': 2 }}>
-                Meet your sky, a little closer. Forecasts, rain radar and satellite clouds for every district and upazila of Bangladesh, in one thoughtful weather map.
+                {tr('Meet your sky, a little closer. Forecasts, rain radar and satellite clouds for every district and upazila of Bangladesh, in one thoughtful weather map.')}
               </p>
               <div className="hero-actions" style={{ '--i': 3 }}>
-                <Link to="/map" className="btn btn-primary" onPointerEnter={prefetchMap} onFocus={prefetchMap}>Open the map<Icon name="arrow" size={20} /></Link>
-                <a href="#features" className="btn btn-ghost">Explore the details<Icon name="arrow" size={18} /></a>
+                <Link to="/map" className="btn btn-primary" onPointerEnter={prefetchMap} onFocus={prefetchMap}>{tr('Open the map')}<Icon name="arrow" size={20} /></Link>
+                <a href="#features" className="btn btn-ghost">{tr('Explore the details')}<Icon name="arrow" size={18} /></a>
               </div>
             </div>
-            <p className="hero-note hero-note--right">Local weather.<br />Wider perspective.<br /><span>Clearer decisions.</span></p>
+            <p className="hero-note hero-note--right">{tr('Local weather.')}<br />{tr('Wider perspective.')}<br /><span>{tr('Clearer decisions.')}</span></p>
             <div className="hero-bottom">
-              <p><span>01 /</span> A little perspective</p>
-              <a className="scroll-cue" href="#features" aria-label="Scroll to features"><Icon name="arrow" size={19} /></a>
+              <p><span>{number('01')} /</span> {tr('A little perspective')}</p>
+              <a className="scroll-cue" href="#features" aria-label={tr('Scroll to features')}><Icon name="arrow" size={19} /></a>
               <div className="hero-bottom-right">
-                <p>Weather for the everyday.</p>
+                <p>{tr('Weather for the everyday.')}</p>
                 <button
                   type="button"
                   className="hero-motion-control"
-                  aria-label={skyPaused ? 'Resume background animation' : 'Pause background animation'}
+                  aria-label={tr(skyPaused ? 'Resume background animation' : 'Pause background animation')}
                   onClick={() => setSkyPaused((paused) => !paused)}
                 >
-                  {skyPaused ? 'Resume motion' : 'Pause motion'}
+                  {tr(skyPaused ? 'Resume motion' : 'Pause motion')}
                 </button>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="facts" data-tone="light" aria-label="Coverage at a glance">
+        <section className="facts" data-tone="light" aria-label={tr('Coverage at a glance')}>
           <dl className="container facts-grid">
             {FACTS.map((fact) => (
               <div key={fact.label} className="fact">
-                <dt>{fact.label}</dt>
-                <dd>{fact.value}</dd>
+                <dt>{tr(fact.label)}</dt>
+                <dd>{number(tr(fact.value))}</dd>
               </div>
             ))}
           </dl>
@@ -185,17 +187,17 @@ export function LandingPage() {
         <section id="features" className="section section-light" data-tone="light" aria-labelledby="features-title">
           <div className="container">
             <header className="section-head">
-              <p className="eyebrow"><span className="section-number">02 /</span> The bigger picture</p>
-              <h2 id="features-title">Many signals.<br /><em>One clear picture.</em></h2>
-              <p className="lead">A little less switching between apps. A little more understanding the sky. All your weather layers, together on one map.</p>
+              <p className="eyebrow"><span className="section-number">{number('02')} /</span> {tr('The bigger picture')}</p>
+              <h2 id="features-title">{tr('Many signals.')}<br /><em>{tr('One clear picture.')}</em></h2>
+              <p className="lead">{tr('A little less switching between apps. A little more understanding the sky. All your weather layers, together on one map.')}</p>
             </header>
             <ul className="feature-grid">
               {FEATURES.map((feature, index) => (
                 <li key={feature.title} className="feature-card">
-                  <div className="feature-top"><span className="feature-icon"><Icon name={feature.icon} size={25} /></span><span className="card-number">0{index + 1}</span></div>
-                  <p className="feature-label">{feature.label}</p>
-                  <h3>{feature.title}</h3>
-                  <p>{feature.text}</p>
+                  <div className="feature-top"><span className="feature-icon"><Icon name={feature.icon} size={25} /></span><span className="card-number">{number(String(index + 1).padStart(2, '0'))}</span></div>
+                  <p className="feature-label">{tr(feature.label)}</p>
+                  <h3>{tr(feature.title)}</h3>
+                  <p>{tr(feature.text)}</p>
                 </li>
               ))}
             </ul>
@@ -205,18 +207,18 @@ export function LandingPage() {
         <section id="coverage" className="section coverage" data-tone="light" aria-labelledby="coverage-title">
           <div className="container coverage-grid">
             <div className="coverage-visual">
-              <div className="figure-label"><span>Bangladesh / 8 divisions · 64 districts</span><Icon name="map" size={18} /></div>
+              <div className="figure-label"><span>{tr('Bangladesh / 8 divisions · 64 districts')}</span><Icon name="map" size={18} /></div>
               <BangladeshFigure />
             </div>
             <div className="coverage-copy">
-              <p className="eyebrow"><span className="section-number">03 /</span> Closer to home</p>
-              <h2 id="coverage-title">The whole country.<br /><em>Your little corner.</em></h2>
-              <p className="lead">From Rangpur to Chattogram, the sky tells a different story. Start with Bangladesh, zoom into your upazila, and find the forecast that belongs to your day.</p>
-              <Link to="/map" className="text-link" onPointerEnter={prefetchMap} onFocus={prefetchMap}>Find your place<Icon name="arrow" size={20} /></Link>
+              <p className="eyebrow"><span className="section-number">{number('03')} /</span> {tr('Closer to home')}</p>
+              <h2 id="coverage-title">{tr('The whole country.')}<br /><em>{tr('Your little corner.')}</em></h2>
+              <p className="lead">{tr('From Rangpur to Chattogram, the sky tells a different story. Start with Bangladesh, zoom into your upazila, and find the forecast that belongs to your day.')}</p>
+              <Link to="/map" className="text-link" onPointerEnter={prefetchMap} onFocus={prefetchMap}>{tr('Find your place')}<Icon name="arrow" size={20} /></Link>
               <div className="coverage-source">
-                <p className="eyebrow">A view grounded in real sources</p>
-                <p>BMD forecasts & radar</p>
-                <p>JMA Himawari-9 imagery via NASA GIBS</p>
+                <p className="eyebrow">{tr('A view grounded in real sources')}</p>
+                <p>{tr('BMD forecasts & radar')}</p>
+                <p>{tr('JMA Himawari-9 imagery via NASA GIBS')}</p>
               </div>
             </div>
           </div>
@@ -226,35 +228,35 @@ export function LandingPage() {
           <div className="container data-grid">
             <div>
               <header className="section-head">
-                <p className="eyebrow"><span className="section-number">04 /</span> Clarity, not guesswork</p>
-                <h2 id="data-title">A little certainty.<br /><em>And honest uncertainty.</em></h2>
-                <p className="lead">Knowing what we don't know matters, too. Every source has a name, every update has a time, and missing data never looks like a calm sky.</p>
+                <p className="eyebrow"><span className="section-number">{number('04')} /</span> {tr('Clarity, not guesswork')}</p>
+                <h2 id="data-title">{tr('A little certainty.')}<br /><em>{tr('And honest uncertainty.')}</em></h2>
+                <p className="lead">{tr("Knowing what we don't know matters, too. Every source has a name, every update has a time, and missing data never looks like a calm sky.")}</p>
               </header>
               <ul className="read-list">
                 {HOW_TO_READ.map((item) => (
                   <li key={item.title}>
                     <span className="read-check"><Icon name="check" size={16} /></span>
-                    <p><strong>{item.title}</strong> {item.text}</p>
+                    <p><strong>{tr(item.title)}</strong> {tr(item.text)}</p>
                   </li>
                 ))}
               </ul>
             </div>
 
             <div className="status-card" role="group" aria-labelledby="status-title">
-              <p className="eyebrow">A note on the data</p>
-              <h3 id="status-title">Three states.<br />Nothing left to guess.</h3>
+              <p className="eyebrow">{tr('A note on the data')}</p>
+              <h3 id="status-title">{tr('Three states.')}<br />{tr('Nothing left to guess.')}</h3>
               <ul>
                 {STATUSES.map((status) => (
                   <li key={status.key}>
                     <span className="status-ring" style={{ '--ring': status.color, borderStyle: status.style }} aria-hidden="true" />
                     <div>
-                      <strong>{status.name}</strong>
-                      <p>{status.text}</p>
+                      <strong>{tr(status.name)}</strong>
+                      <p>{tr(status.text)}</p>
                     </div>
                   </li>
                 ))}
               </ul>
-              <p className="status-footnote">A clear grey where there is no data.<br />Always a source. Always a timestamp.</p>
+              <p className="status-footnote">{tr('A clear grey where there is no data.')}<br />{tr('Always a source. Always a timestamp.')}</p>
             </div>
           </div>
         </section>
@@ -262,20 +264,19 @@ export function LandingPage() {
         <section id="who" className="section section-light" data-tone="light" aria-labelledby="who-title">
           <div className="container">
             <header className="section-head">
-              <p className="eyebrow"><span className="section-number">05 /</span> Under the same sky</p>
-              <h2 id="who-title">Different days.<br /><em>The same sky.</em></h2>
+              <p className="eyebrow"><span className="section-number">{number('05')} /</span> {tr('Under the same sky')}</p>
+              <h2 id="who-title">{tr('Different days.')}<br /><em>{tr('The same sky.')}</em></h2>
               <p className="lead">
-                A rain forecast means one thing to a farmer with paddy drying on the ground and another to a rickshaw puller on a slick road.
-                We have written 31 occupation scenarios to turn one weather hazard into advice that fits what each person is doing.
+                {tr('The same forecast can mean different things for different jobs. Our catalogue includes 31 occupation-based scenarios; implemented prototype rules use your work, area and activity to choose relevant advice.')}
               </p>
-              <p className="badge-line"><span className="pill">Next phase</span>Occupation-aware advice is still in design. Today's map is the foundation it will stand on.</p>
+              <p className="badge-line"><span className="pill">{tr('Prototype alerts')}</span>{tr('Occupation-based alerts are available. The rules still need expert review; they do not replace official warnings.')}</p>
             </header>
             <ul className="audience-grid">
               {AUDIENCES.map((audience) => (
                 <li key={audience.code} className="audience-card">
-                  <p className="audience-code"><span>{audience.code}</span>{audience.count} scenarios</p>
-                  <h3>{audience.title}</h3>
-                  <p>{audience.text}</p>
+                  <p className="audience-code"><span>{audience.code}</span>{tr('{n} scenarios', { n: audience.count })}</p>
+                  <h3>{tr(audience.title)}</h3>
+                  <p>{tr(audience.text)}</p>
                 </li>
               ))}
             </ul>
@@ -284,10 +285,10 @@ export function LandingPage() {
 
         <section className="cta" data-tone="light" aria-labelledby="cta-title">
           <div className="container cta-inner">
-            <p className="eyebrow"><span className="section-number">06 /</span> Your day starts here</p>
-            <h2 id="cta-title">Step outside.<br /><em>A little more prepared.</em></h2>
-            <p>A clearer view of the weather. A calmer way to plan your day.</p>
-            <Link to="/map" className="btn btn-dark" onPointerEnter={prefetchMap} onFocus={prefetchMap}>Open the map<Icon name="arrow" size={20} /></Link>
+            <p className="eyebrow"><span className="section-number">{number('06')} /</span> {tr('Your day starts here')}</p>
+            <h2 id="cta-title">{tr('Step outside.')}<br /><em>{tr('A little more prepared.')}</em></h2>
+            <p>{tr('A clearer view of the weather. A calmer way to plan your day.')}</p>
+            <Link to="/map" className="btn btn-dark" onPointerEnter={prefetchMap} onFocus={prefetchMap}>{tr('Open the map')}<Icon name="arrow" size={20} /></Link>
           </div>
         </section>
       </main>
@@ -295,22 +296,21 @@ export function LandingPage() {
       <footer className="footer" data-tone="light">
         <div className="container footer-grid">
           <div className="footer-brand">
-            <p className="footer-logo"><LogoMark size={34} /><span>AkashSathi</span></p>
-            <p>Weather for everyone who works under the open sky.</p>
+            <p className="footer-logo"><LogoMark size={34} /><span>{tr('AkashSathi')}</span></p>
+            <p>{tr('Weather for everyone who works under the open sky.')}</p>
           </div>
-          <nav aria-label="Footer">
+          <nav aria-label={tr('Footer')}>
             <ul className="footer-links">
-              {FOOTER_LINKS.map((link) => <li key={link.href}><a href={link.href}>{link.label}</a></li>)}
-              <li><Link to="/map">Map</Link></li>
+              {FOOTER_LINKS.map((link) => <li key={link.href}><a href={link.href}>{tr(link.label)}</a></li>)}
+              <li><Link to="/map">{tr('Map')}</Link></li>
             </ul>
           </nav>
         </div>
         <div className="container footer-fine">
           <p>
-            Forecast and radar © Bangladesh Meteorological Department. Himawari-9 imagery © JMA via NASA GIBS. Forecast supplement by Open-Meteo (CC BY 4.0).
-            Boundaries: OCHA/HDX COD-AB (CC BY-IGO). Basemap labels: OpenFreeMap, © OpenMapTiles, data © OpenStreetMap contributors.
+            {tr('Forecast and radar © Bangladesh Meteorological Department. Himawari-9 imagery © JMA via NASA GIBS. Forecast supplement by Open-Meteo (CC BY 4.0). Boundaries: OCHA/HDX COD-AB (CC BY-IGO). Basemap labels: OpenFreeMap, © OpenMapTiles, data © OpenStreetMap contributors.')}
           </p>
-          <p>AkashSathi is not an official warning service. For official warnings, follow the Bangladesh Meteorological Department and local authorities.</p>
+          <p>{tr('AkashSathi is not an official warning service. For official warnings, follow the Bangladesh Meteorological Department and local authorities.')}</p>
         </div>
       </footer>
     </div>

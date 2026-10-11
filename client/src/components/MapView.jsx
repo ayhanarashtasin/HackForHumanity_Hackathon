@@ -2,11 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '../map/map.css'; // after MapLibre's CSS on purpose
 import { WeatherMap } from '../map/WeatherMap.js';
+import { useLanguage } from '../i18n/index.js';
+import { MAP } from '../i18n/map.js';
 
 // Thin React wrapper: owns the WeatherMap instance and pushes state into it. All map logic lives in map/WeatherMap.js.
 export function MapView({
   catalogue, initialView, signLayer, snapshot, stepIndex, baseStatus, radarItems, satelliteSpec, lightning, selection, flyRequest, userPosition, handlers,
 }) {
+  const { tr, lang } = useLanguage(MAP);
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const handlersRef = useRef(handlers);
@@ -42,6 +45,8 @@ export function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalogue]);
 
+  useEffect(() => { mapRef.current?.setLanguage(lang); }, [lang, ready]);
+
   useEffect(() => {
     if (ready) mapRef.current.setSigns({ layerId: signLayer, snapshot, stepIndex, status: baseStatus });
   }, [ready, signLayer, snapshot, stepIndex, baseStatus]);
@@ -76,8 +81,8 @@ export function MapView({
 
   return (
     <>
-      <div ref={containerRef} className={`map${ready ? ' is-ready' : ''}`} role="application" aria-label="Interactive weather map of Bangladesh" />
-      {!ready && <div className="map-loading" role="status"><span className="map-spinner" aria-hidden="true" /> Preparing the map…</div>}
+      <div ref={containerRef} className={`map${ready ? ' is-ready' : ''}`} role="application" aria-label={tr('Interactive weather map of Bangladesh')} />
+      {!ready && <div className="map-loading" role="status"><span className="map-spinner" aria-hidden="true" /> {tr('Preparing the map…')}</div>}
     </>
   );
 }
