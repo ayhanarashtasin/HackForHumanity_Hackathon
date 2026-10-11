@@ -1,15 +1,13 @@
-import { Suspense, lazy, useLayoutEffect } from 'react';
+import { Suspense, lazy, useLayoutEffect, useMemo } from 'react';
 import { useRoute } from './lib/router.js';
-import { loadAdminPage } from './pages/loadAdminPage.js';
-import { loadAlertPage } from './pages/loadAlertPage.js';
 import { LandingPage } from './pages/LandingPage.jsx';
-import { loadMapPage } from './pages/loadMapPage.js';
+import { isLazyPage, loadedPage, preloadPage } from './pages/pageLoader.js';
 
 // MapLibre and the whole weather UI load only when someone opens the map; the alert and admin pages are lazy chunks too
 // (the admin chunk is never shipped to a visitor who never opens /admin).
-const MapPage = lazy(loadMapPage);
-const AlertPage = lazy(loadAlertPage);
-const AdminPage = lazy(loadAdminPage);
+// A screen whose chunk has already arrived renders directly. main.jsx loads the current screen's chunk before the first render and links
+// warm the next one on hover, so the loading splash below is only for a chunk that is genuinely still on its way.
+const LAZY = Object.fromEntries(['map', 'alert', 'admin'].map((route) => [route, lazy(() => preloadPage(route).then((component) => ({ default: component })))]));
 
 const TITLES = {
   home: 'AkashSathi · Weather for every upazila of Bangladesh',
@@ -18,7 +16,6 @@ const TITLES = {
   admin: 'AkashSathi · Administrator',
 };
 
-const PAGES = { map: MapPage, alert: AlertPage, admin: AdminPage };
 const LOADING = { map: 'Loading map…', alert: 'Loading alerts…', admin: 'Loading…' };
 
 export default function App() {
@@ -28,6 +25,8 @@ export default function App() {
   useLayoutEffect(() => {
     document.documentElement.dataset.page = route === 'home' ? 'landing' : route;
     document.title = TITLES[route];
+    // Same colours as index.html: the browser's own bar is olive only over the map.
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', route === 'map' ? '#2E3D28' : '#E8E9DF');
 
     // The administrator page must never be indexed.
     let robots = document.querySelector('meta[name="robots"][data-managed]');
@@ -44,7 +43,8 @@ export default function App() {
     }
   }, [route]);
 
-  const Page = PAGES[route];
+  // Chosen once per screen: switching between the loaded component and its lazy twin mid-visit would remount the page and lose its state.
+  const Page = useMemo(() => (isLazyPage(route) ? (loadedPage(route) ?? LAZY[route]) : null), [route]);
   if (Page) {
     return (
       <Suspense fallback={<div className="splash" role="status">{LOADING[route]}</div>}>

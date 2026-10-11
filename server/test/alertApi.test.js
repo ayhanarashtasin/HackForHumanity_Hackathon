@@ -187,6 +187,29 @@ dbTest('completing the form creates a subscriber with an HttpOnly device cookie,
   assert.equal(me.status, 200);
   assert.equal(me.json.data.profile.occupation, 'farmer');
   assert.equal(me.json.data.unread, 0);
+
+  const session = await client.call('/alerts/session');
+  assert.equal(session.status, 200);
+  assert.deepEqual(session.json.data, me.json.data, 'the session check returns the same profile as /me');
+  assert.equal(session.headers.get('cache-control'), 'no-store');
+});
+
+dbTest('the "who am I?" check is never an error: no cookie or a dead cookie gives profile null (and clears the dead cookie)', async () => {
+  const anonymous = new Client();
+  const none = await anonymous.call('/alerts/session');
+  assert.equal(none.status, 200);
+  assert.deepEqual(none.json.data, { profile: null, unread: 0 });
+  assert.equal(none.setCookie.length, 0, 'nothing to clear');
+
+  const stale = new Client();
+  stale.cookies.set('as_sub', 'a'.repeat(43));
+  const dead = await stale.call('/alerts/session');
+  assert.equal(dead.status, 200);
+  assert.equal(dead.json.data.profile, null);
+  assert.ok(dead.setCookie.some((line) => line.startsWith('as_sub=') && /Max-Age=0/i.test(line)), 'the dead cookie is cleared');
+
+  // everything that needs a profile still refuses without one
+  for (const path of ['/alerts/me', '/alerts/inbox', '/alerts/me/coverage', '/alerts/me/channels']) assert.equal((await anonymous.call(path)).status, 401, path);
 });
 
 dbTest('without the cookie there is no profile; a bad form is rejected with the fields to fix', async () => {
@@ -293,12 +316,18 @@ dbTest('admin is disabled until a passcode is set, and its answers are never ind
   assert.equal((await client.call('/admin/login', { method: 'POST', body: { passcode: 'anything' } })).status, 503);
   assert.match(closed.headers.get('x-robots-tag'), /noindex/);
   assert.equal(closed.headers.get('cache-control'), 'no-store');
+
+  const state = await client.call('/admin/session');
+  assert.equal(state.status, 200, 'the session check is never an error');
+  assert.deepEqual(state.json.data, { state: 'closed', devBypass: false });
+  assert.equal(state.headers.get('cache-control'), 'no-store');
 });
 
 dbTest('admin sign-in: wrong passcode, rate limit, session cookie, sign-out', async () => {
   const client = new Client();
   assert.equal((await client.call('/admin/me')).status, 401);
   assert.equal((await client.call('/admin/overview')).status, 401);
+  assert.deepEqual((await client.call('/admin/session')).json.data, { state: 'signed-out', devBypass: false }, 'asking is not an error');
 
   for (let i = 0; i < 5; i += 1) assert.equal((await client.call('/admin/login', { method: 'POST', body: { passcode: `wrong-${i}` } })).status, 401);
   const blocked = await client.call('/admin/login', { method: 'POST', body: { passcode: PASSCODE } });
@@ -320,13 +349,16 @@ dbTest('a correct passcode opens a strict, HttpOnly, hashed session that can be 
 
   assert.equal((await client.call('/admin/me')).json.data.authenticated, true);
   assert.equal((await client.call('/admin/overview')).status, 200);
+  assert.equal((await client.call('/admin/session')).json.data.state, 'signed-in');
 
   await AdminSession.updateOne({}, { $set: { expiresAt: new Date(Date.now() - 1000) } });
   assert.equal((await client.call('/admin/me')).status, 401, 'an expired session is refused even before the TTL job removes it');
+  assert.equal((await client.call('/admin/session')).json.data.state, 'signed-out', 'and the session check agrees');
 
   const again = await adminSignIn();
   assert.equal((await again.call('/admin/logout', { method: 'POST' })).status, 204);
   assert.equal((await again.call('/admin/me')).status, 401);
+  assert.equal((await again.call('/admin/session')).json.data.state, 'signed-out');
   assert.ok(await AdminAction.findOne({ action: 'login', outcome: 'ok' }), 'sign-ins are audited');
 });
 
@@ -336,11 +368,14 @@ dbTest('ADMIN_AUTH=off skips the sign-in locally and is ignored in production', 
   const open = await new Client().call('/admin/me');
   assert.equal(open.status, 200);
   assert.equal(open.json.data.devBypass, true);
+  assert.deepEqual((await new Client().call('/admin/session')).json.data, { state: 'signed-in', devBypass: true });
 
   env.nodeEnv = 'production';
   assert.equal((await new Client().call('/admin/me')).status, 503, 'production with no passcode stays closed');
+  assert.equal((await new Client().call('/admin/session')).json.data.state, 'closed');
   env.admin.passcode = PASSCODE;
   assert.equal((await new Client().call('/admin/me')).status, 401, 'and production with a passcode needs it');
+  assert.equal((await new Client().call('/admin/session')).json.data.state, 'signed-out');
 });
 
 dbTest('send now from weather: preview first, then one send, never a duplicate, and the engine agrees', async () => {

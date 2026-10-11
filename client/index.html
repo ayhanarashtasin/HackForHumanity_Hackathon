@@ -7,9 +7,33 @@
     <meta name="description" content="AkashSathi: live and forecast weather for every district and upazila of Bangladesh. BMD radar, satellite, heat, rain, wind and thunderstorm potential, with grey for missing data, never a false calm." />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%232E3D28%27/%3E%3Ccircle cx=%2712%27 cy=%2713%27 r=%276%27 fill=%27%23A9BE87%27/%3E%3Cpath d=%27M9 24h14a5 5 0 0 0 0-10 7 7 0 0 0-13.3-1.6A5.5 5.5 0 0 0 9 24z%27 fill=%27%23E8E9DF%27/%3E%3C/svg%3E" />
     <title>AkashSathi · Weather for every upazila of Bangladesh</title>
+    <script>
+      // Decide which screen this URL opens before the first paint, so the page background is right from the very first frame. Without this
+      // the root background (Deep Olive, the map's colour) showed first and flashed green before the cream landing, alert and admin pages.
+      // src/lib/router.js resolveRoute is the source of truth; client/test/pageBoot.test.js keeps the two in step.
+      (function () {
+        var path = location.pathname.replace(/\/+$/, '') || '/';
+        var page = path === '/map' ? 'map' : path === '/alert' ? 'alert' : path === '/admin' || path === '/admin/login' ? 'admin' : 'landing';
+        if (page === 'landing' && /^#(.*&)?(view|layer|o)(=|&|$)/.test(location.hash)) page = 'map'; // old shared map links: "/#view=..."
+        document.documentElement.setAttribute('data-page', page);
+        // The browser's own bar (phones, installed apps) takes the page's colour too: olive only over the map.
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', page === 'map' ? '#2E3D28' : '#E8E9DF');
+      })();
+    </script>
+    <style>
+      /* Critical first-paint rules. The full styles load later (in development they arrive with the scripts), so these keep the first frame
+         the right colour: Deep Olive for the map, Soft White for every page that scrolls. */
+      html { background: #2E3D28; }
+      html[data-page='landing'], html[data-page='alert'], html[data-page='admin'] { background: #E8E9DF; }
+      body { margin: 0; }
+      .boot { position: fixed; inset: 0; display: grid; place-items: center; font: 1.1rem Inter, system-ui, sans-serif; color: #E8E9DF; opacity: 0; animation: boot-in 0.2s ease 0.4s forwards; }
+      html[data-page='landing'] .boot, html[data-page='alert'] .boot, html[data-page='admin'] .boot { color: #2E3D28; }
+      @keyframes boot-in { to { opacity: 1; } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="boot" role="status">Loading AkashSathi…</div></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

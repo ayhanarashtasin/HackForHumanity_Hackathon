@@ -5,7 +5,7 @@ import {
 import { parseCookies } from '../middleware/cookies.js';
 import * as admin from '../services/alerts/admin.js';
 import {
-  adminConfigured, createAdminSession, endAdminSession, passcodeMatches,
+  adminConfigured, createAdminSession, endAdminSession, findAdminSession, passcodeMatches,
 } from '../services/alerts/adminAuth.js';
 import { badRequest } from '../services/alerts/errors.js';
 import { getSettings } from '../services/alerts/settings.js';
@@ -32,6 +32,15 @@ export async function logout(req, res) {
   await endAdminSession(parseCookies(req.get('cookie'))[ADMIN_COOKIE]);
   clearAdminCookie(res);
   res.status(204).end();
+}
+
+// "Am I signed in?" for the admin page: never an error. state is closed (no passcode set), signed-out or signed-in, so opening /admin
+// without a session does not log a failed request in the console. Every endpoint that does something still answers 401 without a session.
+export async function session(req, res) {
+  if (!adminConfigured()) return res.json({ data: { state: 'closed', devBypass: false } });
+  if (devBypassAllowed(req)) return res.json({ data: { state: 'signed-in', devBypass: true } });
+  const found = await findAdminSession(parseCookies(req.get('cookie'))[ADMIN_COOKIE]);
+  return res.json({ data: { state: found ? 'signed-in' : 'signed-out', devBypass: false } });
 }
 
 export function me(req, res) {

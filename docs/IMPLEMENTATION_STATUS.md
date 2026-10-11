@@ -6,8 +6,8 @@ Last verified: **11 October 2026**. This document says what is built against [`A
 
 | Check | Result |
 | --- | --- |
-| `npm run test:db` (server, including MongoDB-backed tests, isolated random databases) | **323 passed, 0 failed, 0 skipped** |
-| `npm test` client | **72 passed, 0 failed** |
+| `npm run test:db` (server, including MongoDB-backed tests, isolated random databases) | **324 passed, 0 failed, 0 skipped** |
+| `npm test` client | **83 passed, 0 failed** |
 | `npm run build` | Passes. Alert, admin and map remain separate lazy chunks; Vite still reports the known large MapLibre chunk. |
 | Live provider calls in tests | None. Xweather, Telegram, WhatsApp and SMS are mocked; no test spends quota or sends a message. |
 
@@ -58,6 +58,23 @@ Last verified: **11 October 2026**. This document says what is built against [`A
 - *Request limit* 30 per chat per 10 minutes, in memory (`TELEGRAM_COMMAND_LIMIT`); `/start`, `/stop` and `/help` are not limited.
 
 **Not done.** A scheduled daily digest (would use the delivery queue and cost messages); choosing between ambiguous places with buttons (the bot lists the exact command to send instead); the Bangla text, like all Bangla here, needs a fluent reader; `/forecast` shows no observed values or official extremes.
+
+## Page load, green flash and CPU review (11 October 2026)
+
+Reported: a green flash on every refresh, an error on refresh, and sometimes lag. Measured in headless Edge over the DevTools protocol (frame-by-frame colour, long tasks, layout shift, per-process CPU, request timing), on the production build and on the Vite dev server, against the real server with live data.
+
+| Finding | Cause | Fix |
+| --- | --- | --- |
+| Green flash on `/`, `/alert`, `/admin` | The root background is Deep Olive (the map's colour); light pages only turned cream after React had started, and the loading splash was olive too. React also holds a revealed lazy page back about 300 ms after showing a fallback, so `/alert` and `/admin` showed olive for about 290 ms on every reload, even with the code cached (0.4-0.8 s on a slow connection) | `index.html` sets `data-page` before the first paint and carries the first-paint colours; `main.jsx` loads the current page's chunk before the first render (`pages/pageLoader.js`), links warm the next one on hover, so no splash is shown; the splash and the `index.html` placeholder are page-coloured and invisible for the first 0.4 s |
+| Red `401 Unauthorized` in the console on every `/alert` and `/admin` visit | The "who am I?" checks used a 401 as the answer | New `GET /api/alerts/session` and `GET /api/admin/session` always answer 200 (`profile: null`, `state: closed / signed-out / signed-in`); every endpoint that does something still answers 401. The client falls back to the old calls against an older API (a newer page keeps working until the server restarts) |
+| Chrome notice "Password forms should have username fields" | The admin form has one shared passcode and no account name | A hidden, fixed username field |
+| Small layout shift on `/alert` (0.039) | The footer sat in view while the page loaded, then jumped away | Footer shown once the page has loaded (0.000) |
+| Landing hero used 29% of a CPU core (median) in the GPU process while idle, 31% without a GPU | Five infinite SVG animations inside one SVG, redrawn on every screen refresh (60-144 times a second) for motion of a fraction of a pixel | Each moving part is its own composited layer, and all of them step on one 0.125 s beat: 3.4% with a GPU, 6.5% without. The page's own main thread went from 0.4% to 0.1%. Visually identical, still moving (8 updates a second, 0.2-0.5 px each). The existing "Pause motion" button and `prefers-reduced-motion` still apply. Offscreen the hero already cost about 1% |
+| `/api/alerts/status` took ~170-200 ms, `/api/alerts/me/coverage` similar | Three to four database reads one after another | Reads run together: 172 ms to 88 ms |
+
+Checked and fine: the map page is smooth with a GPU (0 dropped frames, worst frame 12-21 ms through slider scrubbing, zoom, pan and play); without a GPU, software WebGL drops frames while panning, which no code change can fix. API latency over three minutes: no stalls (median 5 ms for in-memory endpoints). The three-minute probe also showed the Atlas round trip is 45-100 ms, which is why database-backed endpoints are 45-100 ms and why parallel reads matter.
+
+Not changed: the map page is olive while it loads, by design (it is a dark map). In Vite's dev mode the browser loads about 4 MB of unbundled scripts on the landing page and 9 MB on the map; the production build is 88 KB and 384 KB.
 
 ## UI review (11 October 2026)
 

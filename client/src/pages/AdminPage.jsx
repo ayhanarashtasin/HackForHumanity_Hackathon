@@ -14,13 +14,14 @@ function Gate() {
   useEffect(() => {
     const controller = new AbortController();
     setState({ status: 'checking' });
-    adminApi.me(controller.signal)
-      .then((data) => setState({ status: 'ok', devBypass: Boolean(data?.devBypass) }))
+    adminApi.session(controller.signal)
+      .then((data) => {
+        if (data.state === 'closed') setState({ status: 'closed' });
+        else if (data.state === 'signed-out') navigate('/admin/login', { replace: true });
+        else setState({ status: 'ok', devBypass: Boolean(data.devBypass) });
+      })
       .catch((error) => {
-        if (controller.signal.aborted) return;
-        if (error.status === 401) navigate('/admin/login', { replace: true });
-        else if (error.status === 503) setState({ status: 'closed' });
-        else setState({ status: 'error', message: error.message });
+        if (!controller.signal.aborted) setState({ status: 'error', message: error.message });
       });
     return () => controller.abort();
   }, [attempt]);

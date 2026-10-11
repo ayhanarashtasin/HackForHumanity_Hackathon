@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import {
   availability, demoCreate, demoDelete, demoInbox, demoList, discardHeld, getAdminSettings, getHistory, getOptions, getOverview, getRules, login, logout, me,
-  previewSend, putAdminSettings, sendAlerts, withdrawAlerts,
+  previewSend, putAdminSettings, sendAlerts, session, withdrawAlerts,
 } from '../controllers/adminController.js';
 import { adminHeaders, requireAdmin } from '../middleware/admin.js';
 import { originGuard } from '../middleware/originGuard.js';
@@ -21,6 +21,7 @@ export function createAdminRoutes({ loginLimit = { windowMs: FIFTEEN_MINUTES, ma
   routes.use(originGuard);
 
   routes.get('/availability', availability);
+  routes.get('/session', session);
   routes.post('/login', (req, res, next) => {
     const attempt = limiter.attempt(req.ip);
     if (!attempt.allowed) {

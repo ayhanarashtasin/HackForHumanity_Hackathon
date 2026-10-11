@@ -5,8 +5,10 @@ import { Link } from '../components/Link.jsx';
 import { LogoMark } from '../components/Logo.jsx';
 import { Navbar } from '../components/Navbar.jsx';
 import { STATUS_COLORS } from '../lib/palette.js';
-import { loadMapPage } from './loadMapPage.js';
+import { prefetchPage } from './pageLoader.js';
 import '../landing.css';
+
+const prefetchMap = prefetchPage('map');
 
 // Everything below describes what the map does today. Occupation-aware advice (the scenario catalogue) is not built yet,
 // and the page says so rather than implying it.
@@ -55,57 +57,73 @@ const FOOTER_LINKS = [
 ];
 
 // A decorative glass-and-cloud study, not a weather observation. All fills use the brand palette.
+// Each moving part is its own layer (an <svg> or a <div> of <svg>s stacked on the same 760 x 660 box). The browser paints a layer once and
+// then only moves it, on the graphics card. When all the parts were groups inside one <svg>, every frame of every animation repainted the
+// whole illustration (gradients, strokes and the blur) on the processor: about a third of a CPU core while the hero was on screen.
+const SKY_VIEW = '0 0 760 660';
+
 function SkySculpture() {
   return (
-    <svg className="sky-sculpture" viewBox="0 0 760 660" fill="none" aria-hidden="true" focusable="false">
-      <defs>
-        <radialGradient id="sky-sun" cx="0.3" cy="0.25" r="0.8">
-          <stop stopColor="var(--cream)" />
-          <stop offset="0.5" stopColor="var(--sage)" stopOpacity="0.55" />
-          <stop offset="1" stopColor="var(--olive)" stopOpacity="0.15" />
-        </radialGradient>
-        <linearGradient id="sky-glass" x1="170" y1="150" x2="560" y2="490" gradientUnits="userSpaceOnUse">
-          <stop stopColor="var(--cream)" stopOpacity="0.72" />
-          <stop offset="0.5" stopColor="var(--sage)" stopOpacity="0.12" />
-          <stop offset="1" stopColor="var(--cream)" stopOpacity="0.6" />
-        </linearGradient>
-        <radialGradient id="sky-cloud" cx="0.35" cy="0.2" r="0.8">
-          <stop stopColor="var(--cream)" />
-          <stop offset="0.65" stopColor="var(--cream)" stopOpacity="0.85" />
-          <stop offset="1" stopColor="var(--sage)" stopOpacity="0.42" />
-        </radialGradient>
-        <filter id="sky-soft" x="-30%" y="-30%" width="160%" height="160%">
-          <feGaussianBlur stdDeviation="18" />
-        </filter>
-      </defs>
-      <ellipse cx="391" cy="533" rx="180" ry="20" fill="var(--olive)" opacity="0.1" filter="url(#sky-soft)" />
-      <g className="sky-globe">
-        <circle cx="444" cy="228" r="163" fill="url(#sky-sun)" />
-        <circle cx="444" cy="228" r="162" stroke="var(--cream)" strokeOpacity="0.65" />
-        <g className="sky-globe-grid" stroke="var(--olive)" strokeOpacity="0.13">
+    <div className="sky-sculpture" aria-hidden="true">
+      <svg className="sky-defs" width="0" height="0" focusable="false">
+        <defs>
+          <radialGradient id="sky-sun" cx="0.3" cy="0.25" r="0.8">
+            <stop stopColor="var(--cream)" />
+            <stop offset="0.5" stopColor="var(--sage)" stopOpacity="0.55" />
+            <stop offset="1" stopColor="var(--olive)" stopOpacity="0.15" />
+          </radialGradient>
+          <linearGradient id="sky-glass" x1="170" y1="150" x2="560" y2="490" gradientUnits="userSpaceOnUse">
+            <stop stopColor="var(--cream)" stopOpacity="0.72" />
+            <stop offset="0.5" stopColor="var(--sage)" stopOpacity="0.12" />
+            <stop offset="1" stopColor="var(--cream)" stopOpacity="0.6" />
+          </linearGradient>
+          <radialGradient id="sky-cloud" cx="0.35" cy="0.2" r="0.8">
+            <stop stopColor="var(--cream)" />
+            <stop offset="0.65" stopColor="var(--cream)" stopOpacity="0.85" />
+            <stop offset="1" stopColor="var(--sage)" stopOpacity="0.42" />
+          </radialGradient>
+          <filter id="sky-soft" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="18" />
+          </filter>
+        </defs>
+      </svg>
+
+      <svg className="sky-layer" viewBox={SKY_VIEW} fill="none" focusable="false">
+        <ellipse cx="391" cy="533" rx="180" ry="20" fill="var(--olive)" opacity="0.1" filter="url(#sky-soft)" />
+      </svg>
+
+      <div className="sky-layer sky-globe">
+        <svg viewBox={SKY_VIEW} fill="none" focusable="false">
+          <circle cx="444" cy="228" r="163" fill="url(#sky-sun)" />
+          <circle cx="444" cy="228" r="162" stroke="var(--cream)" strokeOpacity="0.65" />
+        </svg>
+        <svg className="sky-globe-grid" viewBox={SKY_VIEW} fill="none" focusable="false" stroke="var(--olive)" strokeOpacity="0.13">
           <ellipse cx="444" cy="228" rx="120" ry="163" />
           <ellipse cx="444" cy="228" rx="64" ry="163" />
           <ellipse cx="444" cy="228" rx="163" ry="61" transform="rotate(-22 444 228)" />
           <ellipse cx="444" cy="228" rx="163" ry="111" transform="rotate(-22 444 228)" />
-        </g>
-      </g>
-      <g className="sky-glass">
+        </svg>
+      </div>
+
+      <svg className="sky-layer sky-glass" viewBox={SKY_VIEW} fill="none" focusable="false">
         <rect x="155" y="155" width="370" height="365" rx="140" transform="rotate(-24 340 337)" fill="url(#sky-glass)" stroke="var(--cream)" strokeOpacity="0.9" strokeWidth="1.5" />
         <path d="M159 350c-17-65 21-133 85-155" stroke="var(--cream)" strokeOpacity="0.85" strokeWidth="3" strokeLinecap="round" />
-      </g>
-      <g className="sky-cloud" fill="url(#sky-cloud)" stroke="var(--cream)" strokeOpacity="0.6">
+      </svg>
+
+      <svg className="sky-layer sky-cloud" viewBox={SKY_VIEW} focusable="false" fill="url(#sky-cloud)" stroke="var(--cream)" strokeOpacity="0.6">
         <ellipse cx="454" cy="425" rx="143" ry="76" />
         <circle cx="399" cy="370" r="83" />
         <circle cx="486" cy="382" r="67" />
         <circle cx="330" cy="416" r="67" />
-      </g>
-      <g className="sky-orbit">
+      </svg>
+
+      <svg className="sky-layer sky-orbit" viewBox={SKY_VIEW} fill="none" focusable="false">
         <ellipse cx="379" cy="326" rx="283" ry="111" transform="rotate(-31 379 326)" stroke="var(--olive)" strokeOpacity="0.2" />
         <path d="M139 439c79 40 245-2 386-91 91-58 156-123 171-169" stroke="var(--cream)" strokeOpacity="0.85" strokeWidth="2" />
         <circle cx="157" cy="432" r="7" fill="var(--sage)" stroke="var(--cream)" strokeWidth="2" />
         <circle cx="639" cy="217" r="4" fill="var(--olive)" fillOpacity="0.4" />
-      </g>
-    </svg>
+      </svg>
+    </div>
   );
 }
 
@@ -130,7 +148,7 @@ export function LandingPage() {
                 Meet your sky, a little closer. Forecasts, rain radar and satellite clouds for every district and upazila of Bangladesh, in one thoughtful weather map.
               </p>
               <div className="hero-actions" style={{ '--i': 3 }}>
-                <Link to="/map" className="btn btn-primary" onPointerEnter={loadMapPage} onFocus={loadMapPage}>Open the map<Icon name="arrow" size={20} /></Link>
+                <Link to="/map" className="btn btn-primary" onPointerEnter={prefetchMap} onFocus={prefetchMap}>Open the map<Icon name="arrow" size={20} /></Link>
                 <a href="#features" className="btn btn-ghost">Explore the details<Icon name="arrow" size={18} /></a>
               </div>
             </div>
@@ -194,7 +212,7 @@ export function LandingPage() {
               <p className="eyebrow"><span className="section-number">03 /</span> Closer to home</p>
               <h2 id="coverage-title">The whole country.<br /><em>Your little corner.</em></h2>
               <p className="lead">From Rangpur to Chattogram, the sky tells a different story. Start with Bangladesh, zoom into your upazila, and find the forecast that belongs to your day.</p>
-              <Link to="/map" className="text-link" onPointerEnter={loadMapPage} onFocus={loadMapPage}>Find your place<Icon name="arrow" size={20} /></Link>
+              <Link to="/map" className="text-link" onPointerEnter={prefetchMap} onFocus={prefetchMap}>Find your place<Icon name="arrow" size={20} /></Link>
               <div className="coverage-source">
                 <p className="eyebrow">A view grounded in real sources</p>
                 <p>BMD forecasts & radar</p>
@@ -269,7 +287,7 @@ export function LandingPage() {
             <p className="eyebrow"><span className="section-number">06 /</span> Your day starts here</p>
             <h2 id="cta-title">Step outside.<br /><em>A little more prepared.</em></h2>
             <p>A clearer view of the weather. A calmer way to plan your day.</p>
-            <Link to="/map" className="btn btn-dark" onPointerEnter={loadMapPage} onFocus={loadMapPage}>Open the map<Icon name="arrow" size={20} /></Link>
+            <Link to="/map" className="btn btn-dark" onPointerEnter={prefetchMap} onFocus={prefetchMap}>Open the map<Icon name="arrow" size={20} /></Link>
           </div>
         </section>
       </main>

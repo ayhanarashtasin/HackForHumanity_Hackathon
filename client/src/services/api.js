@@ -1,6 +1,8 @@
-const apiUrl = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
+// `import.meta.env` only exists under Vite; the tests run these modules in Node.
+const env = import.meta.env ?? {};
+const apiUrl = (env.VITE_API_URL || '/api').replace(/\/$/, '');
 // The alert and admin cookies must travel with API requests; a separate API origin needs them explicitly.
-const credentials = import.meta.env.VITE_API_URL ? 'include' : 'same-origin';
+const credentials = env.VITE_API_URL ? 'include' : 'same-origin';
 
 export async function request(path, options = {}) {
   let response;

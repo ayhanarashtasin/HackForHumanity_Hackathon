@@ -32,12 +32,13 @@ export function AdminLogin() {
   // Already signed in (or sign-in switched off for local use): go straight to the dashboard.
   useEffect(() => {
     const controller = new AbortController();
-    adminApi.me(controller.signal)
-      .then(() => navigate('/admin', { replace: true }))
-      .catch((failure) => {
-        if (controller.signal.aborted) return;
-        if (failure.status === 503) setState({ checking: false, closed: true });
-        else setState({ checking: false, closed: false });
+    adminApi.session(controller.signal)
+      .then((data) => {
+        if (data.state === 'signed-in') navigate('/admin', { replace: true });
+        else setState({ checking: false, closed: data.state === 'closed' });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setState({ checking: false, closed: false });
       });
     return () => controller.abort();
   }, []);
@@ -73,6 +74,9 @@ export function AdminLogin() {
         <LogoMark size={40} />
         <h1 id="login-title">Administrator sign-in</h1>
         <p className="adm-muted">This page is not for the public. Enter the administrator passcode.</p>
+        {/* There is one shared passcode and no account name. Browsers and password managers still expect a username next to a password
+            field, so a hidden, fixed one keeps them (and the console) quiet. */}
+        <input type="text" name="username" value="administrator" autoComplete="username" readOnly hidden aria-hidden="true" tabIndex={-1} />
 
         <div className="adm-field">
           <div className="adm-field-label"><label htmlFor="admin-passcode">Passcode</label></div>

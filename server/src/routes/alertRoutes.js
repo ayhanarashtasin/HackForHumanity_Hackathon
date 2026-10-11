@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import {
-  deleteMe, getCoverage, getInbox, getMe, getSchema, getStatus, readAll, readOne, subscribe, updateActivity, updateMe, updateStatus,
+  deleteMe, getCoverage, getInbox, getMe, getSchema, getSession, getStatus, readAll, readOne, subscribe, updateActivity, updateMe, updateStatus,
 } from '../controllers/alertController.js';
 import {
   getChannels, linkTelegram, startVerification, unlinkChannel, verifyChannel,
@@ -20,6 +20,7 @@ export function createAlertRoutes({ subscribeLimit = { windowMs: HOUR, max: 10 }
 
   routes.get('/schema', getSchema);
   routes.get('/status', getStatus);
+  routes.get('/session', getSession);
   routes.post('/subscribe', rateLimit({ ...subscribeLimit, message: 'Too many profiles were created from this connection. Please try again later.' }), subscribe);
 
   // Everything below needs the subscriber's device cookie.

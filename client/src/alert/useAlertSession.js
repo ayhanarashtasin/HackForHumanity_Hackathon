@@ -5,7 +5,7 @@ import {
   clearHint, readHint, setUnread, writeHint,
 } from './alertStore.js';
 
-// Loads what the alert page needs: the form schema, the area catalogue, and this browser's profile (a 401 means there is none yet).
+// Loads what the alert page needs: the form schema, the area catalogue, and this browser's profile (`profile: null` means there is none yet).
 // The catalogue failing does not stop the page: the form says the areas could not be loaded.
 export function useAlertSession() {
   const [state, setState] = useState({
@@ -19,7 +19,7 @@ export function useAlertSession() {
     Promise.all([
       alertApi.schema(controller.signal),
       loadCatalogue(controller.signal).then((catalogue) => ({ catalogue })).catch((error) => ({ error })),
-      alertApi.me(controller.signal).then((me) => ({ me })).catch((error) => (error.status === 401 ? { me: null } : Promise.reject(error))),
+      alertApi.session(controller.signal).then((session) => ({ me: session.profile ? session : null })),
     ]).then(([schema, catalogue, mine]) => {
       if (mine.me) {
         setUnread(mine.me.unread);

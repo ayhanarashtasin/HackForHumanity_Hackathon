@@ -4,9 +4,26 @@ import { request } from './api.js';
 // Calls throw an Error with `.status` (401 = no alert profile in this browser) and, for a rejected form, `.details` (field path -> code).
 const json = (body) => ({ headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
+// "Who am I?" -> { profile, unread }, with profile null when this browser has none. The current API answers 200 either way, so a first visit
+// logs no failed request. An API that predates /alerts/session (it answers 401 or 404 there) is asked the old way: /alerts/me, where 401 means
+// "no profile". That keeps a newer page working while the server is still the old one, for example between two restarts.
+async function session(signal) {
+  try {
+    return await request('/alerts/session', { signal });
+  } catch (error) {
+    if (error.status !== 401 && error.status !== 404) throw error;
+    return request('/alerts/me', { signal }).catch((failure) => {
+      if (failure.status === 401) return { profile: null, unread: 0 };
+      throw failure;
+    });
+  }
+}
+
 export const alertApi = {
   schema: (signal) => request('/alerts/schema', { signal }),
   status: (signal) => request('/alerts/status', { signal }),
+  // The alert page checks this first (see session above).
+  session,
   me: (signal) => request('/alerts/me', { signal }),
   subscribe: (payload) => request('/alerts/subscribe', { method: 'POST', ...json(payload) }),
   updateProfile: (payload) => request('/alerts/me', { method: 'PUT', ...json(payload) }),

@@ -32,6 +32,10 @@
   text-rendering: optimizeLegibility;
 }
 
+/* Pages that scroll sit on Soft White all the way to the root, so nothing green shows at the edges or while they load. index.html sets
+   data-page before the first paint (and carries the same rule); the map keeps the Deep Olive root. */
+html[data-page='landing'], html[data-page='alert'], html[data-page='admin'] { background: var(--cream); }
+
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
 body { margin: 0; overflow: hidden; background: var(--olive); }
@@ -49,7 +53,11 @@ ul { padding: 0; list-style: none; }
 html[data-page='alert'], html[data-page='alert'] body, html[data-page='alert'] #root,
 html[data-page='admin'], html[data-page='admin'] body, html[data-page='admin'] #root { height: auto; min-height: 100%; }
 html[data-page='alert'] body, html[data-page='admin'] body { overflow: visible; background: var(--cream); }
-.splash { position: absolute; inset: 0; display: grid; place-items: center; background: var(--olive); color: var(--cream); font-size: 1.1rem; }
+/* The loading splash matches the page it is waiting for, and stays invisible for the first 0.4 s so a fast load never shows it at all. */
+.splash { position: absolute; inset: 0; display: grid; place-items: center; background: var(--olive); color: var(--cream); font-size: 1.1rem; opacity: 0; animation: splash-in 0.2s ease 0.4s forwards; }
+html[data-page='alert'] .splash, html[data-page='admin'] .splash { background: var(--cream); color: var(--olive); }
+.splash[role='alert'] { opacity: 1; animation: none; } /* an error is never held back */
+@keyframes splash-in { to { opacity: 1; } }
 
 /* ---------- shared surfaces ---------- */
 .panel {

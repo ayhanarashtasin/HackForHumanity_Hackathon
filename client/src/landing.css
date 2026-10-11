@@ -139,12 +139,17 @@ html[data-page='landing'] { scroll-behavior: smooth; scroll-padding-top: 112px; 
   background: radial-gradient(ellipse at 50% 45%, transparent 28%, rgba(232, 233, 223, 0.35) 75%);
 }
 .hero-art { position: absolute; z-index: -1; top: 80px; left: 50%; width: min(760px, 74vw); transform: translateX(-50%); pointer-events: none; }
-.sky-sculpture { display: block; width: 100%; height: auto; }
-.sky-sculpture g { transform-box: view-box; }
-.sky-globe, .sky-globe-grid { transform-origin: 444px 228px; }
-.sky-glass { transform-origin: 340px 337px; }
-.sky-cloud { transform-origin: 430px 410px; }
-.sky-orbit { transform-origin: 379px 326px; }
+.sky-sculpture { position: relative; display: block; width: 100%; aspect-ratio: 760 / 660; }
+.sky-sculpture svg { display: block; width: 100%; height: 100%; }
+.sky-sculpture .sky-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+/* Every layer sits on the same 760 x 660 box. Origins and distances are percentages of that box (the old pixel values were in the same
+   units), so the motion scales with the picture. will-change keeps each layer on its own composited surface: painted once, then only moved. */
+.sky-layer { position: absolute; inset: 0; will-change: transform; }
+.sky-globe > svg { position: absolute; inset: 0; }
+.sky-globe-grid { will-change: transform; transform-origin: 58.42% 34.55%; }
+.sky-glass { transform-origin: 44.74% 51.06%; }
+.sky-cloud { transform-origin: 56.58% 62.12%; }
+.sky-orbit { transform-origin: 49.87% 49.39%; }
 .hero-art[data-paused='true'] .sky-sculpture * { animation-play-state: paused; }
 .hero-layout { position: relative; display: grid; grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
 .hero-edition {
@@ -294,31 +299,35 @@ html[data-page='landing'] { scroll-behavior: smooth; scroll-padding-top: 112px; 
 .footer-links a:hover { text-decoration: underline; text-underline-offset: 5px; }
 .footer-fine { display: grid; gap: 12px; padding-top: 24px; border-top: 1px solid var(--line-light); color: var(--muted-light); font-size: 0.6875rem; line-height: 1.8; }
 
-/* A slow, transform-only sky study; the text and graph paper stay still. */
+/* A slow, transform-only sky study; the text and graph paper stay still.
+   Every layer moves in steps of 0.125 s, all on the same beat, instead of in a smooth curve. The motion is so slow (the fastest part
+   moves about 0.5 px a step) that it still looks continuous, but the browser draws 8 frames a second here instead of one for every
+   screen refresh (60 to 144), which is what kept the graphics process busy while the hero was on screen. step count = seconds per
+   leg of the loop / 0.125 (the grid turns once in 80 s). */
 @media (prefers-reduced-motion: no-preference) {
   .hero-copy > * { animation: landing-rise 0.8s var(--ease) both; animation-delay: calc(var(--i, 0) * 90ms); }
   .hero-art { animation: landing-fade 1.2s var(--ease) both; }
-  .sky-globe { animation: sky-float 14s ease-in-out infinite; }
-  .sky-globe-grid { animation: sky-turn 80s linear infinite; }
-  .sky-glass { animation: sky-glass-drift 19s ease-in-out infinite; }
-  .sky-cloud { animation: sky-cloud-drift 13s ease-in-out infinite; }
-  .sky-orbit { animation: sky-orbit-drift 24s ease-in-out infinite; }
+  .sky-globe { animation: sky-float 14s steps(56) infinite; }
+  .sky-globe-grid { animation: sky-turn 80s steps(640) infinite; }
+  .sky-glass { animation: sky-glass-drift 19s steps(76) infinite; }
+  .sky-cloud { animation: sky-cloud-drift 13s steps(52) infinite; }
+  .sky-orbit { animation: sky-orbit-drift 24s steps(96) infinite; }
   .hero-motion-control { display: inline-flex; align-items: center; justify-content: center; }
 }
 @keyframes landing-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 @keyframes landing-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes sky-float {
   0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(6px, -12px); }
+  50% { transform: translate(0.79%, -1.82%); }
 }
 @keyframes sky-turn { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @keyframes sky-glass-drift {
   0%, 100% { transform: translate(0, 0) rotate(0deg); }
-  50% { transform: translate(-9px, 8px) rotate(-3deg); }
+  50% { transform: translate(-1.18%, 1.21%) rotate(-3deg); }
 }
 @keyframes sky-cloud-drift {
   0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(14px, -8px); }
+  50% { transform: translate(1.84%, -1.21%); }
 }
 @keyframes sky-orbit-drift {
   0%, 100% { transform: rotate(0deg); }

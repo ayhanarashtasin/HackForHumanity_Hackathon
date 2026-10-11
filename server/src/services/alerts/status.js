@@ -49,12 +49,15 @@ const circlesCovering = (geo, location) => geo.circles.filter((circle) => havers
 export async function coverageFor(subscriber, nowMs = Date.now()) {
   const upazilas = subscriber.relevantUpazilas;
   const sources = loadSources(nowMs);
-  const inputs = await loadForecastInputs(upazilas, nowMs);
-  const areas = upazilas.map((pcode) => buildAreaForecast(pcode, { now: nowMs, sources, xweather: inputs.get(pcode) ?? null })).filter(Boolean);
   const geo = loadGeoData();
   const circleKeys = [...new Set(upazilas.flatMap((pcode) => circlesCovering(geo, locationByPcode.get(pcode) ?? { lat: 0, lon: 0 }).map((circle) => `c:${circle.id}`)))];
-  const probes = await loadSnapshots('xweather', 'lightning-summary', circleKeys);
-  const bulletins = subscriber.occupation === 'fisherman' ? await loadSnapshots('bmd', 'bulletin', PRODUCTS.map((product) => product.key)) : new Map();
+  // The three reads do not depend on each other, so they go out together (each is a database round trip).
+  const [inputs, probes, bulletins] = await Promise.all([
+    loadForecastInputs(upazilas, nowMs),
+    loadSnapshots('xweather', 'lightning-summary', circleKeys),
+    subscriber.occupation === 'fisherman' ? loadSnapshots('bmd', 'bulletin', PRODUCTS.map((product) => product.key)) : new Map(),
+  ]);
+  const areas = upazilas.map((pcode) => buildAreaForecast(pcode, { now: nowMs, sources, xweather: inputs.get(pcode) ?? null })).filter(Boolean);
 
   const rows = [];
   for (const hazard of hazardsFor(subscriber)) {
@@ -176,11 +179,14 @@ export async function bulletinList(nowMs = Date.now()) {
 
 // ---------- public monitoring status ----------
 export async function publicStatus(nowMs = Date.now()) {
-  const [settings, areaCodes, engineState, budget] = await Promise.all([
+  // Every read goes out at once: each is a round trip to the database, and run one after another they made this endpoint take ~200 ms.
+  const [settings, areaCodes, engineState, budget, sources, bulletins] = await Promise.all([
     getSettings({ now: nowMs }),
     Subscriber.distinct('relevantUpazilas', { status: 'active', expiresAt: { $gt: new Date(nowMs) } }),
     JobState.findOne({ key: 'alert-engine' }).lean(),
     createXweatherBudget().summary(),
+    sourceRows(nowMs),
+    bulletinList(nowMs),
   ]);
   const geo = loadGeoData();
   const circles = new Set(areaCodes.flatMap((pcode) => {
@@ -202,11 +208,11 @@ export async function publicStatus(nowMs = Date.now()) {
       marineZones: MARINE_ZONES.map((zone) => zone.id),
       lightning: 'Checked when forecasts indicate thunderstorm potential and hourly in daytime. A check covers the previous 5 minutes only, so this is not continuous monitoring and an unforecast storm can be missed.',
     },
-    sources: await sourceRows(nowMs),
+    sources,
     hold: Object.entries(settings.hold).filter(([, on]) => on).map(([severity]) => severity),
     rules: { version: RULE_VERSION, status: RULE_STATUS },
     languages: { bnReviewed: BN_REVIEWED },
-    bulletins: await bulletinList(nowMs),
+    bulletins,
     xweather: {
       enabled: env.alerts.xweatherEnabled,
       remaining: budget.remaining,

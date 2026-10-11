@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useUnreadBadge } from '../alert/useUnreadBadge.js';
 import { useRoute } from '../lib/router.js';
-import { loadAlertPage } from '../pages/loadAlertPage.js';
-import { loadMapPage } from '../pages/loadMapPage.js';
+import { prefetchPage } from '../pages/pageLoader.js';
 import { Icon } from './Icon.jsx';
 import { Link } from './Link.jsx';
 import { LogoMark } from './Logo.jsx';
+
+const prefetchMap = prefetchPage('map');
+const prefetchAlert = prefetchPage('alert');
 
 // Two links on the left of the centred logo; on the right the two actions: Alert (outlined) and Map (solid, the primary action).
 // "Data" lives in the footer and in the phone menu.
@@ -89,8 +91,8 @@ export function Navbar() {
     </li>
   );
 
-  const mapProps = { to: '/map', onPointerEnter: loadMapPage, onFocus: loadMapPage };
-  const alertProps = { to: '/alert', onPointerEnter: loadAlertPage, onFocus: loadAlertPage };
+  const mapProps = { to: '/map', onPointerEnter: prefetchMap, onFocus: prefetchMap };
+  const alertProps = { to: '/alert', onPointerEnter: prefetchAlert, onFocus: prefetchAlert };
   const badge = unread > 9 ? '9+' : String(unread);
   const alertLabel = unread > 0 ? `Alerts, ${unread} unread` : 'Alerts';
 

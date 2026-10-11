@@ -269,7 +269,8 @@ All responses use `{ "data": ... }`; errors use `{ "message": "..." }`. Every en
 | `GET /api/satellite/frames` | Himawari frame times and tile URL template |
 | `GET /api/lightning/status`, `/summaries`, `/upazila/:pcode` | Campaign state and results |
 | `GET /api/alerts/schema`, `POST /api/alerts/subscribe` | Bilingual form definitions and anonymous subscription |
-| `GET/PUT/DELETE /api/alerts/me` | Read, edit or delete the browser's profile |
+| `GET /api/alerts/session` | "Who am I?": the browser's profile, or `profile: null`. Always 200, so a first visit logs no failed request |
+| `GET/PUT/DELETE /api/alerts/me` | Read, edit or delete the browser's profile (401 without one) |
 | `PUT /api/alerts/me/activity`, `PUT /api/alerts/me/status` | Temporary activity, pause and resume |
 | `GET /api/alerts/inbox`, `POST /api/alerts/inbox/:id/read`, `POST /api/alerts/inbox/read-all` | Inbox and read state |
 | `GET /api/alerts/status`, `GET /api/alerts/me/coverage` | Monitoring and bulletin status; personal coverage |
@@ -278,7 +279,8 @@ All responses use `{ "data": ... }`; errors use `{ "message": "..." }`. Every en
 | `POST /api/alerts/me/channels/:channel/start`, `…/verify` | Send and check a verification code (`whatsapp`, `sms`) |
 | `DELETE /api/alerts/me/channels/:channel` | Disconnect a channel |
 | `POST /api/channels/telegram/webhook` | Telegram updates; answers only requests that carry the webhook secret |
-| `/api/admin/*` | Session, overview, previews and sends, history and withdrawal, rules, settings, demo tools; requires administrator access |
+| `GET /api/admin/session` | "Am I signed in?": `closed`, `signed-out` or `signed-in`. Always 200 |
+| `/api/admin/*` | Overview, previews and sends, history and withdrawal, rules, settings, demo tools; requires administrator access |
 
 ## Project layout
 

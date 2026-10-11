@@ -15,13 +15,17 @@ export function clearSubscriberCookie(res) {
   res.append('Set-Cookie', clearCookie(SUBSCRIBER_COOKIE, cookieOptions()));
 }
 
-export async function requireSubscriber(req, res, next) {
+// The profile this browser's cookie points to, or null. A stale or deleted profile also gets its dead cookie cleared.
+export async function loadSubscriber(req, res) {
   const token = parseCookies(req.get('cookie'))[SUBSCRIBER_COOKIE];
   const subscriber = await findByToken(token);
-  if (!subscriber) {
-    if (token) clearSubscriberCookie(res); // a stale or deleted profile: stop sending the dead cookie
-    return res.status(401).json({ message: 'No alert profile found for this browser.' });
-  }
+  if (!subscriber && token) clearSubscriberCookie(res);
+  return subscriber;
+}
+
+export async function requireSubscriber(req, res, next) {
+  const subscriber = await loadSubscriber(req, res);
+  if (!subscriber) return res.status(401).json({ message: 'No alert profile found for this browser.' });
   req.subscriber = subscriber;
   return next();
 }

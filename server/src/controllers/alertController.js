@@ -1,4 +1,4 @@
-import { clearSubscriberCookie, setSubscriberCookie } from '../middleware/subscriber.js';
+import { clearSubscriberCookie, loadSubscriber, setSubscriberCookie } from '../middleware/subscriber.js';
 import { evaluateSubscriberNow, reevaluateSubscriber } from '../services/alerts/engine.js';
 import {
   listInbox, markAllRead, markRead, unreadCount,
@@ -27,6 +27,15 @@ export async function subscribe(req, res) {
   res.status(201).json({
     data: { profile: profileView(subscriber), unread: await unreadCount(subscriber._id), backfilled },
   });
+}
+
+// "Who am I?" for the alert page: never an error. A browser with no profile (or a stale cookie) gets `profile: null` instead of a 401, so a
+// first visit does not log a failed request in the console. Every endpoint that needs a profile still answers 401 without one.
+export async function getSession(req, res) {
+  res.set('Cache-Control', 'no-store');
+  const subscriber = await loadSubscriber(req, res);
+  if (!subscriber) return res.json({ data: { profile: null, unread: 0 } });
+  return res.json({ data: { profile: profileView(subscriber), unread: await unreadCount(subscriber._id) } });
 }
 
 export async function getMe(req, res) {

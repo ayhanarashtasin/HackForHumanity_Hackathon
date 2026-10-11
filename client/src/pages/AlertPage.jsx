@@ -183,9 +183,12 @@ export default function AlertPage() {
             {body}
           </div>
         </main>
-        <footer className="alert-footer" data-tone="light">
-          <div className="container alert-container"><p>{tr('footer.note')}</p></div>
-        </footer>
+        {/* Not while loading: the page is one line tall then, so the footer sat in view and jumped away when the form arrived. */}
+        {phase !== 'loading' && (
+          <footer className="alert-footer" data-tone="light">
+            <div className="container alert-container"><p>{tr('footer.note')}</p></div>
+          </footer>
+        )}
         <div className="sr-only" role="status" aria-live="polite">{inbox.announcement}</div>
       </div>
     </AlertContext.Provider>

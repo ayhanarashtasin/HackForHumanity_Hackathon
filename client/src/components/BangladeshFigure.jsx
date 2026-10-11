@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { BD_DIVISIONS, BD_OUTLINE } from '../lib/bdOutline.js';
 import { outlinePoint } from '../lib/geometry.js';
-import { loadMapPage } from '../pages/loadMapPage.js';
+import { prefetchPage } from '../pages/pageLoader.js';
 import { Icon } from './Icon.jsx';
 import { Link } from './Link.jsx';
+
+const prefetchMap = prefetchPage('map');
 
 // Categorical brand tints distinguish administrative areas, not weather conditions.
 const REGION_TINTS = [42, 16, 62, 18, 32, 56, 20, 50];
@@ -21,9 +23,9 @@ export function BangladeshFigure() {
     to: `/map#view=${division.lat.toFixed(4)},${division.lon.toFixed(4)},${division.name === 'Chattogram' ? '6.8' : '7.5'}z`,
     'aria-label': `Explore ${division.name} division, ${division.districts} districts`,
     style: { '--division-fill': `color-mix(in srgb, var(--sage) ${REGION_TINTS[index]}%, var(--cream))` },
-    onPointerEnter: () => { setHovered(division.name); loadMapPage(); },
+    onPointerEnter: () => { setHovered(division.name); prefetchMap(); },
     onPointerLeave: () => setHovered(null),
-    onFocus: () => { setFocused(division.name); loadMapPage(); },
+    onFocus: () => { setFocused(division.name); prefetchMap(); },
     onBlur: () => setFocused(null),
   });
 
