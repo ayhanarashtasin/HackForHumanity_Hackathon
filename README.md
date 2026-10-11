@@ -4,7 +4,7 @@
 
 - **A live weather map** (`/map`) in the style of [Zoom Earth](https://zoom.earth): heat, rain, temperature, wind and thunderstorm signs for every district and upazila, over BMD radar and Himawari satellite imagery.
 - **Occupation-aware alerts** (`/alert`): tell it your work and where you do it, and when the weather crosses a threshold that matters for your job an alert appears with the reason, the source, the validity and what to do. English and Bangla. No account.
-- **Telegram, WhatsApp and SMS delivery** (optional): a short copy of each alert on the phone, with consent, quiet hours and per-channel limits.
+- **Telegram, WhatsApp and SMS delivery** (optional): a short copy of each alert on the phone, with consent, quiet hours and per-channel limits. The Telegram bot also answers weather commands (`/update`, `/heat`, `/rain`, `/wind`, `/thunderstorm`, `/lightning`, `/forecast`, `/alerts`, `/status`) in English and Bangla.
 - **An administrator dashboard** (`/admin`): preview and send alerts, declare a hazard, withdraw, watch the engine and delivery health.
 
 > **This is a prototype, not an official warning service.** Alert thresholds are labelled `prototype`: they are set from published references and have not been reviewed by experts. Unknown, stale or missing data is never shown as calm weather.
@@ -13,7 +13,7 @@ Stack: **MongoDB, Express 5, React 19, Node.js**, MapLibre GL, Vite, npm workspa
 
 ## Contents
 
-[How data reaches the screen](#how-data-reaches-the-screen) · [Getting started](#getting-started) · [Pages](#pages) · [Occupation-aware alerts](#occupation-aware-alerts) · [Telegram, WhatsApp and SMS](#telegram-whatsapp-and-sms) · [The map](#what-the-map-shows) · [Data sources](#data-sources) · [Lightning campaign](#lightning-campaign) · [API](#api) · [Layout and commands](#project-layout) · [Documentation](#documentation) · [Security and privacy](#security-and-privacy)
+[How data reaches the screen](#how-data-reaches-the-screen) · [Getting started](#getting-started) · [Pages](#pages) · [Occupation-aware alerts](#occupation-aware-alerts) · [Telegram, WhatsApp and SMS](#telegram-whatsapp-and-sms) · [Telegram weather commands](#telegram-weather-commands) · [The map](#what-the-map-shows) · [Data sources](#data-sources) · [Lightning campaign](#lightning-campaign) · [API](#api) · [Layout and commands](#project-layout) · [Documentation](#documentation) · [Security and privacy](#security-and-privacy)
 
 ## How data reaches the screen
 
@@ -144,7 +144,7 @@ Alerts **always** reach the website inbox. On top of that, a person can connect 
 - **Each alert stage is sent once.** A stage is the severity plus the number of re-notifications, so an escalation or an allowed lightning re-notification is sent again, while a silent evidence refresh is not. A stage that was replaced before it was sent is skipped, and the person gets the newest one.
 - **Never a stale start.** Stale or unavailable data does not start a message; withdrawn, expired, draft and demo alerts are never sent; an alert whose latest change is older than 3 hours is not sent to a channel (it is still in the inbox).
 - **Failure handling.** Temporary failures retry after 1, 5 and 15 minutes (a provider's own retry-after is honoured, and a retry is never scheduled past the end of the alert). A chat that blocked the bot or a number that cannot receive messages is unlinked and its waiting messages dropped. Rejected credentials pause the channel without failing anyone's alerts. A lease keeps two processes from sending the same message. Provider errors never contain the bot token, an API key, a phone number or a message body.
-- **Web page and bot.** `/alert` shows each channel's state (never a chat id or a full number). The bot answers `/start <code>`, `/stop` and `/help` only, in private chats only.
+- **Web page and bot.** `/alert` shows each channel's state (never a chat id or a full number). The bot answers in private chats only: `/start <code>`, `/stop`, `/help` and the weather commands below.
 
 ### Setting up Telegram
 
@@ -152,6 +152,30 @@ Alerts **always** reach the website inbox. On top of that, a person can connect 
 2. In `server/.env` set `TELEGRAM_BOT_TOKEN=...` and `PUBLIC_URL` (the address of your site), then restart. With no webhook URL the server polls Telegram, which needs no public address and is fine locally.
 3. Open `/alert` → **Alerts on your phone** → **Connect Telegram** → **Open Telegram** → **Start**. The page updates by itself.
 4. For production, give the server a public HTTPS address and set `TELEGRAM_WEBHOOK_URL=https://your-domain/api/channels/telegram/webhook` and `TELEGRAM_WEBHOOK_SECRET` (16–256 characters of `A-Z a-z 0-9 _ -`). The server registers the webhook at start-up and rejects any request without the secret header.
+
+<a id="telegram-weather-commands"></a>
+
+### Weather commands in Telegram
+
+Anyone who messages the bot can ask for the weather, connected or not; the bot answers from the stored forecast and never calls a weather provider. Typing `/` lists the commands (registered with Telegram in English and Bangla at start-up).
+
+| Command | Reply |
+| --- | --- |
+| `/update [place]` | The current 3-hour step (condition, temperature, heat index, rain and chance, humidity, wind and gusts, thunderstorm potential), the next 12 hours, the last lightning check, the number of active alerts (connected chats) and the data source and age. Comes with buttons for the reports below. |
+| `/heat [place]` | Heat index and temperature now, the highest in the next 24 hours, its category (Caution, Extreme caution, Danger, Extreme danger) and plain advice, and the heat index by time. |
+| `/rain [place]` | The next 24 hours in 3-hour steps with amount, class and chance, the total and the wettest step. |
+| `/wind [place]` | Wind and gusts now, the strongest gust of the next 24 hours, and the wind by time. |
+| `/thunderstorm [place]` | The thunderstorm outlook: potential (None, Low, Moderate, High) per 3-hour step, the peak, and whether the model forecasts a thunderstorm or hail. |
+| `/lightning [place]` | What lightning checks recorded, and how old the check is. |
+| `/forecast [place]` | The days ahead: temperature range, rain, gusts, chance of rain and thunder. |
+| `/alerts` | The active alerts of the connected profile (title, severity, end time). |
+| `/status` | How fresh each data source is and when the alert engine last ran. |
+
+- **Place.** An upazila, city thana, district or city corporation, in English or Bangla, for example `/heat Badda`, `/rain বাড্ডা` or `/wind Savar, Dhaka`. A name shared by several places (Kotwali) lists up to five candidates with their districts. Without a place, a connected chat uses the saved area (at most two). Aliases: `/weather`, `/thunder`, `/storm`, `/days`.
+- **Language.** A trailing `bn` or `en` wins; then the profile's language; then Bangla if the place was typed in Bangla script; then Telegram's own language; otherwise English.
+- **Honest wording.** Every figure is a *model forecast, not a station reading*, and says which source it came from and when it was updated. Stale data is shown with a warning, never as current; missing data says so and never reads as zero or as calm weather; "no active alert" is explicitly not an all-clear. Rain amounts come from Open-Meteo while it is current (its unit is known); BMD's amounts carry a note that their unit is not yet confirmed. BMD's gust is shown no lighter than its own mean wind, because about a third of its steps report a gust below the mean.
+- **Privacy.** The only profile fact used is the saved area, to choose where to look. No reply contains the occupation, crop, shift or why an alert was sent, and nothing about the asker is stored: the request limit (`TELEGRAM_COMMAND_LIMIT`, 30 requests per 10 minutes per chat) is kept in memory.
+- **Formatting.** Replies are Telegram HTML; if Telegram ever refuses the markup, the same words are sent as plain text.
 
 ### Setting up WhatsApp
 
@@ -180,7 +204,7 @@ Set `SMS_PROVIDER` to `twilio` or `http`, and `CHANNEL_SECRET`.
 
 ### What is and is not verified
 
-The adapters, the queue, the consent flows and the Telegram bot are covered by 50+ automated tests that use mocked provider responses and a real MongoDB. **They have not been run against live Telegram, WhatsApp or SMS accounts in this repository**, because no credentials were available. Provider details most likely to need a small adjustment on the first live run: WhatsApp error-code classification and template shapes, and the success reply of your SMS gateway. Delivery is *at-least-once*: a crash between a provider accepting a message and the row being marked sent can repeat that one message.
+The adapters, the queue, the consent flows, the Telegram bot and the weather commands are covered by 100+ automated tests that use mocked provider responses and a real MongoDB; the weather commands were also run end to end against the real server with live BMD and Open-Meteo data and a mock Telegram that enforces Telegram's strict HTML rules. **They have not been run against live Telegram, WhatsApp or SMS accounts in this repository**, because no credentials were available. Provider details most likely to need a small adjustment on the first live run: WhatsApp error-code classification and template shapes, and the success reply of your SMS gateway. Delivery is *at-least-once*: a crash between a provider accepting a message and the row being marked sent can repeat that one message.
 
 Switch the whole layer off with `DELIVERY=off`; unconfigured channels simply stay idle.
 
@@ -278,6 +302,7 @@ All responses use `{ "data": ... }`; errors use `{ "message": "..." }`. Every en
 │       ├── services/       providers, store, history, campaign
 │       │   ├── alerts/     hazard detection, scenarios, notifications, admin
 │       │   └── delivery/   queue, policy, formatting, linking, Telegram bot, channel adapters
+│       │       └── botReports/   the bot's weather commands: places, readings, wording, router
 │       ├── jobs/           scheduler, lightning, alert engine, delivery
 │       └── controllers/ routes/ models/ middleware/ config/
 ├── scripts/                geography builds and the database test preloader

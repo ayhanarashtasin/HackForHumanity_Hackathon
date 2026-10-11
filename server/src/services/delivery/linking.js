@@ -106,6 +106,11 @@ export async function unlinkTelegramChat(chatId) {
   return { count: linked.length, language: linked[0]?.language ?? null };
 }
 
+// The profile a private chat is connected to (at most one), with just what the weather commands need: language and saved areas.
+export async function subscriberForChat(chatId, now = new Date()) {
+  return Subscriber.findOne({ 'channels.telegram.chatId': String(chatId), expiresAt: { $gt: now } }, { language: 1, areas: 1 }).lean();
+}
+
 export async function telegramLanguage(chatId) {
   const subscriber = await Subscriber.findOne({ 'channels.telegram.chatId': String(chatId) }, { language: 1 }).lean();
   return subscriber?.language ?? null;

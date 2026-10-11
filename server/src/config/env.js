@@ -138,6 +138,8 @@ export const env = {
       webhookUrl: (process.env.TELEGRAM_WEBHOOK_URL || '').trim(),
       // Telegram only allows A-Z a-z 0-9 _ - here; anything else disables the webhook rather than failing later.
       webhookSecret: ((value) => (/^[A-Za-z0-9_-]{16,256}$/.test(value) && !/^change_me/i.test(value) ? value : ''))((process.env.TELEGRAM_WEBHOOK_SECRET || '').trim()),
+      // Weather commands (/update, /heat ...) one chat may send in ten minutes; beyond it the bot asks the person to wait.
+      commandLimit: numberFromEnv('TELEGRAM_COMMAND_LIMIT', 30, { min: 1, max: 500, integer: true }),
     },
 
     whatsapp: {

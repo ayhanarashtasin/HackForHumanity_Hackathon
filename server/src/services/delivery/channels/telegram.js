@@ -49,9 +49,13 @@ export function createTelegramChannel({ config = env.channels.telegram, fetchImp
     available: configured,
     call,
 
-    // content: { text }; `to` is the stored chat id.
+    // content: { text, parseMode?, buttons? }; `to` is the stored chat id. Alerts are plain text; the weather replies are HTML with
+    // optional inline buttons (rows of { text, data }).
     async send({ to, content }) {
-      const result = await call('sendMessage', { chat_id: String(to), text: content.text, disable_web_page_preview: true });
+      const payload = { chat_id: String(to), text: content.text, disable_web_page_preview: true };
+      if (content.parseMode) payload.parse_mode = content.parseMode;
+      if (content.buttons?.length) payload.reply_markup = { inline_keyboard: content.buttons.map((row) => row.map((button) => ({ text: button.text, callback_data: button.data }))) };
+      const result = await call('sendMessage', payload);
       return { providerMessageId: result?.message_id === undefined ? null : String(result.message_id) };
     },
 
@@ -69,10 +73,16 @@ export function createTelegramChannel({ config = env.channels.telegram, fetchImp
 
     getUpdates: (offset, timeoutSeconds = 25, signal = null) => call(
       'getUpdates',
-      { offset, timeout: timeoutSeconds, allowed_updates: ['message'] },
+      { offset, timeout: timeoutSeconds, allowed_updates: ['message', 'callback_query'] },
       { timeoutMs: (timeoutSeconds + 10) * 1000, signal },
     ),
-    setWebhook: (url, secretToken) => call('setWebhook', { url, secret_token: secretToken, allowed_updates: ['message'], drop_pending_updates: false }),
+    setWebhook: (url, secretToken) => call('setWebhook', { url, secret_token: secretToken, allowed_updates: ['message', 'callback_query'], drop_pending_updates: false }),
     deleteWebhook: () => call('deleteWebhook', { drop_pending_updates: false }),
+
+    // Stops the spinner on a pressed inline button. Best effort: the reply message is what matters.
+    answerCallbackQuery: (callbackQueryId) => call('answerCallbackQuery', { callback_query_id: String(callbackQueryId) }),
+
+    // The "/" menu. `languageCode` makes a list for people whose Telegram is set to that language; without it, the default list.
+    setCommands: (commands, languageCode = null) => call('setMyCommands', { commands, ...(languageCode ? { language_code: languageCode } : {}) }),
   };
 }

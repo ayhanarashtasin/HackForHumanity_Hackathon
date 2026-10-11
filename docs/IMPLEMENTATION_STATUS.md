@@ -6,7 +6,7 @@ Last verified: **11 October 2026**. This document says what is built against [`A
 
 | Check | Result |
 | --- | --- |
-| `npm run test:db` (server, including MongoDB-backed tests, isolated random databases) | **273 passed, 0 failed, 0 skipped** |
+| `npm run test:db` (server, including MongoDB-backed tests, isolated random databases) | **323 passed, 0 failed, 0 skipped** |
 | `npm test` client | **72 passed, 0 failed** |
 | `npm run build` | Passes. Alert, admin and map remain separate lazy chunks; Vite still reports the known large MapLibre chunk. |
 | Live provider calls in tests | None. Xweather, Telegram, WhatsApp and SMS are mocked; no test spends quota or sends a message. |
@@ -24,6 +24,7 @@ Last verified: **11 October 2026**. This document says what is built against [`A
 | **M7** Hardening | **Mostly open** | No VEND-03 saved-market handling, CONS-04, recovery code, or rule editor. Bangla is unreviewed. Quiet hours are now enforced for external channels (see below). |
 | **Delivery channels** (plan: "Later") | **Built** | Telegram bot, WhatsApp (templates) and SMS (Twilio or generic HTTP). Mocked-provider tests only; not run against live accounts. See the README. |
 | **Stored history** | **Built** | Per-district run summaries with a TTL, and `GET /api/weather/history`. |
+| **Telegram weather commands** | **Built** | `/update`, `/heat`, `/rain`, `/wind`, `/thunderstorm`, `/lightning`, `/forecast`, `/alerts`, `/status`, with a menu and buttons. See below. |
 
 ## What the last pass changed
 
@@ -39,6 +40,24 @@ Last verified: **11 October 2026**. This document says what is built against [`A
 4. `trust proxy` was never set, so behind a reverse proxy every visitor shared one rate-limit bucket. `TRUST_PROXY` now configures it.
 5. User-facing 5xx messages (for example "SMS is not set up on this server") were masked as "Internal server error". They can now be marked as exposed.
 6. `ADMIN_AUTH=off` now prints a warning at start-up, as the plan required.
+
+## Telegram weather commands (11 October 2026)
+
+`server/src/services/delivery/botReports/`: `places.js` (633 places: 64 districts, 544 BMD locations, 25 boundary areas without a BMD code; English and Bangla; ambiguity lists up to five), `readings.js` (pure calculations over the stored forecast), `text.js` (English and Bangla wording, Telegram HTML), `commands.js` (parsing, language, place, request limit), `data.js` (the few MongoDB reads: lightning checks, active alerts, engine status). `telegramBot.js` routes commands and button presses; `channels/telegram.js` gained HTML mode, inline buttons, `answerCallbackQuery` and `setMyCommands`.
+
+**Verification.** 47 unit tests (`botReports.test.js`: places, readings, wording in both languages for every command and place type, stale and missing data, privacy, buttons, rate limit, HTML fallback, adapter payloads, menu), 2 MongoDB-backed tests (connected chat, lightning), and a full run of the real server against live BMD and Open-Meteo data with a mock Telegram that rejects invalid HTML like the real one (menu registered in both languages, every command, six buttons, a connected chat, a real alert through the admin API and delivery job, and a flood of 34 requests). Not run against a live Telegram chat.
+
+**Decisions worth knowing.**
+
+- *Current weather is the forecast for the current 3-hour step.* The project has no station observations; every reply says "model forecast, not a station reading".
+- *Rain amounts come from Open-Meteo while it is current*, because BMD's rainfall unit is still unconfirmed (spike S3, the same reason the alert engine refuses BMD amounts). When BMD's amounts are used the reply says their unit is not independently confirmed.
+- *BMD's gust is below BMD's own mean wind in about 30% of stored steps* (measured on 17,408 steps). The bot shows the larger of the two published numbers, so a gust is never lighter than the mean wind. The alert engine is unchanged and still reads BMD's gust as published; if BMD's gust is systematically low, STRONG_WIND alerts under-detect. Worth asking BMD what its gust field is.
+- *`/lightning` shows the most recent of two stored checks*: the alert engine's probes of the 100 km circle around monitored areas (hourly 10:00-22:00, every 5 minutes while thunder is forecast or lightning was seen) and the map campaign's samples (07:00, 15:00 and 23:00 for ten days). It never says that no lightning is happening.
+- *`/forecast` is derived from the 3-hour steps* (up to five local days, four are stored), so it works for every place type and uses the same rain-source rule. The 10-day BMD outlook stays on the website.
+- *Anyone can use the weather commands*, connected or not. The profile is used only to find the saved area and the active alerts; replies never contain occupation, crop, shift or the reason an alert was sent. A typed Bangla place name gets a Bangla reply unless the profile says otherwise.
+- *Request limit* 30 per chat per 10 minutes, in memory (`TELEGRAM_COMMAND_LIMIT`); `/start`, `/stop` and `/help` are not limited.
+
+**Not done.** A scheduled daily digest (would use the delivery queue and cost messages); choosing between ambiguous places with buttons (the bot lists the exact command to send instead); the Bangla text, like all Bangla here, needs a fluent reader; `/forecast` shows no observed values or official extremes.
 
 ## UI review (11 October 2026)
 
@@ -93,6 +112,7 @@ Plan requirements that the code does not meet, with where they live:
 - Unknown, stale or unavailable is never safe. Stale data may annotate an existing alert but never creates, raises or rewrites one. Expiry and withdrawal are never an all-clear.
 - Lightning is always CRITICAL; one episode per area, one card per subscriber and rule, at most two re-notifications, a quiet ending.
 - Default automatic publication; optional severity hold and per-hazard kill switches; administrator preview and confirmation; sends are idempotent and audited.
+- The bot's weather replies follow the alert wording rules (no "safe", no "all clear", a forecast is never a measurement, missing is never zero) and carry no profile answers; a test lints every command in both languages.
 - External messages carry no profile data (CTX-03); CRITICAL messages are never held by quiet hours or the daily cap (CTX-04); each alert stage reaches a channel at most once.
 - UI uses Soft White, Sage and Deep Olive; only severity chips use the additional amber and red. English and Bangla, keyboard access, 44 px controls.
 

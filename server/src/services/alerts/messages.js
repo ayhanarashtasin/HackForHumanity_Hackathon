@@ -34,7 +34,7 @@ export function lintText(text) {
 }
 
 // ---------- time ----------
-function dayWord(ms, nowMs, lang) {
+export function dayWord(ms, nowMs, lang) {
   const diff = (Date.parse(`${dhakaDate(new Date(ms))}T00:00:00Z`) - Date.parse(`${dhakaDate(new Date(nowMs))}T00:00:00Z`)) / 86_400_000;
   if (diff === 0) return lang === 'bn' ? 'আজ' : 'today';
   if (diff === 1) return lang === 'bn' ? 'আগামীকাল' : 'tomorrow';

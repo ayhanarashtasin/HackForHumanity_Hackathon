@@ -11,8 +11,10 @@ import { Delivery } from '../src/models/Delivery.js';
 import { JobState } from '../src/models/JobState.js';
 import { Notification } from '../src/models/Notification.js';
 import { Subscriber } from '../src/models/Subscriber.js';
+import { WeatherSnapshot } from '../src/models/WeatherSnapshot.js';
 import { createAlertRoutes } from '../src/routes/alertRoutes.js';
 import { overview } from '../src/services/alerts/admin.js';
+import { saveSnapshot } from '../src/services/alerts/snapshots.js';
 import { createSubscriber, deleteSubscriber } from '../src/services/alerts/subscribers.js';
 import { ChannelError } from '../src/services/delivery/errors.js';
 import { resetSharedChannels, setSharedChannels } from '../src/services/delivery/channels/index.js';
@@ -23,13 +25,16 @@ import { formatHm } from '../src/services/time.js';
 import {
   deliveryStats, dispatchDue, enqueueDeliveries, linkedChannels, runDeliveryCycle,
 } from '../src/services/delivery/queue.js';
+import { defaultDeps } from '../src/services/delivery/botReports/data.js';
+import { loadForecast } from '../src/services/delivery/botReports/readings.js';
 import { decrypt, encrypt } from '../src/services/delivery/secretBox.js';
 import { handleTelegramUpdate, resetBotForTests } from '../src/services/delivery/telegramBot.js';
+import { forecastInputs, NOW as FORECAST_NOW } from './support/botFixtures.js';
 import { BADDA } from './support/alertFixtures.js';
 
 const testUri = process.env.TEST_MONGODB_URI;
 const dbTest = (name, fn) => test(name, { skip: !testUri }, fn);
-const MODELS = [Subscriber, Notification, Delivery, JobState];
+const MODELS = [Subscriber, Notification, Delivery, JobState, WeatherSnapshot];
 const MINUTE = 60_000;
 const HOUR = 3_600_000;
 const SECRET = 'a-test-channel-secret-0123456789';
@@ -569,6 +574,73 @@ dbTest('the bot: /start with a code connects the chat, /stop disconnects it, any
   await handleTelegramUpdate(message('/stop'), { channels });
   assert.match(channels.telegram.sent.at(-1).content.text, /No AkashSathi alert profile was connected/);
   assert.equal((await unlinkTelegramChat('4242')).count, 0);
+});
+
+dbTest('the weather commands for a connected chat use its saved area and active alerts, and none of its answers appear', async () => {
+  const id = await person({ telegram: false, language: 'bn' });
+  const channels = channelSet();
+  const code = (await createTelegramLink(await Subscriber.findById(id).lean(), channels, new Date(now))).url.split('start=')[1];
+  await handleTelegramUpdate({ update_id: 1, message: { chat: { id: 4242, type: 'private' }, text: `/start ${code}` } }, { channels });
+
+  await alertFor(id);
+  await alertFor(id, { title: 'An old notice', status: 'withdrawn' });
+  await alertFor(id, { title: 'Expired notice', validUntil: new Date(now - HOUR) });
+  const inputs = forecastInputs();
+  const deps = { ...defaultDeps, loadForecast: () => loadForecast({ ...inputs, now: FORECAST_NOW }) };
+  const ask = async (text, updateId, language) => {
+    await handleTelegramUpdate({ update_id: updateId, message: { chat: { id: 4242, type: 'private' }, text, from: { language_code: language } } }, { channels, deps, now: new Date(now) });
+    return channels.telegram.sent.at(-1).content;
+  };
+
+  const update = await ask('/update', 10);
+  assert.equal(update.parseMode, 'HTML');
+  assert.match(update.text, /বাড্ডা/, 'the saved area, in the profile language');
+  assert.match(update.text, /১টি সক্রিয় সতর্কবার্তা/, 'one active alert (not the withdrawn or the expired one)');
+  assert.ok(update.buttons.flat().every((button) => button.data.endsWith(':bn')));
+  for (const word of ['farmer', 'rice', 'harvest', 'cropStage', 'workload', 'pump']) assert.ok(!update.text.toLowerCase().includes(word), word);
+
+  const alerts = await ask('/alerts', 11);
+  assert.match(alerts.text, /\[সতর্কতা\] Heavy rain expected near Badda — পর্যন্ত/);
+  assert.ok(!/An old notice|Expired notice/.test(alerts.text));
+  assert.ok(!/Cover harvested crop|You farm|farm/i.test(alerts.text), 'the title and time only, never the reason or the advice');
+
+  assert.match((await ask('/heat', 12)).text, /বাড্ডা/);
+  assert.match((await ask('/heat Savar, Dhaka', 13)).text, /সাভার|Savar/, 'a typed place beats the saved area');
+
+  // Disconnected: the weather commands still work for anyone, but there is no saved area and no alerts
+  await handleTelegramUpdate({ update_id: 14, message: { chat: { id: 4242, type: 'private' }, text: '/stop' } }, { channels, deps });
+  assert.match((await ask('/update', 15, 'en')).text, /Which place\?/);
+  assert.match((await ask('/rain Badda', 16, 'en')).text, /<b>Badda<\/b>/);
+  assert.match((await ask('/alerts', 17, 'en')).text, /not connected to an alert profile/);
+  assert.match((await ask('/help', 18, 'en')).text, /\/thunderstorm — thunderstorm outlook/);
+});
+
+dbTest('lightning: the most recent stored check for the circle around a place is what is reported, and nothing is called when none exists', async () => {
+  const channels = channelSet();
+  const deps = { ...defaultDeps, loadForecast: () => loadForecast({ ...forecastInputs(), now: FORECAST_NOW }) };
+  let updateId = 100;
+  const ask = async (text) => {
+    updateId += 1;
+    await handleTelegramUpdate({ update_id: updateId, message: { chat: { id: 31, type: 'private' }, text } }, { channels, deps, now: new Date(now) });
+    return channels.telegram.sent.at(-1).content.text;
+  };
+
+  assert.match(await ask('/lightning Savar'), /Lightning has not been checked yet\./, 'an upazila with no stored check');
+  assert.match(await ask('/lightning Badda'), /Lightning has not been checked yet/, 'a city thana is covered by the same search circle');
+
+  const probe = (status, data, at) => saveSnapshot({
+    provider: 'xweather', product: 'lightning-summary', queryKey: 'c:BD-C08', scope: { gate: 'open', radiusKm: 100 }, status, data, now: new Date(at),
+  });
+  await probe('NO_MATCH', { count: 0 }, now - 20 * MINUTE);
+  assert.match(await ask('/lightning Badda'), /is out of date/, 'an open-gate check is current for 15 minutes');
+  await probe('NO_MATCH', { count: 0 }, now - 10 * MINUTE);
+  assert.match(await ask('/lightning Badda'), /No lightning was recorded within the 100 km search area at the last check/);
+
+  await probe('FRESH', { count: 3 }, now - 2 * MINUTE);
+  const reported = await ask('/lightning Badda');
+  assert.match(reported, /Lightning was recorded within the 100 km search area at the last check \(.*\): 3 strikes in the 5 minutes before it\./);
+  assert.match(await ask('/update Badda'), /⚡ Last lightning check \(.*\): lightning recorded within the 100 km search area\./);
+  assert.match(await ask('/lightning Dhaka'), /Lightning was recorded/, 'a district uses the circle around its centre');
 });
 
 dbTest('phone verification: consent and a Bangladeshi number are required, the code is sent, and nothing is stored in the clear', async () => {
