@@ -1,0 +1,2 @@
+# Keep text line endings consistent across Windows, Linux, and GitHub Actions.
+* text=auto eol=lf

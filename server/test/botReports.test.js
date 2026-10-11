@@ -335,45 +335,43 @@ test('answers: every weather command works for every kind of place in both langu
         });
         const text = plain(result);
         const label = `/${command} ${place} ${lang}`;
-        assert.ok(result.messages.every((item) => item.text.length <= 3800), `${label}: length`);
+        assert.ok(result.messages.every((item) => item.text.length <= 1800), `${label}: compact reply`);
+        assert.match(result.messages[0].text.split('\n')[0], /<b>.+<\/b>/, `${label}: clear heading`);
         assert.doesNotMatch(text, /NaN|undefined|null|\[object/, label);
         assert.deepEqual(lintText(text), [], `${label}: banned phrasing`);
         if (lang === 'bn') assert.doesNotMatch(text, /[0-9]/, `${label}: Bangla digits`);
-        assert.match(text, /bmd\.gov\.bd/, `${label}: points to the official source`);
+        assert.doesNotMatch(text, /Prototype information|not an official warning service|Source:|not a station reading|bmd\.gov\.bd|পরীক্ষামূলক তথ্য|সূত্র:|কোনো কেন্দ্রের পরিমাপ নয়|বজ্রপাত শনাক্তকরণ নয়/, `${label}: no boilerplate footer`);
       }
     }
   }
 });
 
-test('answers: a forecast is never described as a measurement', async () => {
+test('answers: forecast headings identify forecasts without repeating explanatory footers', async () => {
   for (const command of ['update', 'heat', 'rain', 'wind', 'thunderstorm', 'forecast']) {
     const text = plain(await ask(command, ['Badda'], { bmdOverrides: HOT, meteoOverrides: STORMY }));
-    assert.match(text, /model (forecast|outlook)/i, command);
-    assert.match(text, /not a (station reading|lightning detection)/i, command);
+    assert.match(text.split('\n')[0], /forecast|days ahead/i, command);
+    assert.doesNotMatch(text, /station reading|lightning detection|measured value|WBGT/i, command);
   }
 });
 
 test('answers: stale data is shown with its age and a warning, never as current', async () => {
-  // BMD stale while Open-Meteo is current: the reply uses the current source and names it
+  // BMD stale while Open-Meteo is current: the reply uses the current source without a stale note.
   const fallback = plain(await ask('update', ['Badda'], { bmdStatus: 'stale' }));
-  assert.match(fallback, /Source: Open-Meteo forecast/);
   assert.doesNotMatch(fallback, /Stale data/);
 
   const bothStale = plain(await ask('update', ['Badda'], { bmdStatus: 'stale', meteoStatus: 'stale' }));
-  assert.match(bothStale, /Source: BMD forecast .* updated today 08:00/);
-  assert.match(bothStale, /Stale data: last updated today 08:00. Treat it with caution./);
+  assert.match(bothStale, /⚠ Stale data · updated today 08:00/);
   const meteoStale = plain(await ask('thunderstorm', ['Badda'], { meteoStatus: 'stale', meteoOverrides: STORMY }));
   assert.match(meteoStale, /Stale data/);
   const rainStale = plain(await ask('rain', ['Badda'], { meteoStatus: 'stale' }));
-  assert.match(rainStale, /Rain source: BMD forecast/);
-  assert.match(rainStale, /unit has not been independently confirmed/);
+  assert.match(rainStale, /⚠ Rain unit unverified\./);
   const fine = plain(await ask('update', ['Badda']));
   assert.doesNotMatch(fine, /Stale data/);
 });
 
 test('answers: missing data says so, and never reads as calm weather or as zero', async () => {
   const none = await ask('update', ['Badda'], { bmd: null, openMeteo: null });
-  assert.match(textOf(none), /is not available for this place right now\. Missing data does not mean calm weather\./);
+  assert.match(textOf(none), /is not available for this place right now\./);
   assert.doesNotMatch(textOf(none), /0\.0|°C/);
 
   const noThunder = plain(await ask('thunderstorm', ['Badda'], { openMeteo: null }));
@@ -381,16 +379,19 @@ test('answers: missing data says so, and never reads as calm weather or as zero'
   assert.doesNotMatch(noThunder, /no thunderstorm/i);
 
   const noRain = plain(await ask('rain', ['Badda'], { bmd: sourceData([BADDA]), openMeteo: null, pcodes: [BADDA] }));
-  assert.match(noRain, /Rain source: BMD forecast/);
-  assert.match(noRain, /unit has not been independently confirmed/);
+  assert.match(noRain, /⚠ Rain unit unverified\./);
+
+  const missingStep = plain(await ask('thunderstorm', ['Badda'], { meteoOverrides: { all: { ts: { 4: null, 5: 2 } } } }));
+  assert.match(missingStep, /today 12:00–15:00 · –/);
+  assert.doesNotMatch(missingStep, /today 12:00–15:00 · None/);
 });
 
-test('answers: heat names the category, gives its advice, and is honest about what a heat index is', async () => {
+test('answers: heat gives the current index, peak category, time and short advice', async () => {
   const text = plain(await ask('heat', ['Badda'], { bmdOverrides: HOT }));
-  assert.match(text, /heat index 43 °C \(Danger\)/);
-  assert.match(text, /Heat exhaustion is likely/);
-  assert.match(text, /not a measured value or a WBGT reading/);
-  assert.match(text, /Now \(today 09:00–12:00\): temperature 28\.0 °C · heat index 36 °C — Extreme caution/);
+  assert.match(text, /Peak heat index \(24 h\): 43 °C · Danger/);
+  assert.match(text, /Time: today 15:00–18:00/);
+  assert.match(text, /Limit outdoor work, drink water often and rest in the shade/);
+  assert.match(text, /Now: 28\.0 °C · heat index 36 °C \(Extreme caution\)/);
 
   const mild = plain(await ask('heat', ['Badda'], { bmdOverrides: { all: { hi: Object.fromEntries(Array.from({ length: 32 }, (_, i) => [i, 20])) } } }));
   assert.match(mild, /stays below the caution level \(27 °C\)/);
@@ -400,51 +401,55 @@ test('answers: heat names the category, gives its advice, and is honest about wh
 test('answers: rain lists the steps, the total and the wettest step, and a gap makes the total a lower bound', async () => {
   const text = plain(await ask('rain', ['Badda'], { meteoOverrides: STORMY }));
   assert.match(text, /today 18:00–21:00 · 25\.5 mm \(heavy rain\) · chance 85%/);
-  assert.match(text, /Total: 37\.7 mm/);
-  assert.match(text, /Wettest step: 25\.5 mm around today 18:00–21:00/);
+  assert.match(text, /Total \(24 h\): 37\.7 mm/);
+  assert.match(text, /Wettest 3 h: 25\.5 mm · heavy rain\nTime: today 18:00–21:00/);
   const gap = plain(await ask('rain', ['Badda'], { meteoOverrides: { all: { rf: { 5: null, 6: 3 } } } }));
-  assert.match(gap, /Total: at least 3\.0 mm/);
+  assert.match(gap, /Total \(24 h\): at least 3\.0 mm/);
   const dry = plain(await ask('rain', ['Badda']));
-  assert.match(dry, /almost no rain/);
+  assert.match(dry, /Almost no rain/);
 });
 
 test('answers: wind gives the strongest gust of the next day with its class', async () => {
   const text = plain(await ask('wind', ['Badda'], { bmdOverrides: HOT }));
-  assert.match(text, /Strongest gust in the next 24 hours: 52 km\/h \(strong gusts\) around today 18:00–21:00/);
+  assert.match(text, /Peak gust \(24 h\): 52 km\/h · strong gusts\nTime: today 18:00–21:00/);
   assert.match(text, /from NW/);
-  assert.match(text, /Strong gusts can bring down branches/);
-  assert.doesNotMatch(plain(await ask('wind', ['Badda'])), /Strong gusts can bring down/, 'only when the gust is strong');
+  assert.match(text, /Secure loose objects/);
+  assert.doesNotMatch(plain(await ask('wind', ['Badda'])), /Secure loose objects/, 'only when the gust is strong');
+
+  const overnight = plain(await ask('wind', ['Badda'], { bmdOverrides: { all: { wg: { 9: 80 } } } }));
+  assert.match(overnight, /Peak gust \(24 h\): 80 km\/h · severe gusts\nTime: tomorrow 03:00–06:00/, 'the short timeline does not hide the overnight peak');
 });
 
 test('answers: the thunderstorm outlook gives the peak, flags a modelled thunderstorm and hail, and keeps the advice free of "safe"', async () => {
   const text = plain(await ask('thunderstorm', ['Badda'], { meteoOverrides: STORMY }));
-  assert.match(text, /today 15:00–18:00 · Low · chance of rain 60%/);
+  assert.match(text, /today 15:00–18:00 · Low · rain 60%/);
   assert.match(text, /today 21:00–00:00 · High/);
-  assert.match(text, /Highest: High around today 21:00–00:00/);
-  assert.match(text, /The model forecasts a thunderstorm: today 18:00–21:00; today 21:00–00:00 — with hail\./);
-  assert.match(text, /go into a building or a hard-topped vehicle/);
-  assert.match(text, /not a lightning detection/);
+  assert.match(text, /Peak potential \(24 h\): High\nTime: today 21:00–00:00/);
+  assert.match(text, /Thunderstorm forecast with hail\./);
+  assert.match(text, /go indoors; avoid isolated trees and open water/);
+  assert.doesNotMatch(text, /not a lightning detection|Send \/lightning/);
   assert.deepEqual(lintText(text), []);
 
   const calm = plain(await ask('thunderstorm', ['Badda']));
-  assert.match(calm, /shows no thunderstorm potential in this period\. A model can miss local storms\./);
-  assert.doesNotMatch(calm, /The model forecasts a thunderstorm/);
+  assert.match(calm, /Peak potential \(24 h\): None/);
+  assert.doesNotMatch(calm, /Thunderstorm forecast with hail/);
 
   const bn = plain(await ask('thunderstorm', ['Badda', 'bn'], { meteoOverrides: STORMY }));
   assert.match(bn, /শিলাবৃষ্টিসহ।/, 'a Bangla full stop');
 });
 
-test('answers: lightning says what was recorded, how old the check is, and that checks are not continuous', async () => {
+test('answers: lightning reports the recorded count, check time and search window', async () => {
   const lightning = (pick, error = false) => ({ lightningFor: async () => ({ pick, error }) });
   const reported = plain(await ask('lightning', ['Badda'], {}, lightning({ kind: 'reported', sampledMs: NOW - 600_000, count: 4, radiusKm: 100 })));
-  assert.match(reported, /Lightning was recorded within the 100 km search area at the last check \(today 09:50\): 4 strikes in the 5 minutes before it\./);
+  assert.match(reported, /Lightning was recorded\./);
+  assert.match(reported, /Last check: today 09:50\nStrikes \(previous 5 min\): 4\nSearch radius: 100 km/);
   const none = plain(await ask('lightning', ['Badda'], {}, lightning({ kind: 'none', sampledMs: NOW - 3_600_000, count: 0, radiusKm: 100 })));
   assert.match(none, /No lightning was recorded/);
-  assert.match(none, /does not show that lightning is not happening/);
+  assert.match(none, /Last check: today 09:00\nWindow: previous 5 min · radius 100 km/);
   assert.match(plain(await ask('lightning', ['Badda'], {}, lightning({ kind: 'stale', sampledMs: NOW - 9e6, radiusKm: 100 }))), /out of date/);
   assert.match(plain(await ask('lightning', ['Badda'], {}, lightning({ kind: 'unavailable', sampledMs: NOW, radiusKm: 100 }))), /not available right now/);
   assert.match(plain(await ask('lightning', ['Badda'], {}, lightning({ kind: 'not-checked', sampledMs: null, radiusKm: 100 }))), /has not been checked yet/);
-  assert.match(plain(await ask('lightning', ['Badda'], {}, lightning(null))), /No lightning check covers this place yet/);
+  assert.match(plain(await ask('lightning', ['Badda'], {}, lightning(null))), /No lightning check for this place yet/);
   assert.match(plain(await ask('lightning', ['Badda'], {}, lightning(null, true))), /could not be read right now/);
   const forecastMissing = await ask('lightning', ['Badda'], { bmd: null, openMeteo: null }, lightning({ kind: 'none', sampledMs: NOW, radiusKm: 100 }));
   assert.match(textOf(forecastMissing), /No lightning was recorded/, 'the lightning answer does not need the forecast');
@@ -452,17 +457,16 @@ test('answers: lightning says what was recorded, how old the check is, and that 
 
 test('answers: the forecast lists the days ahead with rain, gusts and the thunder peak', async () => {
   const text = plain(await ask('forecast', ['Badda'], { meteoOverrides: STORMY }));
-  assert.match(text, /Today: \d+–\d+ °C · rain 37\.7 mm · gusts up to 25 km\/h · chance of rain 85% · thunder: High/);
-  assert.match(text, /Tomorrow:/);
-  assert.match(text, /13 Oct:/);
-  assert.match(text, /10-day outlook/);
+  assert.match(text, /Today · \d+–\d+ °C\nrain 37\.7 mm · chance 85%\ngust 25 km\/h · thunder: High/);
+  assert.match(text, /Tomorrow ·/);
+  assert.match(text, /13 Oct ·/);
 });
 
 test('answers: alerts shows the titles and times, escapes them, and is not an all-clear when there are none', async () => {
   const subscriber = { _id: 's', language: 'en', areas: [{ upazilaPcode: BADDA }] };
   const none = plain(await ask('alerts', [], {}, { subscriberForChat: async () => subscriber }));
   assert.match(none, /no active AkashSathi alert/);
-  assert.match(none, /not a statement that the weather is calm/);
+  assert.match(none, /Weather forecast: \/update/);
   assert.deepEqual(lintText(none), []);
 
   const items = [
@@ -471,7 +475,7 @@ test('answers: alerts shows the titles and times, escapes them, and is not an al
   ];
   const result = await ask('alerts', [], {}, { subscriberForChat: async () => subscriber, alertsFor: async () => ({ items }) });
   const html = textOf(result);
-  assert.match(html, /\[Warning\] Heavy rain &lt;near&gt; Badda &amp; Dhaka — until today 15:00/);
+  assert.match(html, /<b>Warning<\/b> · Heavy rain &lt;near&gt; Badda &amp; Dhaka\nUntil: today 15:00/);
   assert.match(html, /…and 2 more in the app\./);
 
   const unlinked = plain(await ask('alerts'));
@@ -480,10 +484,10 @@ test('answers: alerts shows the titles and times, escapes them, and is not an al
 
 test('answers: status shows the age of each source and the alert engine, and says STALE when a source is', async () => {
   const text = plain(await ask('status', [], { bmdStatus: 'stale' }));
-  assert.match(text, /⚠ BMD forecast: STALE · updated today 08:00 \(2 h ago\)/);
+  assert.match(text, /⚠ BMD forecast: STALE\nUpdated: today 08:00 · 2 h ago/);
   assert.match(text, /✅ Open-Meteo forecast: current/);
   assert.match(text, /Alert engine: last run 1 min ago/);
-  assert.match(text, /not continuous monitoring/);
+  assert.doesNotMatch(text, /station readings|not continuous monitoring|Prototype information/);
   const off = plain(await ask('status', [], {}, { engineStatus: async () => ({ enabled: false, lastCompletedMs: null }) }));
   assert.match(off, /Alert engine: switched off/);
   const never = plain(await ask('status', [], { bmd: null }, { engineStatus: async () => ({ enabled: true, lastCompletedMs: null }) }));
@@ -627,7 +631,8 @@ test('bot: if Telegram refuses the formatting the same words go out as plain tex
   const fallback = channels.telegram.sent[1].content;
   assert.equal(fallback.parseMode, undefined);
   assert.ok(!/<\/?[bi]>/.test(fallback.text), 'no tags left');
-  assert.match(fallback.text, /Heat index by time/);
+  assert.equal(fallback.text, toPlain(channels.telegram.sent[0].content.text));
+  assert.match(fallback.text, /Heat index · next 12 hours/);
 });
 
 test('bot: an error while preparing a reply is answered with an apology, not silence, and leaks nothing', async () => {

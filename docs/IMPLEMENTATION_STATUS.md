@@ -6,10 +6,13 @@ Last verified: **11 October 2026**. This document says what is built against [`A
 
 | Check | Result |
 | --- | --- |
-| `npm run test:db` (server, including MongoDB-backed tests, isolated random databases) | **324 passed, 0 failed, 0 skipped** |
-| `npm test` client | **83 passed, 0 failed** |
+| `npm run test:db` (server, including MongoDB-backed tests, isolated random databases) | **354 passed, 0 failed, 0 skipped** |
+| `npm test` (client workspace) | **84 passed, 0 failed** |
 | `npm run build` | Passes. Alert, admin and map remain separate lazy chunks; Vite still reports the known large MapLibre chunk. |
+| `npm audit` | **0 reported vulnerabilities** at the latest pre-push check. |
 | Live provider calls in tests | None. Xweather, Telegram, WhatsApp and SMS are mocked; no test spends quota or sends a message. |
+
+The latest local verification used Node.js **24.14.0**. [GitHub CI](../.github/workflows/ci.yml) is configured to run the workspace tests against an isolated MongoDB 8 service and build the frontend on Node.js 22. The hosted workflow still requires its first run after pushing.
 
 ## Milestones against the plan
 
@@ -57,7 +60,28 @@ Last verified: **11 October 2026**. This document says what is built against [`A
 - *Anyone can use the weather commands*, connected or not. The profile is used only to find the saved area and the active alerts; replies never contain occupation, crop, shift or the reason an alert was sent. A typed Bangla place name gets a Bangla reply unless the profile says otherwise.
 - *Request limit* 30 per chat per 10 minutes, in memory (`TELEGRAM_COMMAND_LIMIT`); `/start`, `/stop` and `/help` are not limited.
 
-**Not done.** A scheduled daily digest (would use the delivery queue and cost messages); choosing between ambiguous places with buttons (the bot lists the exact command to send instead); the Bangla text, like all Bangla here, needs a fluent reader; `/forecast` shows no observed values or official extremes.
+**Not done.** Choosing between ambiguous places with buttons (the bot lists the exact command to send instead); the Bangla text, like all Bangla here, needs a fluent reader; `/forecast` shows no observed values or official extremes.
+
+### Compact report formatting
+
+The Telegram formatting update uses short HTML headings and a maximum of four timeline rows for the next 12 hours, while retaining 24-hour peaks and totals. Routine reports no longer repeat source, prototype, or observation-disclaimer footers; `/status` provides source freshness, stale forecasts show update-time warnings, and unverified BMD rainfall retains a warning. The morning digest still includes its model-forecast disclaimer and update time. Missing values, HTML escaping, language selection, and profile-data privacy remain covered by tests.
+
+## Morning weather message (11 October 2026)
+
+Every day at 06:00 Bangladesh time the bot sends today's weather, unasked, to each Telegram chat connected to a profile with a saved area. Added beside the existing code: `services/delivery/morningDigest.js` (window, claim, send, retry), `jobs/morningDigestJob.js` (a one-minute tick, started with the other delivery jobs), `models/MorningDigest.js` (one row per person per day), `renderMorning` at the end of `botReports/text.js`, `todayIdx` and `dayParts` in `botReports/readings.js`, and three settings (`MORNING_DIGEST`, `MORNING_DIGEST_TIME`, `MORNING_DIGEST_GRACE_HOURS`). Nothing that existed was changed in behaviour: the only edits to existing code are `export` on the two month-name lists in `alerts/messages.js`, new imports in `text.js` and `readings.js`, one line in `scheduler.js` and the model list in `models/index.js`. README: "Morning weather message".
+
+**Verification.** 30 tests in `morningDigest.test.js`: the wording in English and Bangla (every block, the day parts, a late-day send, missing data never zero, the alert rules' forbidden phrases, no Latin digits in Bangla, under the Telegram limit), the send window, and, against a throwaway MongoDB database, once-a-day idempotency (second tick, two servers at the same moment, next day), before and after the window, a changed time, only connected / active / real profiles, a profile without an area, quiet hours, a stale or missing forecast, a place the forecast does not cover, language, two saved areas with a retry that does not repeat the first, a Telegram outage with back-off up to the window's end, a blocked chat, a rejected token, the HTML fallback, nothing added to the alert queue, no profile answers in the text, and the job's own tick and lease. The whole server suite passes (353 tests). The message was also rendered from the forecast the real server had stored (read-only, nothing sent), in both languages, for a thana and a district. Not run against a live Telegram chat.
+
+**Decisions worth knowing.**
+
+- *Everyone who connected Telegram gets it, with no separate opt-in.* They connected for alerts; the morning message is a new kind of message to them. `/stop` ends all messages in the chat; there is no "morning message only off" switch yet (it would need a new command or a profile setting).
+- *Outside the alert path on purpose.* It does not use the `Delivery` queue (which is keyed by alert notification), so it cannot delay an alert, does not count against the daily cap and is not shown in the administrator's delivery counts.
+- *A forecast that is not current is never sent as today's weather.* It waits until the forecast is current or the window closes. This is the same rule the alert queue applies to alerts built on stale data.
+- *Quiet hours hold it, a closed window drops it.* A person whose quiet hours end after the window closes gets no message that day.
+- *Retries stay inside the window* so a message about the morning never arrives in the evening.
+- *The Bangla text is a draft, like all Bangla here.*
+
+**Not done.** A per-person on/off switch or choice of time; the administrator page does not list morning messages; no live-chat run (needs a real send to a connected chat, which only the person who owns the bot can see).
 
 ## Page load, green flash and CPU review (11 October 2026)
 

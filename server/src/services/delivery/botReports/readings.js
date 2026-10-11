@@ -2,7 +2,7 @@ import { hazardRules } from '../../../config/alertRules.js';
 import { env } from '../../../config/env.js';
 import { heatIndexCategories } from '../../../config/thresholds.js';
 import { circularMeanDegrees } from '../../aggregate.js';
-import { dhakaDate } from '../../time.js';
+import { dhakaDate, dhakaParts } from '../../time.js';
 import { allStatuses, getSourceData } from '../../weatherStore.js';
 
 // What the bot knows about the weather at a place: pure functions over the stored forecast. Nothing here reads the network or the database,
@@ -135,6 +135,34 @@ export function windowIdx(forecast, hours) {
 export function laterIdx(forecast, hours) {
   const { steps, nowMs } = forecast;
   return steps.map((start, i) => i).filter((i) => steps[i] > nowMs && steps[i] < nowMs + hours * HOUR);
+}
+
+// The steps of today's Bangladesh calendar day. By default only the ones that have not ended yet (what is still ahead); `whole` gives the
+// whole day, including the steps already gone, for a figure about the day itself such as its lowest and highest temperature.
+export function todayIdx(forecast, { whole = false } = {}) {
+  const { steps, nowMs } = forecast;
+  const today = dhakaDate(new Date(nowMs));
+  return steps.map((start, i) => i).filter((i) => dhakaDate(new Date(steps[i])) === today && (whole || steps[i] + STEP_MS > nowMs));
+}
+
+// Morning (until 12:00, so the small hours join it), afternoon and evening, each with the step indexes of `indexes` that fall inside it.
+// A part with no step left is not listed.
+export const DAY_PARTS = [
+  { key: 'morning', from: 0, to: 12 },
+  { key: 'afternoon', from: 12, to: 18 },
+  { key: 'evening', from: 18, to: 24 },
+];
+
+export function dayParts(forecast, indexes = todayIdx(forecast)) {
+  return DAY_PARTS
+    .map((part) => ({
+      ...part,
+      indexes: indexes.filter((i) => {
+        const { hh } = dhakaParts(new Date(forecast.steps[i]));
+        return hh >= part.from && hh < part.to;
+      }),
+    }))
+    .filter((part) => part.indexes.length);
 }
 
 // ---------- numbers over some steps ----------

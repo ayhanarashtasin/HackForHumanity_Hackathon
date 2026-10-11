@@ -20,6 +20,12 @@ function severityFromEnv(name, fallback) {
   return value;
 }
 
+function timeFromEnv(name, fallback) {
+  const value = (process.env[name] || fallback).trim();
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) throw new Error(`${name} must be a time like 06:00 (24 hours, Bangladesh time).`);
+  return value;
+}
+
 // A JSON object of string headers (for example an API key). A malformed value is ignored rather than crashing start-up.
 function jsonFromEnv(name) {
   try {
@@ -129,6 +135,14 @@ export const env = {
       telegram: severityFromEnv('DELIVERY_MIN_SEVERITY_TELEGRAM', 'ADVISORY'),
       whatsapp: severityFromEnv('DELIVERY_MIN_SEVERITY_WHATSAPP', 'WARNING'),
       sms: severityFromEnv('DELIVERY_MIN_SEVERITY_SMS', 'WARNING'),
+    },
+
+    // The morning weather message to every Telegram chat connected to a profile with a saved area (MORNING_DIGEST=off turns it off).
+    // Bangladesh time. A server that was down at the set time can still send it for `graceHours` afterwards; later than that it skips the day.
+    morningDigest: {
+      enabled: process.env.MORNING_DIGEST !== 'off',
+      time: timeFromEnv('MORNING_DIGEST_TIME', '06:00'),
+      graceHours: numberFromEnv('MORNING_DIGEST_GRACE_HOURS', 4, { min: 0, max: 12, integer: true }),
     },
 
     telegram: {

@@ -1,19 +1,21 @@
 import { env } from '../../../config/env.js';
 import {
-  PROVIDER_LABELS, dayWord, localizeDigits, whenText,
+  BN_MONTHS, EN_MONTHS, PROVIDER_LABELS, dayWord, localizeDigits, whenText,
 } from '../../alerts/messages.js';
-import { formatHm } from '../../time.js';
+import {
+  DHAKA_OFFSET_MS, addDays, dhakaDate, formatHm,
+} from '../../time.js';
 import { parentOf } from './places.js';
 import {
-  COMPASS, STEP_MS, compassIndex, dailySummaries, freshnessOf, gustClass, hasHailCode, heatCategory, isThunderCode, laterIdx, peakOf, rainClass, sumOf,
-  windowIdx,
+  COMPASS, STEP_MS, compassIndex, dailySummaries, dayParts, freshnessOf, gustClass, hasHailCode, heatCategory, isThunderCode, laterIdx, lowOf, peakOf,
+  rainClass, sumOf, todayIdx, windowIdx,
 } from './readings.js';
 
 // The words of the bot's weather replies, in English and Bangla. The Bangla is a draft that still needs a fluent reader (BN_REVIEWED).
 // Style rules are the alert rules (alerts/messages.js DISCOURAGED_PHRASES, enforced by test): never "safe", never "all clear", never a
 // forecast described as a measurement, never zero for a missing value. Replies are HTML for Telegram; every dynamic string is escaped.
 const MAX_LENGTH = 3800;
-const MAX_LINES = 9;
+const MAX_TIMELINE_LINES = 4;
 
 export const COMMAND_NAMES = ['update', 'heat', 'rain', 'wind', 'thunderstorm', 'lightning', 'forecast', 'alerts', 'status'];
 
@@ -93,17 +95,17 @@ const HEAT_NAMES = {
 const HEAT_ADVICE = {
   en: [
     'The forecast heat index stays below the caution level (27 °C) in the next 24 hours.',
-    'Fatigue is possible with long exposure or activity. Drink water regularly and take breaks in the shade.',
-    'Heat cramps and heat exhaustion are possible with long exposure or activity. Drink water often, rest in the shade and avoid the hottest hours for hard work.',
-    'Heat exhaustion is likely and heat stroke is possible with long exposure or activity. Limit outdoor work, drink water often and rest in the shade.',
-    'Heat stroke is highly likely with continued exposure. Avoid outdoor activity during these hours.',
+    'Drink water regularly and take breaks in the shade.',
+    'Drink water often, rest in the shade and avoid heavy work in the hottest hours.',
+    'Limit outdoor work, drink water often and rest in the shade.',
+    'Avoid outdoor activity during these hours.',
   ],
   bn: [
     'পরবর্তী ২৪ ঘণ্টায় পূর্বাভাসের হিট ইনডেক্স সতর্ক-স্তরের (২৭ °সে.) নিচে থাকবে।',
-    'দীর্ঘক্ষণ রোদে থাকলে বা পরিশ্রম করলে ক্লান্তি হতে পারে। নিয়মিত পানি পান করুন এবং ছায়ায় বিশ্রাম নিন।',
-    'দীর্ঘক্ষণ রোদে থাকলে বা পরিশ্রম করলে পেশিতে টান ও গরমজনিত অবসাদ হতে পারে। ঘন ঘন পানি পান করুন, ছায়ায় বিশ্রাম নিন এবং সবচেয়ে গরম সময়ে ভারী কাজ এড়িয়ে চলুন।',
-    'দীর্ঘক্ষণ রোদে থাকলে বা পরিশ্রম করলে গরমজনিত অবসাদের সম্ভাবনা বেশি এবং হিটস্ট্রোক হতে পারে। বাইরের কাজ কমান, ঘন ঘন পানি পান করুন এবং ছায়ায় বিশ্রাম নিন।',
-    'রোদে থাকা চালিয়ে গেলে হিটস্ট্রোকের আশঙ্কা অত্যন্ত বেশি। এই সময়গুলোতে বাইরের কাজ এড়িয়ে চলুন।',
+    'নিয়মিত পানি পান করুন এবং ছায়ায় বিশ্রাম নিন।',
+    'ঘন ঘন পানি পান করুন, ছায়ায় বিশ্রাম নিন এবং গরমের সময় ভারী কাজ এড়িয়ে চলুন।',
+    'বাইরের কাজ কমান, ঘন ঘন পানি পান করুন এবং ছায়ায় বিশ্রাম নিন।',
+    'এই সময়ে বাইরের কাজ এড়িয়ে চলুন।',
   ],
 };
 
@@ -132,65 +134,58 @@ function placeTitle(place, T) {
   const parent = parentOf(place);
   const parentName = parent ? (T.L === 'bn' ? parent.nameBn || parent.name : parent.name) : null;
   const kind = KIND_NAMES[T.L][place.kind];
-  const where = place.level === 'district' ? kind : [kind, parentName ? T.s(`${parentName} district`, `${parentName} জেলা`) : null].filter(Boolean).join(', ');
+  const where = place.level === 'district' ? kind : parentName || kind;
   return `${bold(nameOf(place, T.L))} · ${esc(where)}`;
 }
 
 function placeNote(place, T) {
   if (place.level === 'district') {
     return T.s(
-      'District figures: temperature and humidity are the average of its upazilas; heat, rain and gusts show the highest upazila.',
-      'জেলার হিসাব: তাপমাত্রা ও আর্দ্রতা উপজেলাগুলোর গড়; গরম, বৃষ্টি ও দমকা হাওয়ায় সবচেয়ে বেশি মান থাকা উপজেলাটি দেখানো হয়েছে।',
+      'District: average temperature; highest heat, rain and gusts.',
+      'জেলা: গড় তাপমাত্রা; সর্বোচ্চ গরম, বৃষ্টি ও দমকা হাওয়া।',
     );
   }
   if (place.level === 'polygon') {
     return (place.members?.length ?? 0) > 1 && !place.approx
-      ? T.s(`${nameOf(place, T.L)} is shown as the average of its BMD thanas.`, `${nameOf(place, T.L)} তার বিএমডি থানাগুলোর গড় হিসেবে দেখানো হয়েছে।`)
-      : T.s(`BMD has no separate forecast for ${nameOf(place, T.L)}; this uses the nearest BMD location.`, `${nameOf(place, T.L)}-এর জন্য বিএমডির আলাদা পূর্বাভাস নেই; এখানে নিকটতম বিএমডি অবস্থানের পূর্বাভাস দেখানো হয়েছে।`);
+      ? T.s('Area forecast: average of its thanas.', 'এলাকার পূর্বাভাস: থানাগুলোর গড়।')
+      : T.s('Forecast for the nearest available location.', 'নিকটতম অবস্থানের পূর্বাভাস।');
   }
   return null;
 }
 
 // ---------- shared lines ----------
-const DISCLAIMER = (T) => T.s(
-  'Prototype information, not an official warning service. Official warnings: bmd.gov.bd.',
-  'পরীক্ষামূলক তথ্য, সরকারি সতর্কীকরণ সেবা নয়। সরকারি সতর্কবার্তার জন্য bmd.gov.bd দেখুন।',
-);
-
-function sourceLine(T, source, info, { label = 'Source' } = {}) {
+function freshnessNote(T, info) {
   const fresh = freshnessOf(info);
-  const name = PROVIDER_LABELS[source][T.L];
-  const parts = [`${T.s(label, 'সূত্র')}: ${name}`, T.s('model forecast, not a station reading', 'মডেল পূর্বাভাস, কোনো কেন্দ্রের পরিমাপ নয়')];
-  if (fresh.updatedMs) parts.push(T.s(`updated ${T.when(fresh.updatedMs)}`, `হালনাগাদ ${T.when(fresh.updatedMs)}`));
-  let line = italic(parts.join(' · '));
+  if (fresh.status === 'ok') return null;
   if (fresh.status === 'stale') {
-    line += `\n⚠ ${T.s(
-      `Stale data${fresh.updatedMs ? `: last updated ${T.when(fresh.updatedMs)}` : ''}. Treat it with caution.`,
-      `পুরনো তথ্য${fresh.updatedMs ? `: সর্বশেষ হালনাগাদ ${T.when(fresh.updatedMs)}` : ''}। সতর্কতার সঙ্গে ব্যবহার করুন।`,
-    )}`;
-  } else if (fresh.status !== 'ok') {
-    line += `\n⚠ ${T.s('This source is not available right now.', 'এই সূত্র এখন পাওয়া যাচ্ছে না।')}`;
+    return `⚠ ${T.s('Stale data', 'পুরনো তথ্য')}${fresh.updatedMs ? ` · ${T.s('updated', 'হালনাগাদ')} ${esc(T.when(fresh.updatedMs))}` : ''}`;
   }
-  return line;
+  return `⚠ ${T.s('Latest data unavailable', 'সর্বশেষ তথ্য পাওয়া যাচ্ছে না')}`;
 }
 
-const closing = (T, lines) => [...lines.filter(Boolean), italic(DISCLAIMER(T))].join('\n');
+function reportHeader(place, T, icon, en, bn, infos = []) {
+  const lines = [`${icon} ${bold(T.s(en, bn))}`, placeTitle(place, T)];
+  const note = placeNote(place, T);
+  if (note) lines.push(italic(note));
+  lines.push(...new Set(infos.map((info) => freshnessNote(T, info)).filter(Boolean)));
+  return [...lines, ''];
+}
+
+const rainNote = (f, T) => (f.rain.unverified ? `⚠ ${T.s('Rain unit unverified.', 'বৃষ্টির একক যাচাই হয়নি।')}` : null);
 
 function unavailable(f, place, T, what) {
   return fit([
     placeTitle(place, T),
     '',
     T.s(
-      `${what} is not available for this place right now. Missing data does not mean calm weather.`,
-      `এই জায়গার জন্য ${what} এখন পাওয়া যাচ্ছে না। তথ্য না থাকার অর্থ আবহাওয়া শান্ত থাকা নয়।`,
+      `${what} is not available for this place right now.`,
+      `এই জায়গার জন্য ${what} এখন পাওয়া যাচ্ছে না।`,
     ),
-    '',
-    italic(DISCLAIMER(T)),
   ].join('\n'));
 }
 
 const heatName = (level, T) => HEAT_NAMES[T.L][level];
-const thunderName = (level, T) => THUNDER_NAMES[T.L][Math.min(Math.max(level ?? 0, 0), 3)];
+const thunderName = (level, T) => (Number.isFinite(level) ? THUNDER_NAMES[T.L][Math.min(Math.max(level, 0), 3)] : '–');
 const windFrom = (degrees, T) => {
   const i = compassIndex(degrees);
   if (i === null) return '';
@@ -212,34 +207,31 @@ export function renderUpdate(f, { lang, nowMs, lightning = undefined, alertCount
   const T = makeText(lang, nowMs);
   if (!f.available) return unavailable(f, f.place, T, T.s('The forecast', 'পূর্বাভাস'));
 
-  const lines = [`📍 ${placeTitle(f.place, T)}`];
-  const note = placeNote(f.place, T);
-  if (note) lines.push(italic(note));
-  lines.push('');
+  const lines = reportHeader(f.place, T, '📍', 'Weather forecast', 'আবহাওয়ার পূর্বাভাস', [f.coreInfo, f.rain.info, ...(f.thunder.values ? [f.thunder.info] : [])]);
 
   const i = f.nowIdx;
   const { cols } = f;
   if (i >= 0) {
     const code = cols.wmo?.[i] ?? null;
     const label = CONDITION[T.L][code] ?? null;
-    lines.push(`${T.s('Now', 'এখন')} · ${T.range(f.steps[i])}`);
+    lines.push(`${bold(T.s('Now', 'এখন'))} · ${T.range(f.steps[i])}`);
     lines.push(`${conditionEmoji(code)} ${label ? `${esc(label)} · ` : ''}${bold(T.c(cols.temp[i], 1))}`);
     const hiLevel = heatCategory(cols.hi?.[i]);
-    lines.push(`${T.s('Heat index', 'হিট ইনডেক্স')} ${T.c(cols.hi?.[i], 0)}${hiLevel === null ? '' : ` (${esc(heatName(hiLevel, T))})`}`);
-    const chance = Number.isFinite(f.cols.pop?.[i]) ? ` · ${T.s('chance of rain', 'বৃষ্টির সম্ভাবনা')} ${T.pct(f.cols.pop[i])}` : '';
-    lines.push(`${T.s('Rain', 'বৃষ্টি')} ${T.mm(f.rain.values?.[i])} ${T.s('in 3 h', '৩ ঘণ্টায়')}${chance}`);
-    lines.push(`${T.s('Humidity', 'আর্দ্রতা')} ${T.pct(cols.rh?.[i])} · ${T.s('Wind', 'বাতাস')} ${T.kph(cols.ws?.[i])}${esc(windFrom(cols.wd?.[i], T))}, ${T.s('gusts up to', 'দমকা হাওয়া সর্বোচ্চ')} ${T.kph(cols.wg?.[i])}`);
+    lines.push(`${T.s('Heat index', 'হিট ইনডেক্স')}: ${T.c(cols.hi?.[i], 0)}${hiLevel === null ? '' : ` · ${esc(heatName(hiLevel, T))}`}`);
+    const chance = Number.isFinite(f.cols.pop?.[i]) ? ` · ${T.s('chance', 'সম্ভাবনা')} ${T.pct(f.cols.pop[i])}` : '';
+    lines.push(`${T.s('Rain (3 h)', 'বৃষ্টি (৩ ঘণ্টা)')}: ${T.mm(f.rain.values?.[i])}${chance}`);
+    lines.push(`${T.s('Wind', 'বাতাস')}: ${T.kph(cols.ws?.[i])} · ${T.s('gust', 'দমকা')} ${T.kph(cols.wg?.[i])}`);
+    lines.push(`${T.s('Humidity', 'আর্দ্রতা')}: ${T.pct(cols.rh?.[i])}`);
     if (f.thunder.values) lines.push(`${T.s('Thunderstorm potential', 'বজ্রঝড়ের সম্ভাবনা')}: ${esc(thunderName(f.thunder.values[i], T))}`);
   } else {
     lines.push(T.s('The stored forecast does not cover the current time.', 'সংরক্ষিত পূর্বাভাস বর্তমান সময়কে ধরে না।'));
   }
 
-  const later = laterIdx(f, 12).slice(0, 4);
+  const later = laterIdx(f, 12).slice(0, MAX_TIMELINE_LINES);
   if (later.length) {
     lines.push('', bold(T.s('Next 12 hours', 'পরবর্তী ১২ ঘণ্টা')));
     for (const k of later) {
-      const parts = [T.when(f.steps[k]), `${T.n(cols.temp[k])}°`, T.mm(f.rain.values?.[k]), `${T.s('gust', 'দমকা')} ${T.n(cols.wg?.[k])}`];
-      if ((f.thunder.values?.[k] ?? 0) >= 1) parts.push(`${T.s('thunder', 'বজ্রঝড়')} ${thunderName(f.thunder.values[k], T)}`);
+      const parts = [T.when(f.steps[k]), T.c(cols.temp[k]), `${T.s('rain', 'বৃষ্টি')} ${T.mm(f.rain.values?.[k])}`];
       lines.push(parts.map(esc).join(' · '));
     }
   }
@@ -248,14 +240,10 @@ export function renderUpdate(f, { lang, nowMs, lightning = undefined, alertCount
   if (alertCount !== null) {
     lines.push(alertCount > 0
       ? `🔔 ${T.s(`${T.n(alertCount)} active alert${alertCount === 1 ? '' : 's'} · send /alerts`, `${T.n(alertCount)}টি সক্রিয় সতর্কবার্তা · /alerts পাঠান`)}`
-      : `🔔 ${T.s('No active AkashSathi alert for your saved area. That does not mean calm weather.', 'আপনার সংরক্ষিত এলাকায় আকাশসাথীর কোনো সক্রিয় সতর্কবার্তা নেই। এর মানে আবহাওয়া শান্ত থাকা নয়।')}`);
+      : `🔔 ${T.s('No active AkashSathi alert.', 'আকাশসাথীর কোনো সক্রিয় সতর্কবার্তা নেই।')}`);
   }
 
-  const extraSource = f.coreSource !== 'open-meteo' && (f.thunder.values || f.rain.source === 'open-meteo')
-    ? sourceLine(T, 'open-meteo', f.thunder.info, { label: f.rain.source === 'open-meteo' ? 'Rain amounts, rain chance and thunder' : 'Rain chance and thunder' })
-    : null;
-  const rainCaveat = f.rain.unverified ? italic(T.s('Rain amounts are BMD values as published; their unit has not been independently confirmed.', 'বৃষ্টির পরিমাণ বিএমডির প্রকাশিত মান; এর একক এখনো স্বাধীনভাবে নিশ্চিত করা হয়নি।')) : null;
-  lines.push('', closing(T, [rainCaveat, sourceLine(T, f.coreSource, f.coreInfo), extraSource]));
+  if (rainNote(f, T)) lines.push('', rainNote(f, T));
   return fit(lines.join('\n'));
 }
 
@@ -264,38 +252,33 @@ export function renderHeat(f, { lang, nowMs }) {
   const T = makeText(lang, nowMs);
   if (!f.available) return unavailable(f, f.place, T, T.s('Heat information', 'গরমের তথ্য'));
   const { cols } = f;
-  const win = windowIdx(f, 24).slice(0, MAX_LINES);
+  const win = windowIdx(f, 24);
   const peak = peakOf(cols.hi, win);
   const hottest = peakOf(cols.temp, win);
   if (!peak && !hottest) return unavailable(f, f.place, T, T.s('Heat information', 'গরমের তথ্য'));
 
-  const lines = [`🌡 ${placeTitle(f.place, T)}`];
-  const note = placeNote(f.place, T);
-  if (note) lines.push(italic(note));
-  lines.push('');
+  const lines = reportHeader(f.place, T, '🌡', 'Heat forecast', 'গরমের পূর্বাভাস', [f.coreInfo]);
 
   const i = f.nowIdx;
   if (i >= 0) {
     const level = heatCategory(cols.hi?.[i]);
-    lines.push(`${bold(T.s('Now', 'এখন'))} (${T.range(f.steps[i])}): ${T.s('temperature', 'তাপমাত্রা')} ${T.c(cols.temp[i], 1)} · ${T.s('heat index', 'হিট ইনডেক্স')} ${T.c(cols.hi?.[i])}${level === null ? '' : ` — ${esc(heatName(level, T))}`}`);
+    lines.push(`${T.s('Now', 'এখন')}: ${T.c(cols.temp[i], 1)} · ${T.s('heat index', 'হিট ইনডেক্স')} ${T.c(cols.hi?.[i])}${level === null ? '' : ` (${esc(heatName(level, T))})`}`);
   }
   if (peak) {
     const level = heatCategory(peak.value);
-    lines.push(`${bold(T.s('Highest in the next 24 hours', 'পরবর্তী ২৪ ঘণ্টায় সর্বোচ্চ'))}: ${T.s('heat index', 'হিট ইনডেক্স')} ${T.c(peak.value)} (${esc(heatName(level, T))}) ${T.s('around', 'প্রায়')} ${T.range(f.steps[peak.index])}${hottest ? `; ${T.s('temperature up to', 'তাপমাত্রা সর্বোচ্চ')} ${T.c(hottest.value, 1)}` : ''}`);
-    lines.push('', esc(HEAT_ADVICE[T.L][level]));
-    lines.push('', bold(T.s('Heat index by time', 'সময় অনুযায়ী হিট ইনডেক্স')));
-    for (const k of win) {
+    lines.push(`${bold(T.s('Peak heat index (24 h)', 'সর্বোচ্চ হিট ইনডেক্স (২৪ ঘণ্টা)'))}: ${T.c(peak.value)} · ${esc(heatName(level, T))}`);
+    lines.push(`${T.s('Time', 'সময়')}: ${T.range(f.steps[peak.index])}`);
+    if (hottest) lines.push(`${T.s('Max temperature', 'সর্বোচ্চ তাপমাত্রা')}: ${T.c(hottest.value, 1)}`);
+    const later = laterIdx(f, 12).slice(0, MAX_TIMELINE_LINES);
+    if (later.length) lines.push('', bold(T.s('Heat index · next 12 hours', 'হিট ইনডেক্স · পরবর্তী ১২ ঘণ্টা')));
+    for (const k of later) {
       const level2 = heatCategory(cols.hi?.[k]);
-      lines.push(`${esc(T.when(f.steps[k]))} · ${T.n(cols.hi?.[k])}°${level2 ? ` (${esc(heatName(level2, T))})` : ''} · ${T.n(cols.temp[k], 1)}°`);
+      lines.push(`${esc(T.when(f.steps[k]))} · ${T.c(cols.hi?.[k])}${level2 ? ` · ${esc(heatName(level2, T))}` : ''}`);
     }
+    lines.push('', esc(HEAT_ADVICE[T.L][level]));
   } else {
     lines.push(T.s('The heat index is not available; only the temperature is.', 'হিট ইনডেক্স পাওয়া যাচ্ছে না; শুধু তাপমাত্রা আছে।'));
   }
-  lines.push('', italic(T.s(
-    'The heat index is computed from temperature and humidity (NWS). It is not a measured value or a WBGT reading. Alerts matched to your work arrive automatically.',
-    'হিট ইনডেক্স তাপমাত্রা ও আর্দ্রতা থেকে হিসাব করা (এনডব্লিউএস)। এটি পরিমাপ করা মান বা ডব্লিউবিজিটি নয়। আপনার কাজ অনুযায়ী সতর্কবার্তা নিজে থেকেই আসবে।',
-  )));
-  lines.push('', closing(T, [sourceLine(T, f.coreSource, f.coreInfo)]));
   return fit(lines.join('\n'));
 }
 
@@ -303,28 +286,27 @@ export function renderHeat(f, { lang, nowMs }) {
 export function renderRain(f, { lang, nowMs }) {
   const T = makeText(lang, nowMs);
   if (!f.available || !f.rain.values) return unavailable(f, f.place, T, T.s('The rain forecast', 'বৃষ্টির পূর্বাভাস'));
-  const win = windowIdx(f, 24).slice(0, MAX_LINES);
+  const win = windowIdx(f, 24);
   const { total, partial } = sumOf(f.rain.values, win);
   if (total === null) return unavailable(f, f.place, T, T.s('The rain forecast', 'বৃষ্টির পূর্বাভাস'));
 
-  const lines = [`🌧 ${placeTitle(f.place, T)}`];
-  const note = placeNote(f.place, T);
-  if (note) lines.push(italic(note));
-  lines.push('', bold(T.s('Next 24 hours, in 3-hour steps', 'পরবর্তী ২৪ ঘণ্টা, ৩ ঘণ্টা করে')));
-  for (const k of win) {
+  const lines = reportHeader(f.place, T, '🌧', 'Rain forecast', 'বৃষ্টির পূর্বাভাস', [f.rain.info]);
+  lines.push(`${bold(T.s('Total (24 h)', 'মোট (২৪ ঘণ্টা)'))}: ${partial ? T.s('at least ', 'কমপক্ষে ') : ''}${T.mm(total)}`);
+  const wettest = peakOf(f.rain.values, win);
+  if (wettest && wettest.value >= 0.1) {
+    lines.push(`${T.s('Wettest 3 h', 'সর্বোচ্চ বৃষ্টি (৩ ঘণ্টা)')}: ${T.mm(wettest.value)} · ${esc(RAIN_NAMES[T.L][rainClass(wettest.value)])}`);
+    lines.push(`${T.s('Time', 'সময়')}: ${T.range(f.steps[wettest.index])}`);
+  }
+  if (total < 0.1) lines.push(T.s('Almost no rain in the forecast.', 'পূর্বাভাসে প্রায় কোনো বৃষ্টি নেই।'));
+  const later = laterIdx(f, 12).slice(0, MAX_TIMELINE_LINES);
+  if (later.length) lines.push('', bold(T.s('Next 12 hours · 3-hour amounts', 'পরবর্তী ১২ ঘণ্টা · ৩ ঘণ্টার পরিমাণ')));
+  for (const k of later) {
     const amount = f.rain.values[k];
     const klass = rainClass(amount);
     const chance = Number.isFinite(f.cols.pop?.[k]) ? ` · ${T.s('chance', 'সম্ভাবনা')} ${T.pct(f.cols.pop[k])}` : '';
     lines.push(`${esc(T.range(f.steps[k]))} · ${T.mm(amount)}${klass ? ` (${esc(RAIN_NAMES[T.L][klass])})` : ''}${chance}`);
   }
-  lines.push('', `${bold(T.s('Total', 'মোট'))}: ${partial ? T.s('at least ', 'কমপক্ষে ') : ''}${T.mm(total)}`);
-  const wettest = peakOf(f.rain.values, win);
-  if (wettest && wettest.value >= 0.1) lines.push(`${bold(T.s('Wettest step', 'সবচেয়ে বেশি বৃষ্টির ধাপ'))}: ${T.mm(wettest.value)} ${T.s('around', 'প্রায়')} ${T.range(f.steps[wettest.index])}`);
-  if (total < 0.1) lines.push(T.s('The forecast shows almost no rain in this period. Local showers can be missed by a model.', 'এই সময়ে পূর্বাভাসে প্রায় কোনো বৃষ্টি নেই। মডেল স্থানীয় বৃষ্টির ঝাপটা ধরতে না-ও পারে।'));
-  lines.push('', italic(f.rain.unverified
-    ? T.s('Rain amounts are BMD values as published; their unit has not been independently confirmed.', 'বৃষ্টির পরিমাণ বিএমডির প্রকাশিত মান; এর একক এখনো স্বাধীনভাবে নিশ্চিত করা হয়নি।')
-    : T.s('Rain amounts are millimetres per 3-hour step; the class names follow the alert rules.', 'বৃষ্টির পরিমাণ প্রতি ৩ ঘণ্টায় মিলিমিটারে; শ্রেণির নামগুলো সতর্কবার্তার নিয়ম অনুযায়ী।')));
-  lines.push('', closing(T, [sourceLine(T, f.rain.source, f.rain.info, { label: 'Rain source' })]));
+  if (rainNote(f, T)) lines.push('', rainNote(f, T));
   return fit(lines.join('\n'));
 }
 
@@ -333,24 +315,22 @@ export function renderWind(f, { lang, nowMs }) {
   const T = makeText(lang, nowMs);
   if (!f.available || !f.cols.wg) return unavailable(f, f.place, T, T.s('The wind forecast', 'বাতাসের পূর্বাভাস'));
   const { cols } = f;
-  const win = windowIdx(f, 24).slice(0, MAX_LINES);
+  const win = windowIdx(f, 24);
   const peak = peakOf(cols.wg, win);
   if (!peak) return unavailable(f, f.place, T, T.s('The wind forecast', 'বাতাসের পূর্বাভাস'));
 
-  const lines = [`💨 ${placeTitle(f.place, T)}`];
-  const note = placeNote(f.place, T);
-  if (note) lines.push(italic(note));
-  lines.push('');
+  const lines = reportHeader(f.place, T, '💨', 'Wind forecast', 'বাতাসের পূর্বাভাস', [f.coreInfo]);
   const i = f.nowIdx;
-  if (i >= 0) lines.push(`${bold(T.s('Now', 'এখন'))} (${T.range(f.steps[i])}): ${T.kph(cols.ws?.[i])}${esc(windFrom(cols.wd?.[i], T))}, ${T.s('gusts up to', 'দমকা হাওয়া সর্বোচ্চ')} ${T.kph(cols.wg[i])}`);
+  if (i >= 0) lines.push(`${T.s('Now', 'এখন')}: ${T.kph(cols.ws?.[i])}${esc(windFrom(cols.wd?.[i], T))} · ${T.s('gust', 'দমকা')} ${T.kph(cols.wg[i])}`);
   const klass = gustClass(peak.value);
-  lines.push(`${bold(T.s('Strongest gust in the next 24 hours', 'পরবর্তী ২৪ ঘণ্টায় সবচেয়ে জোরালো দমকা হাওয়া'))}: ${T.kph(peak.value)} (${esc(GUST_NAMES[T.L][klass])}) ${T.s('around', 'প্রায়')} ${T.range(f.steps[peak.index])}`);
-  lines.push('', bold(T.s('By time', 'সময় অনুযায়ী')));
-  for (const k of win) {
-    lines.push(`${esc(T.when(f.steps[k]))} · ${T.kph(cols.ws?.[k])}${esc(windFrom(cols.wd?.[k], T))} · ${T.s('gust', 'দমকা')} ${T.kph(cols.wg?.[k])}`);
+  lines.push(`${bold(T.s('Peak gust (24 h)', 'সর্বোচ্চ দমকা হাওয়া (২৪ ঘণ্টা)'))}: ${T.kph(peak.value)} · ${esc(GUST_NAMES[T.L][klass])}`);
+  lines.push(`${T.s('Time', 'সময়')}: ${T.range(f.steps[peak.index])}`);
+  const later = laterIdx(f, 12).slice(0, MAX_TIMELINE_LINES);
+  if (later.length) lines.push('', bold(T.s('Next 12 hours', 'পরবর্তী ১২ ঘণ্টা')));
+  for (const k of later) {
+    lines.push(`${esc(T.when(f.steps[k]))} · ${T.kph(cols.ws?.[k])} · ${T.s('gust', 'দমকা')} ${T.kph(cols.wg?.[k])}`);
   }
-  if (peak.value >= 40) lines.push('', T.s('Strong gusts can bring down branches and loose objects. Take extra care on boats, roofs and open ground.', 'প্রবল দমকা হাওয়ায় ডালপালা ও আলগা জিনিস ভেঙে পড়তে পারে। নৌকা, ছাদ ও খোলা জায়গায় বাড়তি সতর্ক থাকুন।'));
-  lines.push('', closing(T, [sourceLine(T, f.coreSource, f.coreInfo)]));
+  if (peak.value >= 40) lines.push('', T.s('Secure loose objects; take care on boats and roofs.', 'আলগা জিনিস বেঁধে রাখুন; নৌকা ও ছাদে সতর্ক থাকুন।'));
   return fit(lines.join('\n'));
 }
 
@@ -359,42 +339,35 @@ export function renderThunderstorm(f, { lang, nowMs }) {
   const T = makeText(lang, nowMs);
   const values = f.available ? f.thunder.values : null;
   if (!f.available || !values) return unavailable(f, f.place, T, T.s('The thunderstorm outlook', 'বজ্রঝড়ের পূর্বাভাস'));
-  const win = windowIdx(f, 24).slice(0, MAX_LINES);
+  const win = windowIdx(f, 24);
   const peak = peakOf(values, win);
   if (!peak) return unavailable(f, f.place, T, T.s('The thunderstorm outlook', 'বজ্রঝড়ের পূর্বাভাস'));
 
-  const lines = [`⛈ ${placeTitle(f.place, T)}`];
-  const note = placeNote(f.place, T);
-  if (note) lines.push(italic(note));
-  lines.push('', bold(T.s('Thunderstorm potential, next 24 hours', 'বজ্রঝড়ের সম্ভাবনা, পরবর্তী ২৪ ঘণ্টা')));
-  for (const k of win) {
-    const chance = Number.isFinite(f.cols.pop?.[k]) ? ` · ${T.s('chance of rain', 'বৃষ্টির সম্ভাবনা')} ${T.pct(f.cols.pop[k])}` : '';
-    lines.push(`${esc(T.range(f.steps[k]))} · ${esc(thunderName(values[k], T))}${chance}`);
-  }
-
+  const lines = reportHeader(f.place, T, '⛈', 'Thunderstorm forecast', 'বজ্রঝড়ের পূর্বাভাস', [f.thunder.info]);
+  lines.push(`${bold(T.s('Peak potential (24 h)', 'সর্বোচ্চ সম্ভাবনা (২৪ ঘণ্টা)'))}: ${esc(thunderName(peak.value, T))}`);
   if (peak.value >= 1) {
     const gust = f.cols.wg?.[peak.index];
-    lines.push('', `${bold(T.s('Highest', 'সর্বোচ্চ'))}: ${esc(thunderName(peak.value, T))} ${T.s('around', 'প্রায়')} ${T.range(f.steps[peak.index])}${Number.isFinite(gust) ? ` (${T.s('gusts up to', 'দমকা হাওয়া সর্বোচ্চ')} ${T.kph(gust)})` : ''}`);
-  } else {
-    lines.push('', T.s('The model shows no thunderstorm potential in this period. A model can miss local storms.', 'এই সময়ে মডেলে বজ্রঝড়ের সম্ভাবনা দেখা যাচ্ছে না। মডেল স্থানীয় ঝড় ধরতে না-ও পারে।'));
+    lines.push(`${T.s('Time', 'সময়')}: ${T.range(f.steps[peak.index])}`);
+    if (Number.isFinite(f.cols.pop?.[peak.index])) lines.push(`${T.s('Chance of rain', 'বৃষ্টির সম্ভাবনা')}: ${T.pct(f.cols.pop[peak.index])}`);
+    if (Number.isFinite(gust)) lines.push(`${T.s('Gust', 'দমকা হাওয়া')}: ${T.kph(gust)}`);
   }
 
   const codes = f.cols.wmo;
   const stormSteps = win.filter((k) => isThunderCode(codes?.[k]));
   if (stormSteps.length) {
     const hail = stormSteps.some((k) => hasHailCode(codes[k]));
-    lines.push(`${T.s('The model forecasts a thunderstorm', 'মডেল বজ্রসহ বৃষ্টির পূর্বাভাস দিচ্ছে')}: ${stormSteps.map((k) => T.range(f.steps[k])).map(esc).join('; ')}${hail ? ` — ${T.s('with hail', 'শিলাবৃষ্টিসহ')}` : ''}${T.s('.', '।')}`);
+    lines.push(T.s(`Thunderstorm forecast${hail ? ' with hail' : ''}.`, `বজ্রসহ বৃষ্টির পূর্বাভাস${hail ? ', শিলাবৃষ্টিসহ' : ''}।`));
   }
-
+  const later = laterIdx(f, 12).slice(0, MAX_TIMELINE_LINES);
+  if (later.length) lines.push('', bold(T.s('Next 12 hours', 'পরবর্তী ১২ ঘণ্টা')));
+  for (const k of later) {
+    const chance = Number.isFinite(f.cols.pop?.[k]) ? ` · ${T.s('rain', 'বৃষ্টি')} ${T.pct(f.cols.pop[k])}` : '';
+    lines.push(`${esc(T.range(f.steps[k]))} · ${esc(thunderName(values[k], T))}${chance}`);
+  }
   lines.push('', T.s(
-    'If you hear thunder, go into a building or a hard-topped vehicle. Do not shelter under an isolated tree and stay away from open water.',
-    'বজ্রের শব্দ শুনলে দালান বা শক্ত ছাদের গাড়ির ভেতরে যান। একা দাঁড়ানো গাছের নিচে আশ্রয় নেবেন না এবং খোলা জলাশয় থেকে দূরে থাকুন।',
+    'If you hear thunder, go indoors; avoid isolated trees and open water.',
+    'বজ্রের শব্দ শুনলে ঘরে যান; একা গাছ ও খোলা জলাশয় এড়িয়ে চলুন।',
   ));
-  lines.push('', italic(T.s(
-    'This is a model outlook of storm potential, not a lightning detection. Send /lightning for what was recorded.',
-    'এটি ঝড়ের সম্ভাবনার মডেল পূর্বাভাস, বজ্রপাত শনাক্তকরণ নয়। কী রেকর্ড হয়েছে জানতে /lightning পাঠান।',
-  )));
-  lines.push('', closing(T, [sourceLine(T, 'open-meteo', f.thunder.info)]));
   return fit(lines.join('\n'));
 }
 
@@ -404,28 +377,30 @@ function lightningLines(lightning, T, { short = false } = {}) {
   const pick = lightning?.pick ?? null;
   if (!pick) {
     if (lightning?.error) return T.s('Lightning data could not be read right now.', 'বজ্রপাতের তথ্য এখন পড়া যাচ্ছে না।');
-    return T.s(
-      'No lightning check covers this place yet. Lightning data is shown for a specific upazila or city thana: try /lightning Savar.',
-      'এই জায়গার জন্য এখনো কোনো বজ্রপাত পরীক্ষা নেই। বজ্রপাতের তথ্য নির্দিষ্ট উপজেলা বা সিটি থানার জন্য দেখানো হয়: /lightning Savar চেষ্টা করুন।',
-    );
+    return T.s('No lightning check for this place yet.', 'এই জায়গার জন্য এখনো বজ্রপাতের তথ্য নেই।');
   }
-  const at = T.when(pick.sampledMs);
+  const at = Number.isFinite(pick.sampledMs) ? T.when(pick.sampledMs) : '–';
   const r = T.n(pick.radiusKm);
-  const area = T.s(`within the ${r} km search area`, `${r} কিমি অনুসন্ধান এলাকার মধ্যে`);
   switch (pick.kind) {
     case 'reported': {
-      const count = Number.isFinite(pick.count) ? T.s(`${T.n(pick.count)} strike${pick.count === 1 ? '' : 's'} in the 5 minutes before it`, `তার আগের ৫ মিনিটে ${T.n(pick.count)}টি বজ্রপাত`) : T.s('the number was not reported', 'সংখ্যা জানানো হয়নি');
+      const count = T.n(pick.count);
       return short
-        ? T.s(`Last lightning check (${at}): lightning recorded ${area}.`, `সর্বশেষ বজ্রপাত পরীক্ষা (${at}): ${area} বজ্রপাত রেকর্ড হয়েছে।`)
-        : T.s(`Lightning was recorded ${area} at the last check (${at}): ${count}.`, `সর্বশেষ পরীক্ষায় (${at}) ${area} বজ্রপাত রেকর্ড হয়েছে: ${count}।`);
+        ? T.s(`Last lightning check: ${at} · ${count} recorded (${r} km).`, `সর্বশেষ বজ্রপাত পরীক্ষা: ${at} · ${count}টি রেকর্ড (${r} কিমি)।`)
+        : [
+          T.s('Lightning was recorded.', 'বজ্রপাত রেকর্ড হয়েছে।'),
+          T.s(`Last check: ${at}`, `সর্বশেষ পরীক্ষা: ${at}`),
+          T.s(`Strikes (previous 5 min): ${count}`, `বজ্রপাত (আগের ৫ মিনিট): ${count}টি`),
+          T.s(`Search radius: ${r} km`, `অনুসন্ধানের ব্যাসার্ধ: ${r} কিমি`),
+        ].join('\n');
     }
     case 'none':
       return short
-        ? T.s(`Last lightning check (${at}): none recorded ${area}. Checks are not continuous.`, `সর্বশেষ বজ্রপাত পরীক্ষা (${at}): ${area} কিছু রেকর্ড হয়নি। পরীক্ষা সারাক্ষণ চলে না।`)
-        : T.s(
-          `No lightning was recorded ${area} at the last check (${at}). A check covers only the 5 minutes before it and checks are not continuous, so this does not show that lightning is not happening.`,
-          `সর্বশেষ পরীক্ষায় (${at}) ${area} কোনো বজ্রপাত রেকর্ড হয়নি। প্রতিটি পরীক্ষা তার আগের মাত্র ৫ মিনিট দেখে এবং পরীক্ষা সারাক্ষণ চলে না, তাই এটি প্রমাণ করে না যে বজ্রপাত হচ্ছে না।`,
-        );
+        ? T.s(`Last lightning check: ${at} · none recorded.`, `সর্বশেষ বজ্রপাত পরীক্ষা: ${at} · কিছু রেকর্ড হয়নি।`)
+        : [
+          T.s('No lightning was recorded at the last check.', 'সর্বশেষ পরীক্ষায় কোনো বজ্রপাত রেকর্ড হয়নি।'),
+          T.s(`Last check: ${at}`, `সর্বশেষ পরীক্ষা: ${at}`),
+          T.s(`Window: previous 5 min · radius ${r} km`, `সময়সীমা: আগের ৫ মিনিট · ব্যাসার্ধ ${r} কিমি`),
+        ].join('\n');
     case 'stale':
       return T.s(`The last successful lightning check (${at}) is out of date.`, `সর্বশেষ সফল বজ্রপাত পরীক্ষা (${at}) পুরনো হয়ে গেছে।`);
     case 'unavailable':
@@ -440,16 +415,8 @@ const lightningShort = (lightning, T) => lightningLines(lightning, T, { short: t
 export function renderLightning(f, { lang, nowMs, lightning, place }) {
   const T = makeText(lang, nowMs);
   const target = place ?? f.place;
-  const lines = [`⚡ ${placeTitle(target, T)}`, '', esc(lightningLines(lightning, T))];
-  if (f.available && f.thunder?.values) {
-    const peak = peakOf(f.thunder.values, windowIdx(f, 12));
-    if (peak && peak.value >= 1) lines.push('', T.s(`Forecast thunderstorm potential in the next 12 hours: ${thunderName(peak.value, T)}. Send /thunderstorm for the outlook.`, `পরবর্তী ১২ ঘণ্টায় বজ্রঝড়ের পূর্বাভাসিত সম্ভাবনা: ${thunderName(peak.value, T)}। বিস্তারিত জানতে /thunderstorm পাঠান।`));
-  }
-  lines.push('', italic(T.s(
-    'Lightning checks come from Xweather and only look at the few minutes before each check. A storm between checks can be missed. If you hear thunder, go indoors.',
-    'বজ্রপাতের পরীক্ষা Xweather থেকে আসে এবং প্রতিটি পরীক্ষার আগের কয়েক মিনিট দেখে। দুই পরীক্ষার মাঝের ঝড় ধরা না-ও পড়তে পারে। বজ্রের শব্দ শুনলে ঘরে যান।',
-  )));
-  lines.push('', closing(T, []));
+  const lines = [`⚡ ${bold(T.s('Lightning report', 'বজ্রপাতের তথ্য'))}`, placeTitle(target, T), '', esc(lightningLines(lightning, T))];
+  if (lightning?.pick?.kind === 'reported') lines.push('', T.s('If you hear thunder, go indoors.', 'বজ্রের শব্দ শুনলে ঘরে যান।'));
   return fit(lines.join('\n'));
 }
 
@@ -460,27 +427,20 @@ export function renderForecast(f, { lang, nowMs }) {
   const days = dailySummaries(f);
   if (!days.length) return unavailable(f, f.place, T, T.s('The daily forecast', 'দৈনিক পূর্বাভাস'));
 
-  const lines = [`📅 ${placeTitle(f.place, T)}`];
-  const note = placeNote(f.place, T);
-  if (note) lines.push(italic(note));
-  lines.push('', bold(T.s('The days ahead', 'আগামী দিনগুলো')));
+  const lines = reportHeader(f.place, T, '📅', 'Daily forecast', 'আগামী দিনগুলোর পূর্বাভাস', [f.coreInfo, f.rain.info, ...(f.thunder.values ? [f.thunder.info] : [])]);
   for (const day of days) {
+    lines.push(`${bold(T.day(day.startMs))} · ${T.n(day.low)}–${T.n(day.high)} ${T.s('°C', '°সে.')}`);
     const parts = [
-      `${esc(T.day(day.startMs))}: ${T.n(day.low)}–${T.n(day.high)} ${T.s('°C', '°সে.')}`,
       day.rain.total === null ? T.s('rain not available', 'বৃষ্টির তথ্য নেই') : `${T.s('rain', 'বৃষ্টি')} ${day.rain.partial ? T.s('at least ', 'কমপক্ষে ') : ''}${T.mm(day.rain.total)}`,
-      `${T.s('gusts up to', 'দমকা হাওয়া সর্বোচ্চ')} ${T.kph(day.gust)}`,
     ];
-    if (Number.isFinite(day.pop)) parts.push(`${T.s('chance of rain', 'বৃষ্টির সম্ভাবনা')} ${T.pct(day.pop)}`);
-    if ((day.thunder ?? 0) >= 1) parts.push(`${T.s('thunder', 'বজ্রঝড়')}: ${thunderName(day.thunder, T)}`);
+    if (Number.isFinite(day.pop)) parts.push(`${T.s('chance', 'সম্ভাবনা')} ${T.pct(day.pop)}`);
     lines.push(parts.join(' · '));
+    const wind = [`${T.s('gust', 'দমকা')} ${T.kph(day.gust)}`];
+    if ((day.thunder ?? 0) >= 1) wind.push(`${T.s('thunder', 'বজ্রঝড়')}: ${thunderName(day.thunder, T)}`);
+    lines.push(wind.join(' · '), '');
   }
-  lines.push('', italic(T.s(
-    'Daily ranges come from the 3-hour model steps, so they can differ from official daily extremes. The website has the 10-day outlook.',
-    'দৈনিক সীমা ৩ ঘণ্টার মডেল ধাপ থেকে নেওয়া, তাই সরকারি দৈনিক সর্বোচ্চ-সর্বনিম্নের সঙ্গে ভিন্ন হতে পারে। ১০ দিনের পূর্বাভাস ওয়েবসাইটে আছে।',
-  )));
-  if (f.rain.unverified) lines.push(italic(T.s('Rain amounts are BMD values as published; their unit has not been independently confirmed.', 'বৃষ্টির পরিমাণ বিএমডির প্রকাশিত মান; এর একক এখনো স্বাধীনভাবে নিশ্চিত করা হয়নি।')));
-  lines.push('', closing(T, [sourceLine(T, f.coreSource, f.coreInfo)]));
-  return fit(lines.join('\n'));
+  if (rainNote(f, T)) lines.push(rainNote(f, T));
+  return fit(lines.join('\n').trimEnd());
 }
 
 // ---------- /alerts ----------
@@ -491,27 +451,25 @@ export function renderAlerts({ lang, nowMs, linked, items = [], webUrl = env.cha
       `🔔 ${bold(T.s('Your alerts', 'আপনার সতর্কবার্তা'))}`,
       '',
       T.s(
-        `This chat is not connected to an alert profile. Set up your alerts at ${webUrl}/alert and choose "Connect Telegram".`,
-        `এই চ্যাট কোনো সতর্কবার্তা প্রোফাইলের সঙ্গে যুক্ত নয়। ${webUrl}/alert-এ সতর্কবার্তা চালু করে "টেলিগ্রাম সংযুক্ত করুন" বেছে নিন।`,
+        `This chat is not connected to an alert profile.\nChoose "Connect Telegram" at ${esc(webUrl)}/alert`,
+        `এই চ্যাট কোনো সতর্কবার্তা প্রোফাইলের সঙ্গে যুক্ত নয়।\n${esc(webUrl)}/alert থেকে "টেলিগ্রাম সংযুক্ত করুন" বেছে নিন।`,
       ),
     ].join('\n'));
   }
   const lines = [`🔔 ${bold(T.s('Your active alerts', 'আপনার সক্রিয় সতর্কবার্তা'))}`, ''];
   if (!items.length) {
     lines.push(T.s(
-      'There is no active AkashSathi alert for your saved area right now. That is not a statement that the weather is calm: send /update for the forecast and check official BMD warnings.',
-      'আপনার সংরক্ষিত এলাকায় এখন আকাশসাথীর কোনো সক্রিয় সতর্কবার্তা নেই। এর মানে আবহাওয়া শান্ত থাকা নয়: পূর্বাভাসের জন্য /update পাঠান এবং বিএমডির সরকারি সতর্কবার্তা দেখুন।',
+      'There is no active AkashSathi alert right now.\nWeather forecast: /update',
+      'এখন আকাশসাথীর কোনো সক্রিয় সতর্কবার্তা নেই।\nআবহাওয়ার পূর্বাভাস: /update',
     ));
   } else {
     for (const item of items.slice(0, 5)) {
       const label = SEVERITY_NAMES[T.L][item.severity] ?? item.severity;
-      lines.push(`[${esc(label)}] ${esc(item.title)} — ${T.s('until', 'পর্যন্ত')} ${esc(T.when(+new Date(item.validUntil)))}`);
+      lines.push(`${bold(label)} · ${esc(item.title)}`, `${T.s('Until', 'মেয়াদ')}: ${esc(T.when(+new Date(item.validUntil)))}`, '');
     }
     if (items.length > 5) lines.push(T.s(`…and ${T.n(items.length - 5)} more in the app.`, `…এবং অ্যাপে আরও ${T.n(items.length - 5)}টি।`));
-    lines.push('', `${T.s('Details', 'বিস্তারিত')}: ${webUrl}/alert`);
+    lines.push(`${T.s('Details', 'বিস্তারিত')}: ${esc(webUrl)}/alert`);
   }
-  lines.push('', italic(T.s('Alerts are only created from current forecast data. Send /status to see how fresh it is.', 'সতর্কবার্তা শুধু হালনাগাদ পূর্বাভাসের তথ্য থেকে তৈরি হয়। তথ্য কতটা নতুন দেখতে /status পাঠান।')));
-  lines.push('', italic(DISCLAIMER(T)));
   return fit(lines.join('\n'));
 }
 
@@ -529,20 +487,15 @@ export function renderStatus({
   for (const [key, source] of [['bmd', 'bmd'], ['openMeteo', 'open-meteo']]) {
     const info = statuses?.[key] ?? null;
     const fresh = freshnessOf(info);
-    const parts = [STATUS_WORDS[T.L][fresh.status] ?? fresh.status];
-    if (fresh.updatedMs) parts.push(T.s(`updated ${T.when(fresh.updatedMs)} (${T.ago(fresh.updatedMs)})`, `হালনাগাদ ${T.when(fresh.updatedMs)} (${T.ago(fresh.updatedMs)})`));
-    lines.push(`${fresh.status === 'ok' ? '✅' : '⚠'} ${esc(PROVIDER_LABELS[source][T.L])}: ${esc(parts.join(' · '))}`);
+    lines.push(`${fresh.status === 'ok' ? '✅' : '⚠'} ${bold(PROVIDER_LABELS[source][T.L])}: ${esc(STATUS_WORDS[T.L][fresh.status] ?? fresh.status)}`);
+    if (fresh.updatedMs) lines.push(T.s(`Updated: ${T.when(fresh.updatedMs)} · ${T.ago(fresh.updatedMs)}`, `হালনাগাদ: ${T.when(fresh.updatedMs)} · ${T.ago(fresh.updatedMs)}`));
+    lines.push('');
   }
   if (engine) {
     const last = engine.lastCompletedMs ? T.s(`last run ${T.ago(engine.lastCompletedMs)}`, `সর্বশেষ চালু হয়েছে ${T.ago(engine.lastCompletedMs)}`) : T.s('has not run yet', 'এখনো চালু হয়নি');
     lines.push(`${engine.enabled ? '✅' : '⚠'} ${T.s('Alert engine', 'সতর্কবার্তা ইঞ্জিন')}: ${engine.enabled ? esc(last) : T.s('switched off', 'বন্ধ আছে')}`);
   }
-  lines.push('', italic(T.s(
-    'Lightning is checked a few times a day (more often when storms are forecast) and each check covers only a few minutes, so it is not continuous monitoring. Weather figures here are model forecasts, not station readings.',
-    'বজ্রপাত দিনে কয়েকবার পরীক্ষা করা হয় (ঝড়ের পূর্বাভাস থাকলে আরও ঘন ঘন) এবং প্রতিটি পরীক্ষা মাত্র কয়েক মিনিট দেখে, তাই এটি সারাক্ষণ নজরদারি নয়। এখানের আবহাওয়ার সংখ্যাগুলো মডেল পূর্বাভাস, কেন্দ্রের পরিমাপ নয়।',
-  )));
-  lines.push('', italic(DISCLAIMER(T)));
-  return fit(lines.join('\n'));
+  return fit(lines.join('\n').trimEnd());
 }
 
 // ---------- help and place questions ----------
@@ -580,18 +533,18 @@ export function renderHelp(lang, { webUrl = env.channels.publicUrl } = {}) {
     const T = makeText(code, 0);
     const list = COMMAND_HELP[T.L].map(([name, text]) => `/${name} — ${text}`).join('\n');
     return [
-      T.s('AkashSathi: weather information and alerts for your work and area.', 'আকাশসাথী: আপনার কাজ ও এলাকার আবহাওয়ার তথ্য ও সতর্কবার্তা।'),
+      bold(T.s('AkashSathi · Commands', 'আকাশসাথী · কমান্ড')),
       '',
       list,
       '',
       T.s(
-        'Add a place to any weather command, in English or Bangla, for example /heat Badda or /rain Savar, Dhaka. Without a place it uses your saved area. Add "bn" or "en" at the end to choose the language.',
-        'যেকোনো আবহাওয়ার কমান্ডের সঙ্গে ইংরেজি বা বাংলায় জায়গার নাম দিন, যেমন /heat বাড্ডা বা /rain Savar, Dhaka। নাম না দিলে আপনার সংরক্ষিত এলাকা ধরা হয়। ভাষা বাছতে শেষে "bn" বা "en" লিখুন।',
+        'Example: /heat Badda\nNo place name → your saved area.\nLanguage: add bn or en.',
+        'উদাহরণ: /heat বাড্ডা\nএলাকার নাম না দিলে → সংরক্ষিত এলাকা।\nভাষা: শেষে bn বা en লিখুন।',
       ),
       '',
       T.s(
-        `To get alerts for your work here, set them up at ${webUrl}/alert and choose "Connect Telegram". /stop turns alerts off in this chat.`,
-        `আপনার কাজের জন্য এখানে সতর্কবার্তা পেতে ${webUrl}/alert-এ সেটআপ করে "টেলিগ্রাম সংযুক্ত করুন" বেছে নিন। /stop এই চ্যাটে সতর্কবার্তা বন্ধ করে।`,
+        `Connect Telegram: ${esc(webUrl)}/alert\n/stop — stop alerts\n/help — all commands`,
+        `টেলিগ্রাম সংযুক্ত করুন: ${esc(webUrl)}/alert\n/stop — সতর্কবার্তা বন্ধ\n/help — সব কমান্ড`,
       ),
     ].join('\n');
   };
@@ -601,16 +554,16 @@ export function renderHelp(lang, { webUrl = env.channels.publicUrl } = {}) {
 export function renderAskPlace(lang) {
   const T = makeText(lang, 0);
   return T.s(
-    'Which place? Send the command with a place name, for example /update Badda or /heat Savar, Dhaka. To use your saved area automatically, connect your alerts first (send /help).',
-    'কোন জায়গা? কমান্ডের সঙ্গে জায়গার নাম দিন, যেমন /update বাড্ডা বা /heat Savar, Dhaka। সংরক্ষিত এলাকা নিজে থেকে ব্যবহার করতে আগে আপনার সতর্কবার্তা সংযুক্ত করুন (/help পাঠান)।',
+    'Which place?\nExample: /update Badda or /heat Savar, Dhaka\nUse a saved area: /help',
+    'কোন জায়গা?\nউদাহরণ: /update বাড্ডা বা /heat Savar, Dhaka\nসংরক্ষিত এলাকা ব্যবহার করতে: /help',
   );
 }
 
 export function renderNotFound(lang, query) {
   const T = makeText(lang, 0);
   return T.s(
-    `I could not find a place called "${esc(query)}". Try the upazila, city thana or district name, in English or Bangla, for example Badda or Savar, Dhaka.`,
-    `"${esc(query)}" নামে কোনো জায়গা পাইনি। উপজেলা, সিটি থানা বা জেলার নাম ইংরেজি বা বাংলায় লিখুন, যেমন বাড্ডা বা Savar, Dhaka।`,
+    `I could not find a place called "${esc(query)}".\nTry an upazila, thana or district, e.g. Badda or Savar, Dhaka.`,
+    `"${esc(query)}" নামে কোনো জায়গা পাইনি।\nউপজেলা, থানা বা জেলার নাম দিন, যেমন বাড্ডা বা Savar, Dhaka।`,
   );
 }
 
@@ -636,3 +589,135 @@ export const renderError = (lang) => makeText(lang, 0).s(
   'Something went wrong while preparing that. Please try again in a moment.',
   'এটি তৈরি করতে সমস্যা হয়েছে। একটু পরে আবার চেষ্টা করুন।',
 );
+
+// ---------- the morning message ----------
+// What the bot sends by itself every morning to a connected chat: today's weather at the saved area, every figure the commands show,
+// in one block. The facts and the honesty rules are the commands' (a forecast, never a measurement; missing is never zero; no "safe").
+const WEEKDAYS = {
+  en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+  bn: ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'],
+};
+const PART_NAMES = {
+  en: { morning: 'Morning', afternoon: 'Afternoon', evening: 'Evening' },
+  bn: { morning: 'সকাল', afternoon: 'দুপুর ও বিকাল', evening: 'সন্ধ্যা ও রাত' },
+};
+
+// The most severe weather code among some steps (WMO codes grow with severity), or null when none of them has one.
+function worstCode(codes, indexes) {
+  const values = indexes.map((k) => codes?.[k]).filter(Number.isFinite);
+  return values.length ? Math.max(...values) : null;
+}
+
+export function renderMorning(f, { lang, nowMs, lightning = undefined, alertCount = null }) {
+  const T = makeText(lang, nowMs);
+  const rest = f.available ? todayIdx(f) : [];
+  if (!rest.length) return unavailable(f, f.place, T, T.s("Today's forecast", 'আজকের পূর্বাভাস'));
+
+  const { cols } = f;
+  const span = (ms) => `${T.hm(ms)}–${T.hm(ms + STEP_MS)}`;
+  const shifted = new Date(nowMs + DHAKA_OFFSET_MS);
+  const dateText = `${WEEKDAYS[T.L][shifted.getUTCDay()]}, ${T.n(shifted.getUTCDate())} ${(T.L === 'bn' ? BN_MONTHS : EN_MONTHS)[shifted.getUTCMonth()]}`;
+  const lines = reportHeader(f.place, T, '🌅', 'Good morning · Today’s weather', 'শুভ সকাল · আজকের আবহাওয়া', [f.coreInfo, f.rain.info, ...(f.thunder.values ? [f.thunder.info] : [])]);
+  lines.splice(1, 0, esc(dateText));
+
+  // The day at a glance: the worst condition still ahead and the day's own lowest and highest temperature.
+  const whole = todayIdx(f, { whole: true });
+  const low = lowOf(cols.temp, whole);
+  const high = peakOf(cols.temp, whole);
+  const code = worstCode(cols.wmo, rest);
+  const label = CONDITION[T.L][code] ?? null;
+  const range = low && high ? `${T.n(low.value)}–${T.n(high.value)} ${T.s('°C', '°সে.')}` : '–';
+  lines.push(`${code === null ? '🌡' : conditionEmoji(code)} ${label ? `${esc(label)} · ` : ''}${bold(range)}`);
+  if (alertCount !== null) {
+    lines.push(alertCount > 0
+      ? `🔔 ${T.s(`${T.n(alertCount)} active alert${alertCount === 1 ? '' : 's'} · send /alerts`, `${T.n(alertCount)}টি সক্রিয় সতর্কবার্তা · /alerts পাঠান`)}`
+      : `🔔 ${T.s('No active AkashSathi alert.', 'আকাশসাথীর কোনো সক্রিয় সতর্কবার্তা নেই।')}`);
+  }
+
+  // Heat
+  lines.push('', `🌡 ${bold(T.s('Heat', 'গরম'))}`);
+  const hi = peakOf(cols.hi, rest);
+  const hottest = peakOf(cols.temp, rest);
+  if (hi) {
+    const level = heatCategory(hi.value);
+    lines.push(`${T.s('Peak heat index', 'সর্বোচ্চ হিট ইনডেক্স')} ${T.c(hi.value)} · ${esc(heatName(level, T))} · ${span(f.steps[hi.index])}`);
+    if (level >= 1) lines.push(esc(HEAT_ADVICE[T.L][level]));
+  } else if (hottest) {
+    lines.push(T.s(`The heat index is not available. Hottest: ${T.c(hottest.value, 1)} · ${span(f.steps[hottest.index])}`, `হিট ইনডেক্স পাওয়া যাচ্ছে না। সবচেয়ে গরম: ${T.c(hottest.value, 1)} · ${span(f.steps[hottest.index])}`));
+  } else {
+    lines.push(T.s('Heat information is not available.', 'গরমের তথ্য পাওয়া যাচ্ছে না।'));
+  }
+
+  // Rain
+  lines.push('', `🌧 ${bold(T.s('Rain', 'বৃষ্টি'))}`);
+  const { total, partial } = f.rain.values ? sumOf(f.rain.values, rest) : { total: null, partial: true };
+  if (total === null) {
+    lines.push(T.s('The rain forecast is not available.', 'বৃষ্টির পূর্বাভাস পাওয়া যাচ্ছে না।'));
+  } else {
+    const chance = peakOf(cols.pop, rest);
+    const amount = `${partial ? T.s('at least ', 'কমপক্ষে ') : ''}${T.mm(total)}`;
+    lines.push(total < 0.1
+      ? T.s('Almost no rain in the forecast.', 'পূর্বাভাসে প্রায় কোনো বৃষ্টি নেই।')
+      : `${T.s('Today', 'আজ')} ${amount}${chance ? ` · ${T.s('chance up to', 'সম্ভাবনা সর্বোচ্চ')} ${T.pct(chance.value)}` : ''}`);
+    const wettest = peakOf(f.rain.values, rest);
+    if (wettest && wettest.value >= 0.1) {
+      lines.push(`${T.s('Wettest 3 h', 'সর্বোচ্চ বৃষ্টি (৩ ঘণ্টা)')} ${T.mm(wettest.value)} · ${span(f.steps[wettest.index])} (${esc(RAIN_NAMES[T.L][rainClass(wettest.value)])})`);
+    }
+  }
+
+  // Wind
+  lines.push('', `💨 ${bold(T.s('Wind', 'বাতাস'))}`);
+  const gust = cols.wg ? peakOf(cols.wg, rest) : null;
+  if (gust) {
+    lines.push(`${T.s('Peak gust', 'সর্বোচ্চ দমকা হাওয়া')} ${T.kph(gust.value)} · ${span(f.steps[gust.index])} · ${esc(GUST_NAMES[T.L][gustClass(gust.value)])}`);
+    if (gust.value >= 40) lines.push(T.s('Secure loose objects; take care on boats and roofs.', 'আলগা জিনিস বেঁধে রাখুন; নৌকা ও ছাদে সতর্ক থাকুন।'));
+  } else {
+    lines.push(T.s('The wind forecast is not available.', 'বাতাসের পূর্বাভাস পাওয়া যাচ্ছে না।'));
+  }
+
+  // Thunderstorm and lightning
+  lines.push('', `⛈ ${bold(T.s('Thunderstorm', 'বজ্রঝড়'))}`);
+  const storm = f.thunder.values ? peakOf(f.thunder.values, rest) : null;
+  if (storm) {
+    lines.push(`${T.s('Peak potential', 'সর্বোচ্চ সম্ভাবনা')}: ${esc(thunderName(storm.value, T))}${storm.value >= 1 ? ` · ${span(f.steps[storm.index])}` : ''}`);
+    const stormSteps = rest.filter((k) => isThunderCode(cols.wmo?.[k]));
+    if (stormSteps.length) {
+      const hail = stormSteps.some((k) => hasHailCode(cols.wmo[k]));
+      lines.push(T.s(`Thunderstorm forecast${hail ? ' with hail' : ''}.`, `বজ্রসহ বৃষ্টির পূর্বাভাস${hail ? ', শিলাবৃষ্টিসহ' : ''}।`));
+    }
+    if (storm.value >= 1 || stormSteps.length) lines.push(T.s('If you hear thunder, go indoors; avoid isolated trees and open water.', 'বজ্রের শব্দ শুনলে ঘরে যান; একা গাছ ও খোলা জলাশয় এড়িয়ে চলুন।'));
+  } else {
+    lines.push(T.s('The thunderstorm outlook is not available.', 'বজ্রঝড়ের পূর্বাভাস পাওয়া যাচ্ছে না।'));
+  }
+  if (lightning !== undefined) lines.push(`⚡ ${esc(lightningShort(lightning, T))}`);
+
+  // Through the day: the parts of today that are still ahead.
+  const parts = dayParts(f, rest);
+  if (parts.length > 1) {
+    lines.push('', bold(T.s('Through the day', 'দিনের বিভিন্ন সময়')));
+    for (const part of parts) {
+      const partLow = lowOf(cols.temp, part.indexes);
+      const partHigh = peakOf(cols.temp, part.indexes);
+      const partRain = f.rain.values ? sumOf(f.rain.values, part.indexes) : { total: null, partial: true };
+      const partCode = worstCode(cols.wmo, part.indexes);
+      const temps = partLow && partHigh ? `${T.n(partLow.value)}–${T.n(partHigh.value)} ${T.s('°C', '°সে.')}` : '–';
+      const rain = partRain.total === null ? '–' : `${partRain.partial ? T.s('at least ', 'কমপক্ষে ') : ''}${T.mm(partRain.total)}`;
+      lines.push(`${partCode === null ? '•' : conditionEmoji(partCode)} ${bold(PART_NAMES[T.L][part.key])} · ${temps} · ${T.s('rain', 'বৃষ্টি')} ${rain}`);
+    }
+  }
+
+  // Tomorrow, in one line.
+  const tomorrow = dailySummaries(f).find((day) => day.date === addDays(dhakaDate(new Date(nowMs)), 1));
+  if (tomorrow) {
+    const bits = [`${T.n(tomorrow.low)}–${T.n(tomorrow.high)} ${T.s('°C', '°সে.')}`];
+    bits.push(tomorrow.rain.total === null ? T.s('rain not available', 'বৃষ্টির তথ্য নেই') : `${T.s('rain', 'বৃষ্টি')} ${tomorrow.rain.partial ? T.s('at least ', 'কমপক্ষে ') : ''}${T.mm(tomorrow.rain.total)}`);
+    if (Number.isFinite(tomorrow.pop)) bits.push(`${T.s('chance', 'সম্ভাবনা')} ${T.pct(tomorrow.pop)}`);
+    if ((tomorrow.thunder ?? 0) >= 1) bits.push(`${T.s('thunder', 'বজ্রঝড়')}: ${thunderName(tomorrow.thunder, T)}`);
+    lines.push('', `📅 ${bold(T.s('Tomorrow', 'আগামীকাল'))} · ${bits.map(esc).join(' · ')}`);
+  }
+
+  const updated = freshnessOf(f.coreInfo).updatedMs;
+  lines.push('', italic(`${T.s('Model forecast, not a station reading', 'মডেল পূর্বাভাস, কোনো কেন্দ্রের পরিমাপ নয়')}${updated ? ` · ${T.s('updated', 'হালনাগাদ')} ${T.when(updated)}` : ''}`));
+  if (rainNote(f, T)) lines.push(rainNote(f, T));
+  return fit(lines.join('\n'));
+}

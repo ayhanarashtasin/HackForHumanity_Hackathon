@@ -554,6 +554,8 @@ dbTest('the bot: /start with a code connects the chat, /stop disconnects it, any
 
   assert.deepEqual(await handleTelegramUpdate(message(`/start ${code}`, undefined, 2), { channels }), { handled: true, action: 'linked' });
   assert.match(channels.telegram.sent.at(-1).content.text, /সংযুক্ত হয়েছে/, 'then in the profile\'s language');
+  assert.equal(channels.telegram.sent.at(-1).content.parseMode, 'HTML');
+  assert.doesNotMatch(channels.telegram.sent.at(-1).content.text, /পরীক্ষামূলক|সরকারি সতর্কীকরণ/);
   assert.equal(channels.telegram.sent.at(-1).to, '4242');
   assert.equal((await Subscriber.findById(id).lean()).channels.telegram.chatId, '4242');
 
@@ -600,7 +602,7 @@ dbTest('the weather commands for a connected chat use its saved area and active 
   for (const word of ['farmer', 'rice', 'harvest', 'cropStage', 'workload', 'pump']) assert.ok(!update.text.toLowerCase().includes(word), word);
 
   const alerts = await ask('/alerts', 11);
-  assert.match(alerts.text, /\[সতর্কতা\] Heavy rain expected near Badda — পর্যন্ত/);
+  assert.match(alerts.text, /<b>সতর্কতা<\/b> · Heavy rain expected near Badda\nমেয়াদ:/);
   assert.ok(!/An old notice|Expired notice/.test(alerts.text));
   assert.ok(!/Cover harvested crop|You farm|farm/i.test(alerts.text), 'the title and time only, never the reason or the advice');
 
@@ -612,7 +614,10 @@ dbTest('the weather commands for a connected chat use its saved area and active 
   assert.match((await ask('/update', 15, 'en')).text, /Which place\?/);
   assert.match((await ask('/rain Badda', 16, 'en')).text, /<b>Badda<\/b>/);
   assert.match((await ask('/alerts', 17, 'en')).text, /not connected to an alert profile/);
-  assert.match((await ask('/help', 18, 'en')).text, /\/thunderstorm — thunderstorm outlook/);
+  const help = await ask('/help', 18, 'en');
+  assert.equal(help.parseMode, 'HTML');
+  assert.match(help.text, /<b>AkashSathi · Commands<\/b>/);
+  assert.match(help.text, /\/thunderstorm — thunderstorm outlook/);
 });
 
 dbTest('lightning: the most recent stored check for the circle around a place is what is reported, and nothing is called when none exists', async () => {
@@ -634,12 +639,12 @@ dbTest('lightning: the most recent stored check for the circle around a place is
   await probe('NO_MATCH', { count: 0 }, now - 20 * MINUTE);
   assert.match(await ask('/lightning Badda'), /is out of date/, 'an open-gate check is current for 15 minutes');
   await probe('NO_MATCH', { count: 0 }, now - 10 * MINUTE);
-  assert.match(await ask('/lightning Badda'), /No lightning was recorded within the 100 km search area at the last check/);
+  assert.match(await ask('/lightning Badda'), /No lightning was recorded at the last check/);
 
   await probe('FRESH', { count: 3 }, now - 2 * MINUTE);
   const reported = await ask('/lightning Badda');
-  assert.match(reported, /Lightning was recorded within the 100 km search area at the last check \(.*\): 3 strikes in the 5 minutes before it\./);
-  assert.match(await ask('/update Badda'), /⚡ Last lightning check \(.*\): lightning recorded within the 100 km search area\./);
+  assert.match(reported, /Lightning was recorded\.\nLast check: .*\nStrikes \(previous 5 min\): 3\nSearch radius: 100 km/);
+  assert.match(await ask('/update Badda'), /⚡ Last lightning check: .* · 3 recorded \(100 km\)\./);
   assert.match(await ask('/lightning Dhaka'), /Lightning was recorded/, 'a district uses the circle around its centre');
 });
 

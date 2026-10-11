@@ -9,9 +9,9 @@ import { LogoMark } from './Logo.jsx';
 const prefetchMap = prefetchPage('map');
 const prefetchAlert = prefetchPage('alert');
 
-// Two links on the left of the centred logo; on the right the two actions: Alert (outlined) and Map (solid, the primary action).
+// The logo and section links sit on the left; Alert and Map form the far-right group.
 // "Data" lives in the footer and in the phone menu.
-const LEFT_LINKS = [{ id: 'features', label: 'Features' }, { id: 'who', label: "Who it's for" }];
+const SECTION_LINKS = [{ id: 'features', label: 'Features' }, { id: 'who', label: "Who it's for" }];
 const MENU_ONLY_LINKS = [{ id: 'data', label: 'Data' }];
 const MENU_BREAKPOINT = 860;
 
@@ -113,7 +113,7 @@ export function Navbar() {
 
         {open && (
           <ul id="nav-menu" className="nav-menu">
-            {[...LEFT_LINKS, ...MENU_ONLY_LINKS].map(sectionLink)}
+            {[...SECTION_LINKS, ...MENU_ONLY_LINKS].map(sectionLink)}
             <li>
               <Link {...alertProps} aria-current={route === 'alert' ? 'page' : undefined} onClick={() => setOpen(false)}>
                 <Icon name="bell" size={18} />Alerts{unread > 0 ? <span className="nav-menu-count">{unread} unread</span> : null}
@@ -122,8 +122,6 @@ export function Navbar() {
             <li><Link {...mapProps} onClick={() => setOpen(false)}><Icon name="map" size={18} />Map</Link></li>
           </ul>
         )}
-
-        <ul className="nav-links nav-links--left">{LEFT_LINKS.map(sectionLink)}</ul>
 
         {onHome ? (
           <a
@@ -141,6 +139,8 @@ export function Navbar() {
             <span className="nav-logo-text">AkashSathi</span>
           </Link>
         )}
+
+        <ul className="nav-links nav-links--left">{SECTION_LINKS.map(sectionLink)}</ul>
 
         <ul className="nav-links nav-links--right">
           <li className="nav-cta-item">

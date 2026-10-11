@@ -7,26 +7,26 @@ import {
 } from './botReports/commands.js';
 import { placeById } from './botReports/places.js';
 import {
-  commandMenu, renderBusy, renderError, renderHelp, toPlain,
+  commandMenu, esc, renderBusy, renderError, renderHelp, toPlain,
 } from './botReports/text.js';
 import { consumeTelegramLink, telegramLanguage, unlinkTelegramChat } from './linking.js';
 
 // The bot's side of the conversation. /start <code> connects this chat to an alert profile, /stop disconnects it, /help lists the commands,
 // and the weather commands (/update, /heat, /rain, /wind, /thunderstorm, /lightning, /forecast, /alerts, /status) answer from the stored
 // forecast (botReports/). Anything else gets the help text. It never asks for or stores a name, number or location.
-const WEB = () => `${env.channels.publicUrl}/alert`;
+const WEB = () => esc(`${env.channels.publicUrl}/alert`);
 
 const REPLIES = {
   en: {
-    linked: () => 'Connected. AkashSathi alerts for your work and area will arrive in this chat. These are prototype alerts, not an official warning service. Send /stop to stop them, or /update for the weather now. Alerts also stay in the app inbox.',
-    invalid: () => `This link has expired or was already used. Open ${WEB()}, choose "Connect Telegram", and try again.`,
-    stopped: () => 'Stopped. You will no longer receive AkashSathi alerts in this chat. Your alerts are still available at the AkashSathi website. The weather commands still work: send /help.',
+    linked: () => '<b>Connected</b>\nAkashSathi alerts will arrive here.\n\n/update — weather forecast\n/stop — stop alerts',
+    invalid: () => `This link has expired or was already used.\nOpen ${WEB()} and choose "Connect Telegram".`,
+    stopped: () => '<b>Stopped</b>\nYou will no longer receive alerts here.\n\n/help — weather commands',
     nothing: () => 'No AkashSathi alert profile was connected to this chat.',
   },
   bn: {
-    linked: () => 'সংযুক্ত হয়েছে। আপনার কাজ ও এলাকার জন্য আকাশসাথীর সতর্কবার্তা এই চ্যাটে আসবে। এগুলো পরীক্ষামূলক সতর্কবার্তা, সরকারি সতর্কীকরণ সেবা নয়। বন্ধ করতে /stop, এখনকার আবহাওয়া জানতে /update পাঠান। অ্যাপের ইনবক্সেও সতর্কবার্তা থাকবে।',
-    invalid: () => `এই লিংকের মেয়াদ শেষ অথবা এটি আগেই ব্যবহার হয়েছে। ${WEB()} খুলে "টেলিগ্রাম সংযুক্ত করুন" বেছে আবার চেষ্টা করুন।`,
-    stopped: () => 'বন্ধ করা হয়েছে। এই চ্যাটে আর আকাশসাথীর সতর্কবার্তা আসবে না। আপনার সতর্কবার্তা আকাশসাথীর ওয়েবসাইটে দেখা যাবে। আবহাওয়ার কমান্ড এখনো কাজ করবে: /help পাঠান।',
+    linked: () => '<b>সংযুক্ত হয়েছে</b>\nআকাশসাথীর সতর্কবার্তা এখানে আসবে।\n\n/update — আবহাওয়ার পূর্বাভাস\n/stop — সতর্কবার্তা বন্ধ',
+    invalid: () => `এই লিংকের মেয়াদ শেষ অথবা এটি আগেই ব্যবহার হয়েছে।\n${WEB()} থেকে "টেলিগ্রাম সংযুক্ত করুন" বেছে নিন।`,
+    stopped: () => '<b>বন্ধ করা হয়েছে</b>\nএই চ্যাটে আর সতর্কবার্তা আসবে না।\n\n/help — আবহাওয়ার কমান্ড',
     nothing: () => 'এই চ্যাটে আকাশসাথীর কোনো সতর্কবার্তা প্রোফাইল সংযুক্ত ছিল না।',
   },
 };
@@ -127,7 +127,7 @@ export async function handleTelegramUpdate(update, { channels = sharedChannels()
   const chatId = String(message.chat.id);
   const [first = '', ...rest] = message.text.trim().split(/\s+/);
   const command = first.split('@')[0].toLowerCase();
-  const reply = (text) => replyPlain(channels, chatId, text);
+  const reply = (text) => sendReport(channels, chatId, { text });
 
   if (command === '/start' && rest[0]) {
     const result = await consumeTelegramLink(rest[0], chatId, now);

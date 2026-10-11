@@ -11,6 +11,7 @@ import { startAlertJob } from './alertJob.js';
 import { startDeliveryJob } from './deliveryJob.js';
 import { every } from './every.js';
 import { startLightningJob } from './lightningJob.js';
+import { startMorningDigestJob } from './morningDigestJob.js';
 import { startTelegramBot } from '../services/delivery/telegramBot.js';
 
 let running = [];
@@ -76,7 +77,7 @@ export async function startJobs() {
 
   // External delivery runs on its own: administrators can send alerts even when the engine is off. Each channel stays idle until configured.
   if (env.channels.deliveryEnabled) {
-    for (const job of [startDeliveryJob(), startTelegramBot()]) if (job) running.push(job);
+    for (const job of [startDeliveryJob(), startTelegramBot(), startMorningDigestJob()]) if (job) running.push(job);
   }
 }
 
