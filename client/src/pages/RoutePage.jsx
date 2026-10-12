@@ -410,7 +410,6 @@ export default function RoutePage() {
           </section>
           <aside className="route-sidebar" aria-label={tr('Route weather summary')}>
             <RoutePlanner
-              fullPage
               catalogue={catalogue}
               onRoute={(result, places) => { setShowingAlternative(false); setSearch(result ? { result, places } : null); }}
             />

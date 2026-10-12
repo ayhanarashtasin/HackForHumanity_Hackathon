@@ -1,5 +1,5 @@
 export const MAP = {
-  'Route': 'পথ', 'Route weather': 'পথের আবহাওয়া', 'Fastest driving route': 'দ্রুততম সড়কপথ', 'Shortest-distance road route': 'দূরত্বে সবচেয়ে ছোট সড়কপথ', 'Plan a route': 'পথ পরিকল্পনা করুন', 'Close route planner': 'পথ পরিকল্পনা বন্ধ করুন',
+  'Route': 'পথ', 'Route weather': 'পথের আবহাওয়া', 'Fastest driving route': 'দ্রুততম সড়কপথ', 'Shortest-distance road route': 'দূরত্বে সবচেয়ে ছোট সড়কপথ', 'Plan a route': 'পথ পরিকল্পনা করুন',
   'AkashSathi route planner': 'আকাশসাথী পথ পরিকল্পনা', 'Plan your route': 'আপনার পথ পরিকল্পনা করুন', 'Check route': 'পথ যাচাই করুন',
   'Start area': 'শুরুর এলাকা', 'Destination area': 'গন্তব্যের এলাকা', 'Loading route map…': 'পথের মানচিত্র লোড হচ্ছে…',
   'Route results appear here after you check a route.': 'পথ যাচাই করলে ফলাফল এখানে দেখা যাবে।', 'Areas along the route': 'পথের মধ্যে পড়া এলাকা',
@@ -21,7 +21,7 @@ export const MAP = {
   'Forecast coverage: {covered} of {total} route samples.': 'পথের {total}টি নমুনার মধ্যে {covered}টির পূর্বাভাস পাওয়া গেছে।',
   'Some route weather data is stale or unavailable.': 'পথের কিছু আবহাওয়ার তথ্য পুরোনো বা পাওয়া যাচ্ছে না।', 'BMD rainfall units have not been verified.': 'বিএমডির বৃষ্টির একক যাচাই করা হয়নি।',
   'Model forecast, not station readings. Weather between sampled locations may differ. Route and ETA are estimates.': 'এটি মডেলের পূর্বাভাস, স্টেশনের সরাসরি মাপ নয়। নমুনা এলাকার মাঝের আবহাওয়া ভিন্ন হতে পারে। পথ ও পৌঁছানোর সময় আনুমানিক।',
-  'Finding route…': 'পথ খোঁজা হচ্ছে…', 'Show route weather': 'পথের আবহাওয়া দেখুন', 'Road route by OSRM. The routing service receives the selected coordinates.': 'সড়কপথ OSRM থেকে নেওয়া হয়। নির্বাচিত স্থানাঙ্ক routing service-এ পাঠানো হয়।',
+  'Finding route…': 'পথ খোঁজা হচ্ছে…', 'Road route by OSRM. The routing service receives the selected coordinates.': 'সড়কপথ OSRM থেকে নেওয়া হয়। নির্বাচিত স্থানাঙ্ক routing service-এ পাঠানো হয়।',
   'Route service is unavailable. Please try again.': 'পথ খোঁজার সেবা পাওয়া যাচ্ছে না। আবার চেষ্টা করুন।', 'No road route was found between those locations.': 'এই দুই স্থানের মধ্যে সড়কপথ পাওয়া যায়নি।',
   'Choose two locations in Bangladesh.': 'বাংলাদেশের মধ্যে দুটি স্থান বেছে নিন।', 'Start and end locations must be different.': 'শুরু ও গন্তব্যের স্থান আলাদা হতে হবে।',
   'Total is the sum of the cloud-to-ground and intracloud counts.': 'মেঘ থেকে ভূমিতে ও মেঘের মধ্যে বজ্রপাতের সংখ্যা যোগ করে মোট হিসাব করা হয়েছে।',

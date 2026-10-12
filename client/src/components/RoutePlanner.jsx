@@ -141,18 +141,17 @@ export function WeatherSummary({ route }) {
   );
 }
 
-export function RoutePlanner({ catalogue, onRoute, onInteraction, fullPage = false }) {
+// The start/destination form of the route page; the page draws the result.
+export function RoutePlanner({ catalogue, onRoute }) {
   const { tr, lang } = useLanguage(MAP);
-  const [expanded, setExpanded] = useState(false);
   const [start, setStart] = useState(null);
   const [end, setEnd] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [route, setRoute] = useState(null);
   const [locating, setLocating] = useState(false);
-  const updateStart = (value) => { setStart(value); setRoute(null); setError(''); onRoute(null); };
-  const updateEnd = (value) => { setEnd(value); setRoute(null); setError(''); onRoute(null); };
-  const swap = () => { setStart(end); setEnd(start); setRoute(null); setError(''); onRoute(null); };
+  const updateStart = (value) => { setStart(value); setError(''); onRoute(null); };
+  const updateEnd = (value) => { setEnd(value); setError(''); onRoute(null); };
+  const swap = () => { setStart(end); setEnd(start); setError(''); onRoute(null); };
   const locate = async () => {
     setLocating(true);
     setError('');
@@ -176,10 +175,8 @@ export function RoutePlanner({ catalogue, onRoute, onInteraction, fullPage = fal
         { name: start.name, lat: start.lat, lon: start.lon },
         { name: end.name, lat: end.lat, lon: end.lon },
       );
-      setRoute(result);
       onRoute(result, { start, end, checkedAt });
     } catch (requestError) {
-      setRoute(null);
       onRoute(null);
       setError(errorText(requestError.message, lang, MAP));
     } finally {
@@ -188,35 +185,27 @@ export function RoutePlanner({ catalogue, onRoute, onInteraction, fullPage = fal
   };
 
   return (
-    <div className={`route-planner${fullPage ? ' route-planner--page' : ''}`} onPointerEnter={onInteraction}>
-      {!fullPage && (
-        <button type="button" className="route-toggle panel" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
-          <Icon name="map" size={18} /> {tr('Route')}
-        </button>
-      )}
-      {(fullPage || expanded) && (
-        <section className="route-panel panel" aria-label={tr('Plan a route')}>
-          <header><div><strong>{tr('Route weather')}</strong><small>{tr('Shortest-distance road route')}</small></div>{!fullPage && <button type="button" className="route-close" aria-label={tr('Close route planner')} onClick={() => setExpanded(false)}>×</button>}</header>
-          <form onSubmit={submit}>
-            <PlaceField field="start" label={tr('Start')} catalogue={catalogue} value={start} onChange={updateStart} onSelect={updateStart} />
-            <div className="route-field-actions">
-              <button type="button" className="route-secondary" onClick={locate} disabled={!catalogue || locating}>
-                <Icon name="locate" size={16} /> {locating ? tr('Finding your location…') : tr('Use my location as start')}
-              </button>
-              <button type="button" className="route-secondary" onClick={swap} disabled={!start && !end} aria-label={tr('Swap start and destination')}>
-                ⇅ {tr('Swap')}
-              </button>
-            </div>
-            <PlaceField field="end" label={tr('Destination')} catalogue={catalogue} value={end} onChange={updateEnd} onSelect={updateEnd} />
-            <button type="submit" className="route-submit" disabled={!start || !end || loading}>
-              {loading ? tr('Finding route…') : tr(fullPage ? 'Check route' : 'Show route weather')}
+    <div className="route-planner route-planner--page">
+      <section className="route-panel panel" aria-label={tr('Plan a route')}>
+        <header><div><strong>{tr('Route weather')}</strong><small>{tr('Shortest-distance road route')}</small></div></header>
+        <form onSubmit={submit}>
+          <PlaceField field="start" label={tr('Start')} catalogue={catalogue} value={start} onChange={updateStart} onSelect={updateStart} />
+          <div className="route-field-actions">
+            <button type="button" className="route-secondary" onClick={locate} disabled={!catalogue || locating}>
+              <Icon name="locate" size={16} /> {locating ? tr('Finding your location…') : tr('Use my location as start')}
             </button>
-          </form>
-          {error && <p className="route-error" role="alert">{error}</p>}
-          {route && !fullPage && <WeatherSummary route={route} />}
-          <p className="route-provider-note">{tr('Road route by OSRM. The routing service receives the selected coordinates.')}</p>
-        </section>
-      )}
+            <button type="button" className="route-secondary" onClick={swap} disabled={!start && !end} aria-label={tr('Swap start and destination')}>
+              ⇅ {tr('Swap')}
+            </button>
+          </div>
+          <PlaceField field="end" label={tr('Destination')} catalogue={catalogue} value={end} onChange={updateEnd} onSelect={updateEnd} />
+          <button type="submit" className="route-submit" disabled={!start || !end || loading}>
+            {loading ? tr('Finding route…') : tr('Check route')}
+          </button>
+        </form>
+        {error && <p className="route-error" role="alert">{error}</p>}
+        <p className="route-provider-note">{tr('Road route by OSRM. The routing service receives the selected coordinates.')}</p>
+      </section>
     </div>
   );
 }
