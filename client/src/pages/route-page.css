@@ -1,0 +1,96 @@
+.route-page { min-height: 100dvh; background: var(--cream); color: var(--olive); }
+.route-page-main { width: min(1500px, calc(100% - 48px)); margin: 0 auto; padding: 118px 0 36px; }
+.route-page-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.route-page-heading .eyebrow { color: var(--map-muted); font-size: .74rem; font-weight: 650; }
+.route-page-heading h1 { margin-top: 4px; font-size: clamp(1.5rem, 3vw, 2.25rem); line-height: 1.2; }
+.route-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(360px, .75fr); gap: 18px; align-items: start; }
+.route-map-column { min-width: 0; }
+.route-map-shell { position: relative; height: min(70dvh, 760px); min-height: 440px; overflow: hidden; border: 1px solid var(--map-rule); border-radius: 16px; background: var(--olive); }
+.route-map-shell .map { position: absolute; inset: 0; }
+.route-map-shell .map-loading { position: absolute; inset: 0; }
+.route-result-line { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: baseline; padding: 12px 2px 0; }
+.route-result-line strong { min-width: 0; overflow-wrap: anywhere; font-size: .95rem; }
+.route-result-line > span { white-space: nowrap; font-weight: 650; font-size: .84rem; }
+.route-result-line small { grid-column: 1 / -1; color: var(--map-muted); }
+.route-shortest-note { margin-top: 8px; color: var(--map-muted); font-size: .7rem; line-height: 1.5; }
+.route-sidebar { min-width: 0; display: grid; gap: 12px; }
+.route-planner--page { position: static; width: auto; z-index: auto; }
+.route-planner--page .route-panel { width: auto; max-height: none; margin: 0; padding: 16px; box-shadow: none; }
+.route-planner--page .route-panel > header { margin-bottom: 14px; }
+.route-planner--page .route-panel > header strong { font-size: 1rem; }
+.route-planner--page .route-panel > header small { font-size: .72rem; }
+.route-planner--page .route-field label { font-size: .76rem; }
+.route-planner--page .route-field input { min-height: 48px; font-size: .86rem; }
+.route-planner--page .route-submit { min-height: 48px; font-size: .86rem; }
+.route-planner--page .route-provider-note { margin-top: 12px; }
+.route-empty-state { padding: 14px 2px; color: var(--map-muted); font-size: .86rem; }
+.route-weather-list { display: grid; gap: 9px; }
+.route-weather-card { min-width: 0; padding: 13px; border: 1px solid var(--map-rule); border-radius: 12px; background: var(--cream-strong); }
+.route-weather-heading { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 9px; align-items: center; }
+.route-step-number { display: grid; place-items: center; width: 28px; aspect-ratio: 1; border-radius: 50%; background: var(--olive); color: var(--cream); font-size: .7rem; font-weight: 700; }
+.route-weather-heading small { color: var(--map-muted); font-size: .68rem; }
+.route-weather-heading h3 { margin-top: 1px; font-size: .94rem; overflow-wrap: anywhere; }
+.route-weather-heading time { color: var(--map-muted); font-size: .68rem; white-space: nowrap; }
+.route-crossed-areas { margin-top: 9px; color: var(--map-muted); font-size: .72rem; line-height: 1.5; overflow-wrap: anywhere; }
+.route-weather-values { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+.route-weather-values > div { min-width: 0; padding: 7px; border-radius: 7px; background: rgba(169, 190, 135, .18); }
+.route-weather-values dt { color: var(--map-muted); font-size: .64rem; }
+.route-weather-values dd { margin-top: 3px; font-size: .76rem; font-weight: 700; overflow-wrap: anywhere; }
+.route-weather-eta { margin-top: 8px; color: var(--map-muted); font-size: .66rem; }
+
+@media (max-width: 980px) {
+  .route-layout { grid-template-columns: minmax(0, 1fr) minmax(320px, .85fr); gap: 12px; }
+  .route-map-shell { min-height: 400px; }
+  .route-weather-values { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 720px) {
+  .route-page-main { width: min(100% - 28px, 600px); padding-top: 100px; }
+  .route-page-heading { margin-bottom: 14px; }
+  .route-layout { grid-template-columns: minmax(0, 1fr); }
+  .route-sidebar { grid-row: 1; }
+  .route-map-column { grid-row: 2; }
+  .route-map-shell { height: 48dvh; min-height: 320px; }
+}
+/* Weather of a route stop or area dot, on hover (or tap on touch screens, so it is not hidden on phones like the map page tooltip). */
+.route-page .route-tooltip { display: flex; width: 236px; max-width: calc(100% - 24px); gap: 2px; font-size: .8rem; }
+.route-tooltip small { font-size: .68rem; }
+.route-tooltip .route-weather-values { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; margin-top: 6px; }
+.route-tooltip .route-weather-values > div { padding: 5px 6px; background: rgba(245, 241, 226, .1); }
+.route-tooltip .route-weather-values dt { color: var(--sage); }
+.route-tooltip .route-weather-values dd { color: var(--cream); }
+
+.route-options { padding: 14px; }
+.route-options > header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.route-options > header strong { font-size: .92rem; }
+.route-options > header small { color: var(--map-muted); font-size: .7rem; }
+.route-sidebar > .route-summary { margin-top: 0; padding: 14px 16px; border: 1px solid var(--map-rule); border-radius: 14px; background: var(--cream-strong); }
+.route-options-note { margin-top: 8px; color: var(--map-muted); font-size: .72rem; }
+.route-alt-button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 10px 14px; border: 1px solid var(--olive); border-radius: 10px; color: var(--olive); background: transparent; text-align: left; font-size: .86rem; font-weight: 700; }
+.route-alt-button:hover { background: var(--sage-soft); }
+.route-alt-button[aria-pressed="true"] { color: var(--cream); background: var(--olive); }
+.route-alt-button span { display: grid; gap: 2px; }
+.route-alt-button small { font-size: .72rem; font-weight: 500; opacity: .8; }
+
+/* Next three days at the destination: inside the destination card in the list, and part of the destination stop's hover tooltip on the map. */
+.route-outlook { padding: 14px 16px; }
+.route-outlook > header { display: grid; gap: 2px; margin-bottom: 8px; }
+.route-outlook > header strong { font-size: .9rem; }
+.route-outlook > header small { color: var(--map-muted); font-size: .72rem; }
+.route-outlook ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.route-outlook li { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 2px 8px; padding: 7px 9px; border-radius: 8px; background: rgba(169, 190, 135, .16); font-size: .76rem; }
+.route-outlook-day { font-weight: 700; }
+.route-outlook-temp { font-weight: 650; white-space: nowrap; }
+.route-outlook-rain, .route-outlook-wind { grid-column: 2 / -1; color: var(--map-muted); font-size: .7rem; }
+.route-outlook-note { display: block; margin-top: 6px; color: var(--map-muted); font-size: .68rem; }
+.route-outlook--tooltip { margin-top: 8px; padding: 8px 0 0; border-top: 1px solid rgba(245, 241, 226, .2); }
+.route-outlook--tooltip > header { margin-bottom: 6px; }
+.route-outlook--tooltip > header strong { font-size: .74rem; }
+.route-outlook--tooltip > header small { color: var(--sage); }
+.route-outlook--tooltip li { padding: 4px 6px; background: rgba(245, 241, 226, .1); font-size: .7rem; }
+.route-outlook--tooltip .route-outlook-rain { color: var(--sage); }
+.route-page .route-tooltip { max-height: calc(100% - 16px); overflow: hidden; }
+.route-outlook--card { margin-top: 10px; padding: 10px 0 0; border-top: 1px solid var(--map-rule); }
+.route-outlook--card > header { margin-bottom: 6px; }
+.route-outlook--card > header strong { font-size: .8rem; }
+

@@ -11,6 +11,10 @@ const locations = [
 const routePayload = {
   code: 'Ok',
   routes: [{
+    distance: 45_000,
+    duration: 2_700,
+    geometry: { coordinates: [[90.25, 23.85], [90.32, 23.83], [90.41, 23.78]] },
+  }, {
     distance: 31_200,
     duration: 3_600,
     geometry: { coordinates: [[90.25, 23.85], [90.33, 23.82], [90.41, 23.78]] },
@@ -25,7 +29,7 @@ test('route sample points cover both ends and stay within the route', () => {
   assert.ok(points.every((point) => point.progress >= 0 && point.progress <= 1));
 });
 
-test('route weather calls fastest driving route and returns route and weather coverage', async () => {
+test('route weather chooses the shortest OSRM candidate and returns route and weather coverage', async () => {
   const calls = [];
   const forecast = {
     nowMs: 0,
@@ -53,13 +57,57 @@ test('route weather calls fastest driving route and returns route and weather co
   });
 
   assert.match(calls[0].url, /route\/v1\/driving/);
+  assert.match(calls[0].url, /alternatives=3/);
   assert.equal(result.distanceKm, 31.2);
   assert.equal(result.durationMinutes, 60);
+  assert.equal(result.routeCandidates, 2);
+  assert.equal(result.routeChoice, 'shortest-distance-among-osrm-options');
   assert.equal(result.summary.coveredCount, result.samples.length);
   assert.equal(result.summary.maxHeatIndexC, 36);
   assert.equal(result.summary.maxRainMm, 8);
   assert.equal(result.summary.rainUnitUnverified, true);
   assert.equal(result.summary.maxThunderPotential, 2);
+
+  // The longer candidate is offered as an alternative with its own weather along it.
+  assert.equal(result.alternatives.length, 1);
+  assert.equal(result.alternatives[0].distanceKm, 45);
+  assert.equal(result.alternatives[0].durationMinutes, 45);
+  assert.deepEqual(result.alternatives[0].coordinates, routePayload.routes[0].geometry.coordinates);
+  assert.equal(result.alternatives[0].summary.maxHeatIndexC, 36);
+});
+
+test('when OSRM finds one road, routes through side points are added if they are different roads and not a long detour', async () => {
+  const route = (km, coordinates) => ({ distance: km * 1000, duration: km * 90, geometry: { coordinates } });
+  const direct = route(30, [[90.25, 23.85], [90.33, 23.815], [90.41, 23.78]]);
+  const north = route(36, [[90.25, 23.85], [90.33, 23.9], [90.41, 23.78]]); // a different road
+  const sameRoad = route(31, direct.geometry.coordinates); // the direct road again
+  const longWay = route(60, [[90.25, 23.85], [90.33, 23.7], [90.41, 23.78]]); // over 50% longer
+  const calls = [];
+  const result = await buildRouteWeather({
+    start: { name: 'Savar', lat: 23.85, lon: 90.25 },
+    end: { name: 'Dhaka', lat: 23.78, lon: 90.41 },
+    nowMs: 0,
+    forecast: { nowMs: 0, base: null, stepsMs: [] },
+    locationList: locations,
+    fetchImpl: async (url) => {
+      calls.push(url);
+      const viaCall = url.split('/driving/')[1].split('?')[0].split(';').length === 3;
+      const routes = !viaCall ? [direct] : calls.length === 2 ? [north, sameRoad] : [longWay];
+      return { ok: true, json: async () => ({ code: 'Ok', routes }) };
+    },
+  });
+  assert.equal(calls.length, 3);
+  assert.ok(calls.slice(1).every((url) => !url.includes('alternatives')));
+  assert.equal(result.distanceKm, 30);
+  assert.deepEqual(result.alternatives.map((option) => option.distanceKm), [36]);
+  assert.equal(result.routeCandidates, 2);
+});
+
+test('side points for extra routes lie either side of the straight line and inside Bangladesh', () => {
+  const vias = routeWeatherInternals.viaPoints({ lat: 23.81, lon: 90.41 }, { lat: 22.36, lon: 91.83 });
+  assert.equal(vias.length, 2);
+  assert.ok(vias.every(routeWeatherInternals.validPoint));
+  assert.notDeepEqual(vias[0], vias[1]);
 });
 
 test('route weather rejects same, out-of-country and missing-road routes', async () => {

@@ -36,6 +36,7 @@ export const COMMON = {
   'Lightning collection is turned off.': 'বজ্রপাতের তথ্য সংগ্রহ বন্ধ আছে।',
   'Language': 'ভাষা',
   'AkashSathi': 'আকাশসাথী',
+  'Route': 'পথ',
   'Main': 'প্রধান মেনু',
   'Features': 'সুবিধাসমূহ',
   "Who it's for": 'কাদের জন্য',

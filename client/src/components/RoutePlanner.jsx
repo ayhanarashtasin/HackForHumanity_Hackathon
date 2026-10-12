@@ -1,8 +1,37 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Icon } from './Icon.jsx';
 import { errorText, useLanguage } from '../i18n/index.js';
 import { MAP } from '../i18n/map.js';
+import { containsPoint } from '../lib/locate.js';
+import { placesFor } from '../lib/neighbourhoods.js';
 import { weatherApi } from '../services/weatherApi.js';
+
+const LOCATION_ERRORS = {
+  1: 'Location access is blocked. Allow location in your browser’s site settings, then try again. Or search for your upazila above.',
+  3: 'Finding your location took too long. Try again, or search for your upazila.',
+};
+
+// The start can be the device position. The upazila it falls in is looked up only to label the field; the route uses the exact point.
+function currentPlace(catalogue) {
+  return new Promise((resolve, reject) => {
+    if (!window.isSecureContext || !navigator.geolocation) {
+      reject(new Error('Location needs a supported browser and a secure (HTTPS) connection. You can still search for your upazila.'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(async ({ coords }) => {
+      const place = { level: 'current', pcode: 'current-location', name: 'My location', nameBn: 'আমার অবস্থান', lat: coords.latitude, lon: coords.longitude };
+      try {
+        const response = await fetch('/data/bd-upazila.geojson');
+        const feature = response.ok ? (await response.json()).features.find((item) => containsPoint(item.geometry, place.lon, place.lat)) : null;
+        const polygon = feature && catalogue?.polygons[feature.properties.pid];
+        if (polygon) place.area = { name: polygon.name, nameBn: polygon.nameBn };
+      } catch { /* the label is optional */ }
+      resolve(place);
+    }, (error) => {
+      reject(new Error(LOCATION_ERRORS[error.code] ?? 'Your device could not find its location. Try again, or search for your upazila.'));
+    }, { enableHighAccuracy: true, timeout: 15_000, maximumAge: 60_000 });
+  });
+}
 
 function PlaceField({ field, label, catalogue, value, onChange, onSelect }) {
   const { tr, name, lang } = useLanguage(MAP);
@@ -17,13 +46,26 @@ function PlaceField({ field, label, catalogue, value, onChange, onSelect }) {
       ...catalogue.locations.map((location) => ({
         ...location, level: 'upazila', kind: tr(location.kind === 'thana' ? 'City thana' : 'Upazila'), parent: name(districts.get(location.district)),
       })),
+      ...(catalogue.areas ?? []).map((area) => ({
+        ...area, pcode: area.id, level: 'area', kind: tr('Local area'), parent: name({ name: area.parentName }),
+      })),
+      ...placesFor(catalogue).map((place) => ({
+        ...place, pcode: place.id, level: 'neighbourhood', kind: tr('Neighbourhood'), parent: tr(place.city),
+      })),
     ].map((place) => ({ ...place, search: `${place.name} ${place.nameBn ?? ''}`.toLowerCase() }));
   }, [catalogue, name, tr]);
+  // An empty field lists every district so a place can be chosen without typing; typing narrows to districts, upazilas, areas and
+  // neighbourhoods, names that start with the text first ("ban" → Banasree, Banani before Bandarban's unions).
   const results = useMemo(() => {
     const text = query.trim().toLowerCase();
-    if (text.length < 2) return [];
-    return index.filter((place) => place.search.includes(text)).slice(0, 6);
+    if (!text) return index.filter((place) => place.level === 'district').sort((a, b) => a.name.localeCompare(b.name));
+    const starts = (place) => place.name.toLowerCase().startsWith(text) || (place.nameBn ?? '').startsWith(text);
+    const matches = index.filter((place) => place.search.includes(text));
+    return [...matches.filter(starts), ...matches.filter((place) => !starts(place))].slice(0, 8);
   }, [index, query]);
+  useEffect(() => {
+    if (open) document.getElementById(`route-${field}-option-${active}`)?.scrollIntoView({ block: 'nearest' });
+  }, [active, field, open]);
   const choose = (place) => {
     onSelect({ ...place, name: place.name, lat: place.lat, lon: place.lon });
     setQuery('');
@@ -37,7 +79,7 @@ function PlaceField({ field, label, catalogue, value, onChange, onSelect }) {
         id={`route-${field}`}
         type="search"
         role="combobox"
-        value={value ? `${name(value)}${value.parent ? `, ${value.parent}` : ''}` : query}
+        value={value ? [name(value), value.parent ?? (value.area && name(value.area))].filter(Boolean).join(', ') : query}
         placeholder={tr('Search English or বাংলা')}
         aria-expanded={open && results.length > 0}
         aria-controls={`route-${field}-results`}
@@ -73,7 +115,7 @@ function PlaceField({ field, label, catalogue, value, onChange, onSelect }) {
 
 const shown = (value, unit, tr, number, decimals = 1) => Number.isFinite(value) ? `${number(value.toFixed(decimals))}${unit}` : tr('Not available');
 
-function WeatherSummary({ route }) {
+export function WeatherSummary({ route }) {
   const { tr, number } = useLanguage(MAP);
   const { summary } = route;
   const hours = Math.floor(route.durationMinutes / 60);
@@ -99,7 +141,7 @@ function WeatherSummary({ route }) {
   );
 }
 
-export function RoutePlanner({ catalogue, onRoute, onInteraction }) {
+export function RoutePlanner({ catalogue, onRoute, onInteraction, fullPage = false }) {
   const { tr, lang } = useLanguage(MAP);
   const [expanded, setExpanded] = useState(false);
   const [start, setStart] = useState(null);
@@ -107,8 +149,21 @@ export function RoutePlanner({ catalogue, onRoute, onInteraction }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [route, setRoute] = useState(null);
+  const [locating, setLocating] = useState(false);
   const updateStart = (value) => { setStart(value); setRoute(null); setError(''); onRoute(null); };
   const updateEnd = (value) => { setEnd(value); setRoute(null); setError(''); onRoute(null); };
+  const swap = () => { setStart(end); setEnd(start); setRoute(null); setError(''); onRoute(null); };
+  const locate = async () => {
+    setLocating(true);
+    setError('');
+    try {
+      updateStart(await currentPlace(catalogue));
+    } catch (locationError) {
+      setError(errorText(locationError.message, lang, MAP));
+    } finally {
+      setLocating(false);
+    }
+  };
 
   const submit = async (event) => {
     event.preventDefault();
@@ -116,12 +171,13 @@ export function RoutePlanner({ catalogue, onRoute, onInteraction }) {
     setLoading(true);
     setError('');
     try {
+      const checkedAt = Date.now();
       const result = await weatherApi.route(
         { name: start.name, lat: start.lat, lon: start.lon },
         { name: end.name, lat: end.lat, lon: end.lon },
       );
       setRoute(result);
-      onRoute(result);
+      onRoute(result, { start, end, checkedAt });
     } catch (requestError) {
       setRoute(null);
       onRoute(null);
@@ -132,22 +188,32 @@ export function RoutePlanner({ catalogue, onRoute, onInteraction }) {
   };
 
   return (
-    <div className="route-planner" onPointerEnter={onInteraction}>
-      <button type="button" className="route-toggle panel" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
-        <Icon name="map" size={18} /> {tr('Route')}
-      </button>
-      {expanded && (
+    <div className={`route-planner${fullPage ? ' route-planner--page' : ''}`} onPointerEnter={onInteraction}>
+      {!fullPage && (
+        <button type="button" className="route-toggle panel" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
+          <Icon name="map" size={18} /> {tr('Route')}
+        </button>
+      )}
+      {(fullPage || expanded) && (
         <section className="route-panel panel" aria-label={tr('Plan a route')}>
-          <header><div><strong>{tr('Route weather')}</strong><small>{tr('Fastest driving route')}</small></div><button type="button" className="route-close" aria-label={tr('Close route planner')} onClick={() => setExpanded(false)}>×</button></header>
+          <header><div><strong>{tr('Route weather')}</strong><small>{tr('Shortest-distance road route')}</small></div>{!fullPage && <button type="button" className="route-close" aria-label={tr('Close route planner')} onClick={() => setExpanded(false)}>×</button>}</header>
           <form onSubmit={submit}>
             <PlaceField field="start" label={tr('Start')} catalogue={catalogue} value={start} onChange={updateStart} onSelect={updateStart} />
+            <div className="route-field-actions">
+              <button type="button" className="route-secondary" onClick={locate} disabled={!catalogue || locating}>
+                <Icon name="locate" size={16} /> {locating ? tr('Finding your location…') : tr('Use my location as start')}
+              </button>
+              <button type="button" className="route-secondary" onClick={swap} disabled={!start && !end} aria-label={tr('Swap start and destination')}>
+                ⇅ {tr('Swap')}
+              </button>
+            </div>
             <PlaceField field="end" label={tr('Destination')} catalogue={catalogue} value={end} onChange={updateEnd} onSelect={updateEnd} />
             <button type="submit" className="route-submit" disabled={!start || !end || loading}>
-              {loading ? tr('Finding route…') : tr('Show route weather')}
+              {loading ? tr('Finding route…') : tr(fullPage ? 'Check route' : 'Show route weather')}
             </button>
           </form>
           {error && <p className="route-error" role="alert">{error}</p>}
-          {route && <WeatherSummary route={route} />}
+          {route && !fullPage && <WeatherSummary route={route} />}
           <p className="route-provider-note">{tr('Road route by OSRM. The routing service receives the selected coordinates.')}</p>
         </section>
       )}

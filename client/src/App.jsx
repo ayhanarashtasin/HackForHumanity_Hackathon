@@ -8,16 +8,17 @@ import { isLazyPage, loadedPage, preloadPage } from './pages/pageLoader.js';
 // (the admin chunk is never shipped to a visitor who never opens /admin).
 // A screen whose chunk has already arrived renders directly. main.jsx loads the current screen's chunk before the first render and links
 // warm the next one on hover, so the loading splash below is only for a chunk that is genuinely still on its way.
-const LAZY = Object.fromEntries(['map', 'alert', 'admin'].map((route) => [route, lazy(() => preloadPage(route).then((component) => ({ default: component })))]));
+const LAZY = Object.fromEntries(['map', 'route', 'alert', 'admin'].map((route) => [route, lazy(() => preloadPage(route).then((component) => ({ default: component })))]));
 
 const TITLES = {
   home: 'AkashSathi · Weather for every upazila of Bangladesh',
   map: 'AkashSathi · Bangladesh Weather Map',
+  route: 'AkashSathi · Route Weather',
   alert: 'AkashSathi · Weather alerts for your work',
   admin: 'AkashSathi · Administrator',
 };
 
-const LOADING = { map: 'Loading map…', alert: 'Loading alerts…', admin: 'Loading…' };
+const LOADING = { map: 'Loading map…', route: 'Loading route planner…', alert: 'Loading alerts…', admin: 'Loading…' };
 
 export default function App() {
   const route = useRoute();

@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Icon } from './Icon.jsx';
 import { useLanguage } from '../i18n/index.js';
 import { MAP } from '../i18n/map.js';
+import { placesFor } from '../lib/neighbourhoods.js';
 
 export function SearchBox({ catalogue, onPick }) {
   const { tr, name, lang } = useLanguage(MAP);
@@ -19,6 +20,12 @@ export function SearchBox({ catalogue, onPick }) {
       })),
       ...catalogue.locations.map((location) => ({
         level: 'upazila', id: location.pcode, name: location.name, nameBn: location.nameBn, kind: location.kind === 'thana' ? 'City thana' : 'Upazila', parent: districtName.get(location.district), lat: location.lat, lon: location.lon, zoom: 10.5,
+      })),
+      ...(catalogue.areas ?? []).map((area) => ({
+        level: 'area', id: area.id, name: area.name, nameBn: area.nameBn, kind: 'Local area', parent: name({ name: area.parentName }), lat: area.lat, lon: area.lon, zoom: 10.5,
+      })),
+      ...placesFor(catalogue).map((place) => ({
+        level: 'neighbourhood', id: place.id, name: place.name, nameBn: place.nameBn, kind: 'Neighbourhood', parent: tr(place.city), lat: place.lat, lon: place.lon, zoom: 12,
       })),
     ].map((item) => ({ ...item, haystack: `${item.name} ${item.nameBn ?? ''}`.toLowerCase() }));
   }, [catalogue, lang, tr]);
@@ -56,8 +63,8 @@ export function SearchBox({ catalogue, onPick }) {
         type="search"
         role="combobox"
         value={query}
-        placeholder={tr('Find an upazila · English / বাংলা')}
-        aria-label={tr('Search district or upazila')}
+        placeholder={tr('Find a district, upazila or area · English / বাংলা')}
+        aria-label={tr('Search district, upazila or area')}
         aria-expanded={open && results.length > 0}
         aria-controls="search-results"
         aria-autocomplete="list"

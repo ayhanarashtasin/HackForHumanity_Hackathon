@@ -79,6 +79,10 @@
 .route-results button span { font-size: .77rem; font-weight: 600; }
 .route-results button em { font-style: normal; font-weight: 400; }
 .route-results button small { color: var(--map-muted); font-size: .6875rem; }
+.route-field-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.route-secondary { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 11px; border: 1px solid var(--map-rule); border-radius: 9px; color: var(--olive); background: transparent; font-size: .72rem; font-weight: 600; }
+.route-secondary:hover:not(:disabled) { background: var(--sage-soft); }
+.route-secondary:disabled { opacity: .55; cursor: not-allowed; }
 .route-submit { min-height: 44px; border: 1px solid var(--olive); border-radius: 9px; color: var(--cream); background: var(--olive); font-size: .78rem; font-weight: 650; }
 .route-submit:disabled { opacity: .55; cursor: not-allowed; }
 .route-error { margin: 10px 0 0; padding: 9px; border-radius: 8px; color: var(--olive); background: rgba(216, 123, 73, .14); font-size: .72rem; line-height: 1.5; }

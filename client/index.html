@@ -13,7 +13,7 @@
       // src/lib/router.js resolveRoute is the source of truth; client/test/pageBoot.test.js keeps the two in step.
       (function () {
         var path = location.pathname.replace(/\/+$/, '') || '/';
-        var page = path === '/map' ? 'map' : path === '/alert' ? 'alert' : path === '/admin' || path === '/admin/login' ? 'admin' : 'landing';
+        var page = path === '/map' ? 'map' : path === '/route' ? 'route' : path === '/alert' ? 'alert' : path === '/admin' || path === '/admin/login' ? 'admin' : 'landing';
         if (page === 'landing' && /^#(.*&)?(view|layer|o)(=|&|$)/.test(location.hash)) page = 'map'; // old shared map links: "/#view=..."
         document.documentElement.setAttribute('data-page', page);
         // Same preference key as src/i18n/language.js; storage may be blocked by the browser.
@@ -30,10 +30,10 @@
       /* Critical first-paint rules. The full styles load later (in development they arrive with the scripts), so these keep the first frame
          the right colour: Deep Olive for the map, Soft White for every page that scrolls. */
       html { background: #2E3D28; }
-      html[data-page='landing'], html[data-page='alert'], html[data-page='admin'] { background: #E8E9DF; }
+      html[data-page='landing'], html[data-page='route'], html[data-page='alert'], html[data-page='admin'] { background: #E8E9DF; }
       body { margin: 0; }
       .boot { position: fixed; inset: 0; display: grid; place-items: center; font: 1.1rem Inter, system-ui, sans-serif; color: #E8E9DF; opacity: 0; animation: boot-in 0.2s ease 0.4s forwards; }
-      html[data-page='landing'] .boot, html[data-page='alert'] .boot, html[data-page='admin'] .boot { color: #2E3D28; }
+      html[data-page='landing'] .boot, html[data-page='route'] .boot, html[data-page='alert'] .boot, html[data-page='admin'] .boot { color: #2E3D28; }
       .boot-bn, html:lang(bn) .boot-en { display: none; }
       html:lang(bn) .boot-bn { display: inline; }
       @keyframes boot-in { to { opacity: 1; } }

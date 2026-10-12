@@ -5,9 +5,11 @@ import { WeatherMap } from '../map/WeatherMap.js';
 import { useLanguage } from '../i18n/index.js';
 import { MAP } from '../i18n/map.js';
 
+const NO_ALTERNATIVES = [];
+
 // Thin React wrapper: owns the WeatherMap instance and pushes state into it. All map logic lives in map/WeatherMap.js.
 export function MapView({
-  catalogue, initialView, signLayer, snapshot, stepIndex, baseStatus, radarItems, satelliteSpec, lightning, route, selection, flyRequest, userPosition, handlers,
+  catalogue, initialView, signLayer, snapshot, stepIndex, baseStatus, radarItems, satelliteSpec, lightning, route, routeAlternatives = NO_ALTERNATIVES, routeDetails = null, selection, flyRequest, userPosition, handlers, maxZoom,
 }) {
   const { tr, lang } = useLanguage(MAP);
   const containerRef = useRef(null);
@@ -21,12 +23,15 @@ export function MapView({
       container: containerRef.current,
       catalogue,
       initialView,
+      maxZoom,
       handlers: {
         onReady: () => setReady(true),
         onSelect: (selected) => handlersRef.current.onSelect(selected),
         onHover: (picked, point) => handlersRef.current.onHover(picked, point),
         onMoveEnd: (view) => handlersRef.current.onMoveEnd(view),
         onLightningSelect: (id) => handlersRef.current.onLightningSelect(id),
+        onRouteHover: (id, point) => handlersRef.current.onRouteHover?.(id, point),
+        onRouteSelect: (index) => handlersRef.current.onRouteSelect?.(index),
       },
     });
     mapRef.current = instance;
@@ -66,8 +71,12 @@ export function MapView({
   }, [ready, lightning]);
 
   useEffect(() => {
-    if (ready) mapRef.current.setRoute(route);
-  }, [ready, route]);
+    if (ready) mapRef.current.setRoute(route, routeAlternatives);
+  }, [ready, route, routeAlternatives]);
+
+  useEffect(() => {
+    if (ready) mapRef.current.setRouteDetails(routeDetails);
+  }, [ready, routeDetails]);
 
   useEffect(() => {
     if (ready) mapRef.current.setSelection(selection);

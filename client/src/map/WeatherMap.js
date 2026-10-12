@@ -1,6 +1,7 @@
 import { AttributionControl, LngLat, LngLatBounds, MapLibreMap, NavigationControl, setWorkerUrl } from 'maplibre-gl';
 import { circlePolygon, clampToBounds, imageCoordinates, outsideMask } from '../lib/geometry.js';
 import { registerIcons } from '../lib/icons.js';
+import { neighbourhoodById } from '../lib/neighbourhoods.js';
 import { LABELS_ANCHOR, buildBaseStyle } from '../lib/mapStyle.js';
 import { BASEMAP, PALETTE, STATUS_COLORS } from '../lib/palette.js';
 import { SIGN_LAYERS, colorAt, dim, textOn } from '../lib/scales.js';
@@ -13,6 +14,7 @@ setWorkerUrl(workerUrl);
 
 // Below this zoom the map shows the 64 districts; from here on, the 544 upazila / thana locations.
 export const UPAZILA_ZOOM = 8.3;
+const AREA_ZOOM = 9.2;
 const BD_BOUNDS = [[88.0, 20.55], [92.75, 26.7]];
 const viewPadding = (container) => ({
   top: Math.min(96, container.clientHeight * 0.15),
@@ -29,6 +31,9 @@ const MAX_ZOOM = 12;
 const NATIONAL_URL = '/data/bd-national.geojson';
 const FILL_OPACITY = 0.56;
 const EMPTY = { type: 'FeatureCollection', features: [] };
+const pidFilter = (pids) => ['in', ['get', 'pid'], ['literal', pids]];
+const NONE = pidFilter([]);
+const ROUTE_STOP_LAYERS = ['route-stop-circles', 'route-area-dots'];
 const TRANSPARENT = 'rgba(0,0,0,0)';
 
 export const LIGHTNING_COLORS = {
@@ -50,7 +55,8 @@ function fillOpacity(scale, upazila) {
 }
 
 export class WeatherMap {
-  constructor({ container, catalogue, initialView, handlers }) {
+  // maxZoom: the weather map stops at district/upazila detail; the route page allows street level to follow a city route.
+  constructor({ container, catalogue, initialView, handlers, maxZoom = MAX_ZOOM }) {
     this.catalogue = catalogue;
     this.handlers = handlers;
     this.ready = false;
@@ -69,7 +75,7 @@ export class WeatherMap {
 
     // Fetched up front so the outside-Bangladesh mask is in place the moment the style loads (no flash of the neighbours).
     this.destroyed = false;
-    this.zoomLimits = { min: ABSOLUTE_MIN_ZOOM, max: MAX_ZOOM };
+    this.zoomLimits = { min: ABSOLUTE_MIN_ZOOM, max: maxZoom };
     this.nationalData = fetch(NATIONAL_URL)
       .then((response) => (response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`))))
       .catch((error) => {
@@ -84,7 +90,7 @@ export class WeatherMap {
         ? { center: [initialView.lon, initialView.lat], zoom: initialView.zoom }
         : { bounds: BD_BOUNDS, fitBoundsOptions: { padding: viewPadding(container), absolutePadding: true } }),
       minZoom: ABSOLUTE_MIN_ZOOM,
-      maxZoom: MAX_ZOOM,
+      maxZoom,
       // A custom constrain replaces MapLibre's default one, including its min/max zoom clamp, so the zoom limits are applied here too.
       transformConstrain: (center, zoom) => {
         const { lng, lat } = clampToBounds(center.lng, center.lat, BD_BOUNDS, PAN_MARGIN);
@@ -103,6 +109,8 @@ export class WeatherMap {
         'Himawari-9 © JMA via NASA GIBS',
         'Open-Meteo',
         'Boundaries: OCHA/HDX (BBS)',
+        'ADM4 boundaries: geoBoundaries (BBS/OCHA ROAP, CC BY 3.0 IGO)',
+        'Mugda point: © OpenStreetMap contributors (ODbL)',
       ],
     }), 'bottom-left');
     this.map.addControl(new NavigationControl({ showCompass: false }), 'bottom-right');
@@ -154,11 +162,13 @@ export class WeatherMap {
     map.addSource('national', { type: 'geojson', data: national ?? NATIONAL_URL });
     map.addSource('districts', { type: 'geojson', data: '/data/bd-district.geojson', promoteId: 'pid' });
     map.addSource('upazilas', { type: 'geojson', data: '/data/bd-upazila.geojson', promoteId: 'pid' });
+    map.addSource('areas', { type: 'geojson', data: '/data/bd-admin4.geojson', promoteId: 'pid' });
     map.addSource('markers', { type: 'geojson', data: EMPTY });
     map.addSource('selection', { type: 'geojson', data: EMPTY });
     map.addSource('lightning', { type: 'geojson', data: EMPTY });
     map.addSource('user-position', { type: 'geojson', data: EMPTY });
     map.addSource('route', { type: 'geojson', data: EMPTY });
+    map.addSource('route-stops', { type: 'geojson', data: EMPTY });
 
     const before = LABELS_ANCHOR;
     const add = (layer, beforeId = before) => map.addLayer(layer, beforeId);
@@ -171,6 +181,23 @@ export class WeatherMap {
     add({
       id: 'upazila-fill', type: 'fill', source: 'upazilas',
       paint: { 'fill-color': ['coalesce', ['feature-state', 'color'], TRANSPARENT], 'fill-opacity': fillOpacity(1, true) },
+    });
+    add({
+      id: 'area-fill', type: 'fill', source: 'areas', minzoom: AREA_ZOOM,
+      paint: {
+        'fill-color': ['coalesce', ['feature-state', 'color'], TRANSPARENT],
+        'fill-opacity': ['interpolate', ['linear'], ['zoom'], AREA_ZOOM, 0.16, 12, 0.3],
+      },
+    });
+    add({
+      id: 'area-point', type: 'circle', source: 'areas', minzoom: AREA_ZOOM,
+      filter: ['==', ['geometry-type'], 'Point'],
+      paint: {
+        'circle-radius': 6,
+        'circle-color': ['coalesce', ['feature-state', 'color'], PALETTE.sage],
+        'circle-stroke-color': PALETTE.cream,
+        'circle-stroke-width': 2,
+      },
     });
     add({
       id: 'upazila-line', type: 'line', source: 'upazilas',
@@ -188,9 +215,22 @@ export class WeatherMap {
         'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.6, 10, 1.6],
       },
     });
-    for (const source of ['districts', 'upazilas']) {
+    add({
+      id: 'area-line', type: 'line', source: 'areas', minzoom: AREA_ZOOM,
+      paint: {
+        'line-color': PALETTE.cream,
+        'line-opacity': ['interpolate', ['linear'], ['zoom'], AREA_ZOOM, 0.5, 12, 0.78],
+        'line-width': ['interpolate', ['linear'], ['zoom'], AREA_ZOOM, 0.55, 12, 1.1],
+      },
+    });
+    // Upazilas and local areas the route crosses (route page only); setRouteDetails fills in the filters.
+    add({ id: 'route-upazila-fill', type: 'fill', source: 'upazilas', filter: NONE, paint: { 'fill-color': PALETTE.sage, 'fill-opacity': 0.16 } });
+    add({ id: 'route-upazila-line', type: 'line', source: 'upazilas', filter: NONE, paint: { 'line-color': PALETTE.sage, 'line-width': 1.6, 'line-opacity': 0.85 } });
+    add({ id: 'route-area-line', type: 'line', source: 'areas', filter: NONE, minzoom: 9, paint: { 'line-color': PALETTE.cream, 'line-width': 1.2, 'line-opacity': 0.8, 'line-dasharray': [2, 1.5] } });
+    for (const source of ['districts', 'upazilas', 'areas']) {
       add({
         id: `${source}-active`, type: 'line', source,
+        minzoom: source === 'areas' ? AREA_ZOOM : 0,
         layout: { 'line-join': 'round' },
         paint: {
           'line-color': PALETTE.cream,
@@ -218,6 +258,17 @@ export class WeatherMap {
     // MapLibre places symbols from the top layer down, so the weather signs (added last) claim space before the names.
     this.addNameLayer('names-district', 'district', 6.2, UPAZILA_ZOOM);
     this.addNameLayer('names-upazila', 'upazila', UPAZILA_ZOOM + 1, 24);
+    map.addLayer({
+      id: 'names-areas', type: 'symbol', source: 'areas', minzoom: AREA_ZOOM + 0.6,
+      layout: {
+        'text-field': ['get', 'name'],
+        'text-font': ['Noto Sans Regular'],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 10, 9, 12, 11],
+        'text-allow-overlap': false,
+        'text-optional': true,
+      },
+      paint: { 'text-color': PALETTE.cream, 'text-opacity': 0.9, 'text-halo-color': BASEMAP.halo, 'text-halo-width': 1.4 },
+    });
     this.addMarkerLayer('markers-district', 'district', 0, UPAZILA_ZOOM);
     this.addMarkerLayer('markers-upazila', 'upazila', UPAZILA_ZOOM, 24);
     map.addLayer({
@@ -236,13 +287,41 @@ export class WeatherMap {
       id: 'user-position-dot', type: 'circle', source: 'user-position', filter: ['==', ['geometry-type'], 'Point'],
       paint: { 'circle-radius': 6, 'circle-color': PALETTE.olive, 'circle-stroke-color': PALETTE.cream, 'circle-stroke-width': 3 },
     });
+    // Alternative routes: dashed and muted under the chosen one, with a wide invisible line so they are easy to point at and click.
+    map.addLayer({ id: 'route-alt-casing', type: 'line', source: 'route', filter: ['==', ['get', 'role'], 'alternative'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': PALETTE.cream, 'line-width': 6, 'line-opacity': 0.75 } });
+    map.addLayer({ id: 'route-alt-line', type: 'line', source: 'route', filter: ['==', ['get', 'role'], 'alternative'], layout: { 'line-join': 'round' }, paint: { 'line-color': PALETTE.olive, 'line-width': 3, 'line-opacity': 0.7, 'line-dasharray': [2, 1.6] } });
+    map.addLayer({ id: 'route-alt-hit', type: 'line', source: 'route', filter: ['==', ['get', 'role'], 'alternative'], paint: { 'line-color': PALETTE.olive, 'line-width': 18, 'line-opacity': 0 } });
     map.addLayer({ id: 'route-casing', type: 'line', source: 'route', filter: ['==', ['get', 'role'], 'path'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': PALETTE.cream, 'line-width': 8, 'line-opacity': 0.95 } });
-    map.addLayer({ id: 'route-line', type: 'line', source: 'route', filter: ['==', ['get', 'role'], 'path'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': PALETTE.sage, 'line-width': 4.5 } });
-    map.addLayer({ id: 'route-points', type: 'circle', source: 'route', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 7, 'circle-color': PALETTE.sage, 'circle-stroke-color': PALETTE.cream, 'circle-stroke-width': 3 } });
+    map.addLayer({ id: 'route-line', type: 'line', source: 'route', filter: ['==', ['get', 'role'], 'path'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': PALETTE.sage, 'line-width': 4.5 } });    map.addLayer({ id: 'route-points', type: 'circle', source: 'route', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 7, 'circle-color': PALETTE.sage, 'circle-stroke-color': PALETTE.cream, 'circle-stroke-width': 3 } });
+    // Numbered stops (one per upazila/thana card in the route list) and a small dot for each local area passed. Hovering either shows
+    // its weather; areas share the forecast of their stop.
+    map.addLayer({
+      id: 'route-area-dots', type: 'circle', source: 'route-stops', filter: ['==', ['get', 'type'], 'area'],
+      paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 3.5, 13, 6], 'circle-color': PALETTE.cream, 'circle-stroke-color': PALETTE.olive, 'circle-stroke-width': 1.5 },
+    });
+    map.addLayer({
+      id: 'route-area-names', type: 'symbol', source: 'route-stops', minzoom: 11, filter: ['==', ['get', 'type'], 'area'],
+      layout: { 'text-field': ['get', 'label'], 'text-font': ['Noto Sans Regular'], 'text-size': 10.5, 'text-anchor': 'left', 'text-offset': [0.8, 0], 'text-optional': true },
+      paint: { 'text-color': PALETTE.cream, 'text-halo-color': BASEMAP.halo, 'text-halo-width': 1.4 },
+    });
+    map.addLayer({
+      id: 'route-stop-circles', type: 'circle', source: 'route-stops', filter: ['==', ['get', 'type'], 'stop'],
+      paint: { 'circle-radius': 11, 'circle-color': PALETTE.olive, 'circle-stroke-color': PALETTE.cream, 'circle-stroke-width': 2.5 },
+    });
+    map.addLayer({
+      id: 'route-stop-numbers', type: 'symbol', source: 'route-stops', filter: ['==', ['get', 'type'], 'stop'],
+      layout: { 'text-field': ['get', 'number'], 'text-font': ['Noto Sans Regular'], 'text-size': 10.5, 'text-allow-overlap': true, 'text-ignore-placement': true },
+      paint: { 'text-color': PALETTE.cream },
+    });
+    map.addLayer({
+      id: 'route-stop-names', type: 'symbol', source: 'route-stops', filter: ['==', ['get', 'type'], 'stop'],
+      layout: { 'text-field': ['get', 'label'], 'text-font': ['Noto Sans Regular'], 'text-size': 11.5, 'text-anchor': 'top', 'text-offset': [0, 1.25], 'text-optional': true },
+      paint: { 'text-color': PALETTE.cream, 'text-halo-color': BASEMAP.halo, 'text-halo-width': 1.6 },
+    });
 
     map.on('click', (event) => this.onClick(event));
     map.on('mousemove', (event) => this.onMouseMove(event));
-    map.on('mouseout', () => this.setHover(null, null));
+    map.on('mouseout', () => { this.setHover(null, null); this.handlers.onRouteHover?.(null); });
 
     this.ready = true;
     this.handlers.onReady?.();
@@ -399,6 +478,10 @@ export class WeatherMap {
     for (const [pid, polygon] of Object.entries(this.catalogue.polygons)) {
       setFill('upazilas', pid, fillFor(mean(polygon.src.map((pcode) => valuesByPcode.get(pcode)))));
     }
+    for (const area of this.catalogue.areas ?? []) {
+      const parent = this.catalogue.polygons[area.parentPid];
+      setFill('areas', area.id, fillFor(parent ? mean(parent.src.map((pcode) => valuesByPcode.get(pcode))) : null));
+    }
     for (const district of this.catalogue.districts) {
       setFill('districts', district.pcode, fillFor(hasData ? snapshot.districts[district.pcode]?.[cfg.districtSeries]?.[stepIndex] : null));
     }
@@ -537,16 +620,34 @@ export class WeatherMap {
       return;
     }
 
+    // A tap on a route stop shows its weather (there is no hover on touch screens).
+    const stop = this.routeStopAt(event.point);
+    if (stop) {
+      this.handlers.onRouteHover?.(stop, { x: event.point.x, y: event.point.y });
+      return;
+    }
+    this.handlers.onRouteHover?.(null);
+
+    const alternative = this.routeAlternativeAt(event.point);
+    if (alternative !== null) {
+      this.handlers.onRouteSelect?.(alternative);
+      return;
+    }
+
     const selection = this.pick(event.point);
     this.handlers.onSelect?.(selection);
   }
 
-  // Marker first, then the polygon under the cursor (district polygons below UPAZILA_ZOOM, upazila polygons above).
+  // Marker first, then the most detailed visible administrative polygon.
   pick(point) {
     const marker = this.map.queryRenderedFeatures(point, { layers: ['markers-district', 'markers-upazila'] })[0];
     if (marker) return { level: marker.properties.level, id: marker.properties.id };
 
     const upazilaMode = this.map.getZoom() >= UPAZILA_ZOOM;
+    if (this.map.getZoom() >= AREA_ZOOM) {
+      const area = this.map.queryRenderedFeatures(point, { layers: ['area-fill', 'area-point'] })[0];
+      if (area) return { level: 'area', id: area.properties.pid };
+    }
     const layer = upazilaMode ? 'upazila-fill' : 'district-fill';
     const feature = this.map.queryRenderedFeatures(point, { layers: [layer] })[0];
     if (!feature) return null;
@@ -560,7 +661,28 @@ export class WeatherMap {
       : { level: 'polygon', id: pid };
   }
 
+  // A route stop or area dot under the pointer, if any; route stops take priority over the weather map underneath.
+  routeStopAt(point) {
+    if (!this.hasRouteStops) return null;
+    return this.map.queryRenderedFeatures(point, { layers: ROUTE_STOP_LAYERS })[0]?.properties.id ?? null;
+  }
+
   onMouseMove(event) {
+    const stop = this.routeStopAt(event.point);
+    this.handlers.onRouteHover?.(stop, stop ? { x: event.point.x, y: event.point.y } : null);
+    if (stop) {
+      this.map.getCanvas().style.cursor = 'pointer';
+      this.setHover(null, null);
+      this.handlers.onHover?.(null);
+      return;
+    }
+    const alternative = this.routeAlternativeAt(event.point);
+    if (alternative !== null) {
+      this.map.getCanvas().style.cursor = 'pointer';
+      this.setHover(null, null);
+      this.handlers.onHover?.(null);
+      return;
+    }
     const picked = this.pick(event.point);
     this.map.getCanvas().style.cursor = picked ? 'pointer' : '';
 
@@ -580,6 +702,11 @@ export class WeatherMap {
     if (!selection) return null;
     if (selection.level === 'district') return { source: 'districts', id: selection.id };
     if (selection.level === 'polygon') return { source: 'upazilas', id: selection.id };
+    if (selection.level === 'neighbourhood') return null;
+    if (selection.level === 'area') {
+      const area = this.catalogue.areas?.find((item) => item.id === selection.id);
+      return area && !area.boundaryApprox ? { source: 'areas', id: selection.id } : null;
+    }
 
     const location = this.locationByPcode.get(selection.id);
     return location?.pid ? { source: 'upazilas', id: location.pid } : null;
@@ -610,6 +737,14 @@ export class WeatherMap {
   }
 
   pointOf(selection) {
+    if (selection.level === 'neighbourhood') {
+      const place = neighbourhoodById(selection.id);
+      return place ? [place.lon, place.lat] : null;
+    }
+    if (selection.level === 'area') {
+      const area = this.catalogue.areas?.find((item) => item.id === selection.id);
+      return area?.boundaryApprox ? [area.lon, area.lat] : null;
+    }
     const location = selection.level === 'upazila' ? this.locationByPcode.get(selection.id) : null;
     return location ? [location.lon, location.lat] : null;
   }
@@ -623,21 +758,55 @@ export class WeatherMap {
     this.map.getSource('user-position').setData({ type: 'FeatureCollection', features });
   }
 
-  setRoute(route) {
+  // alternatives: [{ index, coordinates }] drawn under the chosen route; clicking one calls onRouteSelect(index).
+  setRoute(route, alternatives = []) {
     if (!this.ready) return;
+    const shown = route?.coordinates?.length ? alternatives.filter((option) => option.coordinates?.length) : [];
     const features = route?.coordinates?.length ? [
+      ...shown.map(({ index, coordinates }) => ({ type: 'Feature', properties: { role: 'alternative', index }, geometry: { type: 'LineString', coordinates } })),
       { type: 'Feature', properties: { role: 'path' }, geometry: { type: 'LineString', coordinates: route.coordinates } },
       { type: 'Feature', properties: { role: 'endpoint' }, geometry: { type: 'Point', coordinates: [route.start.lon, route.start.lat] } },
       { type: 'Feature', properties: { role: 'endpoint' }, geometry: { type: 'Point', coordinates: [route.end.lon, route.end.lat] } },
     ] : [];
+    this.hasRouteAlternatives = shown.length > 0;
     this.map.getSource('route').setData({ type: 'FeatureCollection', features });
-    if (features.length) this.fitRoute(route.coordinates);
+    if (!features.length) { this.routeFitKey = null; return; }
+
+    // Switching between the options of one search keeps the camera; a new search fits all its options into view.
+    const all = [route.coordinates, ...shown.map((option) => option.coordinates)];
+    const key = `${route.start.lon},${route.start.lat};${route.end.lon},${route.end.lat};${all.map((line) => line.length).sort().join(',')}`;
+    if (key !== this.routeFitKey) {
+      this.routeFitKey = key;
+      this.fitRoute(all.flat());
+    }
+  }
+
+  routeAlternativeAt(point) {
+    if (!this.hasRouteAlternatives) return null;
+    const feature = this.map.queryRenderedFeatures(point, { layers: ['route-alt-hit'] })[0];
+    return feature ? feature.properties.index : null;
+  }
+
+  // details: { stops: [{ id, type: 'stop' | 'area', number?, label, lon, lat }], upazilaPids: [], areaPids: [] } or null.
+  setRouteDetails(details) {
+    if (!this.ready) return;
+    const stops = details?.stops ?? [];
+    this.hasRouteStops = stops.length > 0;
+    this.map.getSource('route-stops').setData({
+      type: 'FeatureCollection',
+      features: stops.map(({ lon, lat, ...properties }) => ({ type: 'Feature', properties, geometry: { type: 'Point', coordinates: [lon, lat] } })),
+    });
+    this.map.setFilter('route-upazila-fill', pidFilter(details?.upazilaPids ?? []));
+    this.map.setFilter('route-upazila-line', pidFilter(details?.upazilaPids ?? []));
+    this.map.setFilter('route-area-line', pidFilter(details?.areaPids ?? []));
   }
 
   fitRoute(coordinates) {
     if (!coordinates?.length) return;
     const bounds = coordinates.reduce((result, coordinate) => result.extend(coordinate), new LngLatBounds(coordinates[0], coordinates[0]));
-    this.map.fitBounds(bounds, { padding: viewPadding(this.map.getContainer()), maxZoom: 10, duration: 800 });
+    // A short city route (Banasree → Farmgate) needs a close zoom for its stops to be told apart. Never past the map's own limit: the
+    // constrain would clamp the animation mid-flight and the camera would jump.
+    this.map.fitBounds(bounds, { padding: viewPadding(this.map.getContainer()), maxZoom: Math.min(13, this.zoomLimits.max), duration: 800 });
   }
 
   flyTo({ lat, lon, zoom }) {

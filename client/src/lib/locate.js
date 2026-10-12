@@ -22,27 +22,34 @@ export function containsPoint(geometry, lon, lat) {
   return polygons.some(([outer, ...holes]) => inRing(lon, lat, outer) && !holes.some((hole) => inRing(lon, lat, hole)));
 }
 
+// Which forecast a point inside upazila boundary `pid` uses: the upazila's own location, the boundary as a whole where it is approximate,
+// or, inside a city corporation (one boundary, several point-only thanas), the nearest thana.
+export function forecastSelectionIn(pid, { lon, lat }, catalogue) {
+  const polygon = catalogue.polygons[pid];
+  if (!polygon?.src?.length) return null;
+  const members = catalogue.locations.filter((item) => polygon.src.includes(item.pcode));
+  if (!members.length) return null;
+  if (polygon.approx) return { selection: { level: 'polygon', id: pid }, polygon, nearest: null };
+  if (members.length === 1 && polygon.kind !== 'city-corporation') return { selection: { level: 'upazila', id: members[0].pcode }, polygon, nearest: null };
+  const nearest = members.reduce((best, item) => (
+    distanceKm(lat, lon, item.lat, item.lon) < distanceKm(lat, lon, best.lat, best.lon) ? item : best
+  ));
+  return { selection: { level: 'upazila', id: nearest.pcode }, polygon, nearest };
+}
+
 export function locateUpazila({ lon, lat }, boundaries, catalogue) {
   if (!Number.isFinite(lon) || !Number.isFinite(lat) || Math.abs(lon) > 180 || Math.abs(lat) > 90) return null;
   const feature = boundaries.features.find((item) => containsPoint(item.geometry, lon, lat));
   if (!feature) return null;
-  const pid = feature.properties.pid;
-  const polygon = catalogue.polygons[pid];
-  if (!polygon?.src?.length) return null;
-
-  const members = catalogue.locations.filter((item) => polygon.src.includes(item.pcode));
-  if (!members.length) return null;
-  if (polygon.approx) {
-    return { selection: { level: 'polygon', id: pid }, area: polygon.name, note: 'Your area is identified by its boundary. Weather comes from the nearest available forecast location.' };
+  const found = forecastSelectionIn(feature.properties.pid, { lon, lat }, catalogue);
+  if (!found) return null;
+  const { selection, polygon, nearest } = found;
+  if (selection.level === 'polygon') {
+    return { selection, area: polygon.name, note: 'Your area is identified by its boundary. Weather comes from the nearest available forecast location.' };
   }
-  if (members.length === 1 && polygon.kind !== 'city-corporation') {
-    return { selection: { level: 'upazila', id: members[0].pcode }, area: polygon.name, note: null };
-  }
+  if (!nearest) return { selection, area: polygon.name, note: null };
 
   // City corporations contain point-only thanas; do not claim their nearest point is an exact thana boundary.
-  const nearest = members.reduce((best, item) => (
-    distanceKm(lat, lon, item.lat, item.lon) < distanceKm(lat, lon, best.lat, best.lon) ? item : best
-  ));
   return {
     selection: { level: 'upazila', id: nearest.pcode },
     area: polygon.name,

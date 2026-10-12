@@ -1,5 +1,6 @@
 import { translate } from '../i18n/index.js';
 import { MAP } from '../i18n/map.js';
+import { neighbourhoodById } from './neighbourhoods.js';
 const MEAN_KEYS = ['temp', 'rh', 'cc', 'hi', 'rf', 'ws', 'wg'];
 const MAX_KEYS = ['ts', 'pop', 'wmo'];
 
@@ -67,6 +68,57 @@ export function resolveSelection(selection, snapshot, catalogue, lang = 'en') {
       dailyPcode: location.pcode,
       lat: location.lat,
       lon: location.lon,
+    };
+  }
+
+  if (selection.level === 'neighbourhood') {
+    const place = neighbourhoodById(selection.id);
+    const source = place && resolveSelection(place.weatherFrom, snapshot, catalogue, lang);
+    if (!source) return null;
+    return {
+      ...source,
+      level: 'neighbourhood',
+      id: place.id,
+      name: name(place),
+      nameBn: place.nameBn,
+      kind: 'Neighbourhood',
+      parent: tr('{parent}, {city}', { parent: source.name, city: tr(place.city) }),
+      note: tr('{area} has no forecast of its own. Showing the forecast for {parent}, the area it is in.', { area: name(place), parent: source.name }),
+      lat: place.lat,
+      lon: place.lon,
+    };
+  }
+
+  if (selection.level === 'area') {
+    const area = catalogue.areas?.find((item) => item.id === selection.id);
+    const parentPolygon = area && catalogue.polygons[area.parentPid];
+    if (!area || !parentPolygon) return null;
+    const members = parentPolygon.src.map((pcode) => byPcode.get(pcode)).filter(Boolean);
+    const first = members[0];
+    const memberSeries = members.map((member) => snapshot?.locations?.[member.pcode]).filter(Boolean);
+    const district = districtOf(area.district);
+    return {
+      level: 'area',
+      id: area.id,
+      name: name(area),
+      nameBn: area.nameBn,
+      kind: 'Local area',
+      parent: tr(area.parentKind === 'city corporation' ? '{parent} · {district} district' : '{parent} upazila · {district} district', {
+        parent: name({ name: area.parentName }),
+        district: name(district) ?? '',
+      }),
+      series: parentPolygon.approx
+        ? memberSeries[0] ?? null
+        : memberSeries.length ? meanSeries(memberSeries, length) : null,
+      note: area.boundaryApprox
+        ? tr('{area} has no mapped boundary and is shown as an approximate point. Showing the existing forecast for {parent}.', { area: name(area), parent: name({ name: area.parentName }) })
+        : area.parentApprox
+          ? tr('Area parent boundary is approximate. Showing the forecast of {parent}.', { parent: name({ name: area.parentName }) })
+          : tr('Showing the existing forecast for parent area {parent}.', { parent: name({ name: area.parentName }) }),
+      dailyPcode: members.length === 1 ? first.pcode : null,
+      members,
+      lat: area.lat,
+      lon: area.lon,
     };
   }
 

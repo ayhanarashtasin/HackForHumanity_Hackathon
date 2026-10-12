@@ -9,6 +9,7 @@ import { LanguageToggle } from './LanguageToggle.jsx';
 import { useLanguage } from '../i18n/index.js';
 
 const prefetchMap = prefetchPage('map');
+const prefetchRoute = prefetchPage('route');
 const prefetchAlert = prefetchPage('alert');
 
 // The logo and section links sit on the left; Alert and Map form the far-right group.
@@ -95,6 +96,7 @@ export function Navbar({ onLanguageChange, languageDisabled = false }) {
   );
 
   const mapProps = { to: '/map', onPointerEnter: prefetchMap, onFocus: prefetchMap };
+  const routeProps = { to: '/route', onPointerEnter: prefetchRoute, onFocus: prefetchRoute };
   const alertProps = { to: '/alert', onPointerEnter: prefetchAlert, onFocus: prefetchAlert };
   const badge = number(unread > 9 ? '9+' : unread);
   const alertLabel = unread > 0 ? tr('Alerts, {n} unread', { n: unread }) : tr('Alerts');
@@ -123,6 +125,7 @@ export function Navbar({ onLanguageChange, languageDisabled = false }) {
               </Link>
             </li>
             <li><Link {...mapProps} onClick={() => setOpen(false)}><Icon name="map" size={18} />{tr('Map')}</Link></li>
+            <li><Link {...routeProps} aria-current={route === 'route' ? 'page' : undefined} onClick={() => setOpen(false)}><Icon name="route" size={18} />{tr('Route')}</Link></li>
           </ul>
         )}
 
@@ -156,6 +159,9 @@ export function Navbar({ onLanguageChange, languageDisabled = false }) {
           </li>
           <li className="nav-cta-item">
             <Link {...mapProps} className="nav-cta"><Icon name="map" size={18} />{tr('Map')}</Link>
+          </li>
+          <li className="nav-cta-item">
+            <Link {...routeProps} className="nav-cta" aria-current={route === 'route' ? 'page' : undefined}><Icon name="route" size={18} />{tr('Route')}</Link>
           </li>
         </ul>
       </nav>

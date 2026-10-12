@@ -1,6 +1,5 @@
 import { locations } from './geo.js';
 import { forecastFor, loadForecast, stepIndex } from './delivery/botReports/readings.js';
-
 const BOUNDS = { minLat: 20.3, maxLat: 26.9, minLon: 87.5, maxLon: 93.2 };
 const MAX_SAMPLES = 16;
 const EARTH_KM = 6371;
@@ -70,26 +69,79 @@ function maxOf(samples, key) {
   return values.length ? Math.max(...values) : null;
 }
 
-async function fetchRoadRoute(start, end, fetchImpl) {
-  const coordinates = `${start.lon},${start.lat};${end.lon},${end.lat}`;
-  const url = `${ROUTING_SERVICE_URL}/${coordinates}?overview=full&geometries=geojson&steps=false`;
+// Routes offered per search, and what counts as a real alternative rather than the same road again or a pointless detour.
+const MAX_ROUTES = 2; // the shortest road and one alternative
+const MAX_DETOUR = 1.5; // at most 50% longer than the shortest
+const SAME_ROAD_KM = 0.2;
+const MAX_SHARED = 0.8; // an alternative must leave the other routes for at least a fifth of its length
+const VIA_OFFSET = 0.25; // via points sit this fraction of the straight-line distance to each side of the midpoint
+
+async function requestRoutes(points, fetchImpl, { alternatives }) {
+  const coordinates = points.map((point) => `${point.lon},${point.lat}`).join(';');
+  const url = `${ROUTING_SERVICE_URL}/${coordinates}?overview=full&geometries=geojson&steps=false${alternatives ? '&alternatives=3' : ''}`;
   const response = await fetchImpl(url, { signal: AbortSignal.timeout(12_000) });
   if (!response.ok) throw new Error('Route service is unavailable. Please try again.');
   const payload = await response.json();
-  const route = payload.code === 'Ok' ? payload.routes?.[0] : null;
-  if (!route?.geometry?.coordinates?.length || !Number.isFinite(route.distance) || !Number.isFinite(route.duration)) {
-    throw new Error('No road route was found between those locations.');
-  }
-  return route;
+  return payload.code === 'Ok' ? (payload.routes ?? []).filter((candidate) => (
+    candidate?.geometry?.coordinates?.length && Number.isFinite(candidate.distance) && Number.isFinite(candidate.duration)
+  )) : [];
 }
 
-export async function buildRouteWeather({
-  start, end, nowMs = Date.now(), fetchImpl = fetch, forecast = loadForecast({ now: nowMs }), locationList = locations,
-}) {
-  if (!validPoint(start) || !validPoint(end)) throw new Error('Choose two locations in Bangladesh.');
-  if (start.lat === end.lat && start.lon === end.lon) throw new Error('Start and end locations must be different.');
+// Points every `stepKm` along a line, so long straight highway segments are compared along their whole length.
+function densify(coordinates, stepKm) {
+  const points = [coordinates[0]];
+  for (let index = 1; index < coordinates.length; index += 1) {
+    const [a, b] = [coordinates[index - 1], coordinates[index]];
+    const count = Math.max(1, Math.ceil(distanceKm(a, b) / stepKm));
+    for (let step = 1; step <= count; step += 1) points.push([a[0] + (b[0] - a[0]) * step / count, a[1] + (b[1] - a[1]) * step / count]);
+  }
+  return points;
+}
 
-  const route = await fetchRoadRoute(start, end, fetchImpl);
+// Share of `route` that runs along `other` (within SAME_ROAD_KM).
+function sharedFraction(route, other) {
+  const coordinates = route.geometry.coordinates;
+  const along = densify(coordinates, Math.max(0.05, route.distance / 1000 / 150));
+  const road = densify(other.geometry.coordinates, 0.1);
+  const shared = along.filter((point) => road.some((roadPoint) => distanceKm(point, roadPoint) <= SAME_ROAD_KM)).length;
+  return shared / along.length;
+}
+
+// Two points to the left and right of the straight line's midpoint. Routing through them pulls OSRM onto other roads when it found no
+// alternatives of its own (common for long trips across Bangladesh).
+function viaPoints(start, end) {
+  const midLat = (start.lat + end.lat) / 2;
+  const scale = Math.cos(radians(midLat));
+  const dx = (end.lon - start.lon) * scale;
+  const dy = end.lat - start.lat;
+  return [1, -1]
+    .map((side) => ({ lon: (start.lon + end.lon) / 2 + (-dy * VIA_OFFSET * side) / scale, lat: midLat + dx * VIA_OFFSET * side }))
+    .filter(validPoint);
+}
+
+async function fetchRoadRoutes(start, end, fetchImpl) {
+  // Shortest first; the rest are offered as alternatives.
+  const direct = (await requestRoutes([start, end], fetchImpl, { alternatives: true }))
+    .sort((a, b) => a.distance - b.distance || a.duration - b.duration);
+  if (!direct.length) throw new Error('No road route was found between those locations.');
+  const kept = direct.slice(0, MAX_ROUTES);
+  if (kept.length >= MAX_ROUTES) return kept;
+
+  // A failed or empty via request only means fewer alternatives; the search itself has already succeeded.
+  const viaRoutes = (await Promise.all(viaPoints(start, end).map((via) => (
+    requestRoutes([start, via, end], fetchImpl, { alternatives: false }).catch(() => [])
+  )))).flat().sort((a, b) => a.distance - b.distance);
+  for (const candidate of viaRoutes) {
+    if (kept.length >= MAX_ROUTES) break;
+    if (candidate.distance > kept[0].distance * MAX_DETOUR) continue;
+    if (kept.some((route) => sharedFraction(candidate, route) >= MAX_SHARED)) continue;
+    kept.push(candidate);
+  }
+  return kept;
+}
+
+// One road route with weather sampled along it at the expected time of passing.
+function routeOption(route, { nowMs, forecast, locationList }) {
   const points = routeSamples(route.geometry.coordinates);
   const samples = points.map(({ coordinates, progress }) => {
     const nearest = closestLocation(coordinates, locationList);
@@ -125,8 +177,6 @@ export async function buildRouteWeather({
   const available = samples.filter((sample) => sample.place && sample.temperatureC !== null);
 
   return {
-    start: { name: String(start.name ?? ''), lat: start.lat, lon: start.lon },
-    end: { name: String(end.name ?? ''), lat: end.lat, lon: end.lon },
     coordinates: route.geometry.coordinates,
     distanceKm: Math.round(route.distance / 100) / 10,
     durationMinutes: Math.round(route.duration / 60),
@@ -146,4 +196,24 @@ export async function buildRouteWeather({
   };
 }
 
-export const routeWeatherInternals = { closestLocation, distanceKm, routeSamples, validPoint };
+export async function buildRouteWeather({
+  start, end, nowMs = Date.now(), fetchImpl = fetch, forecast = loadForecast({ now: nowMs }), locationList = locations,
+}) {
+  if (!validPoint(start) || !validPoint(end)) throw new Error('Choose two locations in Bangladesh.');
+  if (start.lat === end.lat && start.lon === end.lon) throw new Error('Start and end locations must be different.');
+
+  const routes = await fetchRoadRoutes(start, end, fetchImpl);
+  const [shortest, ...others] = routes.map((route) => routeOption(route, { nowMs, forecast, locationList }));
+
+  // The shortest route stays at the top level (as before); the other OSRM candidates follow in `alternatives`, shortest first.
+  return {
+    start: { name: String(start.name ?? ''), lat: start.lat, lon: start.lon },
+    end: { name: String(end.name ?? ''), lat: end.lat, lon: end.lon },
+    ...shortest,
+    routeCandidates: routes.length,
+    routeChoice: 'shortest-distance-among-osrm-options',
+    alternatives: others,
+  };
+}
+
+export const routeWeatherInternals = { closestLocation, distanceKm, routeSamples, sharedFraction, validPoint, viaPoints };

@@ -1,6 +1,7 @@
 import { loadAdminPage } from './loadAdminPage.js';
 import { loadAlertPage } from './loadAlertPage.js';
 import { loadMapPage } from './loadMapPage.js';
+import { loadRoutePage } from './loadRoutePage.js';
 
 // The map, alert and admin screens are separate chunks. This remembers which ones have arrived, so a screen whose code is already here is
 // rendered at once: no loading splash, and none of the extra delay React adds before it reveals content that was waiting behind a fallback.
@@ -43,4 +44,4 @@ export function createPageLoader(loaders) {
 
 export const {
   isLazyPage, loadedPage, preloadPage, prefetchPage,
-} = createPageLoader({ map: loadMapPage, alert: loadAlertPage, admin: loadAdminPage });
+} = createPageLoader({ map: loadMapPage, route: loadRoutePage, alert: loadAlertPage, admin: loadAdminPage });

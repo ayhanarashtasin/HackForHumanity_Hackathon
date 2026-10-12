@@ -102,19 +102,28 @@ const catalogue = {
   locations: [
     { pcode: '302604', name: 'Badda', nameBn: 'বাড্ডা', district: '3026', lat: 23.79, lon: 90.45, kind: 'thana', pid: null },
     { pcode: '302602', name: 'Adabor', district: '3026', lat: 23.77, lon: 90.35, kind: 'thana', pid: null },
+    { pcode: '302605', name: 'Bangshal', district: '3026', lat: 23.71, lon: 90.4, kind: 'thana', pid: null },
+    { pcode: '302609', name: 'Chak Bazar', district: '3026', lat: 23.72, lon: 90.39, kind: 'thana', pid: null },
     { pcode: '302672', name: 'Savar', district: '3026', lat: 23.85, lon: 90.26, kind: 'upazila', pid: '302672' },
   ],
   polygons: {
     302672: { name: 'Savar', kind: 'upazila', src: ['302672'], approx: false },
     X30260001: { name: 'Dhaka North City Corporation', kind: 'city-corporation', src: ['302604', '302602'], approx: false },
+    X30262000: { name: 'Dhaka South City Corporation', kind: 'city-corporation', src: ['302605', '302609'], approx: false },
     X20030004: { name: 'Karnaphuli', kind: 'upazila', src: ['302672'], approx: true },
   },
+  areas: [
+    { id: 'ADM4-test', name: 'Sample Union', parentPid: '302672', parentName: 'Savar', parentKind: 'upazila', district: '3026', lat: 23.85, lon: 90.26 },
+    { id: 'OSM-node-9026037312', name: 'Mugda', nameBn: 'মুগদা', parentPid: 'X30262000', parentName: 'Dhaka South City Corporation', parentKind: 'city corporation', district: '3026', lat: 23.72912, lon: 90.43357, boundaryApprox: true },
+  ],
 };
 const snapshot = {
   steps: ['2026-10-10T06:00:00+06:00', '2026-10-10T09:00:00+06:00'],
   locations: {
     302604: { temp: [30, 32], rf: [0, 4], ts: [0, 1] },
     302602: { temp: [32, 34], rf: [2, 0], ts: [1, 3] },
+    302605: { temp: [30, 32], rf: [0, 2], ts: [1, 1] },
+    302609: { temp: [32, 34], rf: [2, 0], ts: [2, 3] },
     302672: { temp: [28, 29], rf: [0, 0] },
   },
   districts: { 3026: { temp: [31, 33], rfMax: [2, 4], rf: [1, 2] } },
@@ -147,7 +156,22 @@ test('selections resolve to district, upazila, merged city corporation and appro
   assert.match(approximate.note, /no separate forecast for Karnaphuli.*nearest BMD location, Savar/);
   assert.equal(approximate.dailyPcode, '302672');
 
+  const area = resolveSelection({ level: 'area', id: 'ADM4-test' }, snapshot, catalogue);
+  assert.equal(area.kind, 'Local area');
+  assert.equal(area.name, 'Sample Union');
+  assert.equal(area.parent, 'Savar upazila · Dhaka district');
+  assert.match(area.note, /parent area Savar/);
+  assert.equal(valueAt(area, 'temp', 'temp', 1), 29, 'an ADM4 area uses its parent upazila forecast');
+
+  const mugda = resolveSelection({ level: 'area', id: 'OSM-node-9026037312' }, snapshot, catalogue);
+  assert.equal(mugda.parent, 'Dhaka South City Corporation · Dhaka district');
+  assert.match(mugda.note, /Mugda has no mapped boundary.*existing forecast for Dhaka South City Corporation/);
+  assert.deepEqual(mugda.series.temp, [31, 33], 'Mugda reuses the existing Dhaka South aggregate');
+  assert.equal(mugda.dailyPcode, null);
+  assert.equal(resolveSelection({ level: 'area', id: 'OSM-node-9026037312' }, snapshot, catalogue, 'bn').name, 'মুগদা');
+
   assert.equal(resolveSelection({ level: 'upazila', id: 'nope' }, snapshot, catalogue), null);
+  assert.equal(resolveSelection({ level: 'area', id: 'nope' }, snapshot, catalogue), null);
   assert.equal(resolveSelection(null, snapshot, catalogue), null);
   assert.equal(valueAt(resolveSelection({ level: 'upazila', id: '302672' }, null, catalogue), 'temp', 'temp', 0), null, 'no snapshot means no value, never zero');
 });

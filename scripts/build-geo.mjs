@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // One-time setup: builds the static geography used by the map and the lightning campaign.
 //   - Downloads the OCHA/HDX COD-AB Bangladesh boundaries (CC BY-IGO) once and caches them.
+//   - Downloads geoBoundaries Bangladesh ADM4 areas (BBS/OCHA ROAP, CC BY 3.0 IGO) once and caches them.
 //   - Joins them with BMD's 544 forecast locations (BMD uses 6-digit BBS codes, HDX uses "BD" + 8 digits).
 //   - Simplifies boundaries for the web and computes + verifies the Mode B lightning circle cover.
 // Run: npm run build:geo   (add --refresh to ignore the download cache)
@@ -19,6 +20,9 @@ const REFRESH = process.argv.includes('--refresh');
 
 const HDX_ZIP_URL =
   'https://data.humdata.org/dataset/401d3fae-4262-48c9-891f-461fd776d49b/resource/cec2abe3-d8b7-4025-9362-9f7e780f2a07/download/bgd_admin_boundaries.geojson.zip';
+const ADM4_URL =
+  'https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/9469f09592ced973a3448cf66b6100b741b64c0d/releaseData/gbOpen/BGD/ADM4/geoBoundaries-BGD-ADM4_simplified.geojson';
+const OSM_MUGDA = { id: 'OSM-node-9026037312', name: 'Mugda', nameBn: 'মুগদা', lat: 23.7291223, lon: 90.4335651 };
 const BMD_API_PAGE = 'https://api.bdservers.site/';
 const BMD_LOOKUP = 'https://usf.bmd.gov.bd';
 
@@ -75,6 +79,37 @@ function featureContains(feature, lon, lat) {
 function eachVertex(coordinates, visit) {
   if (typeof coordinates[0] === 'number') visit(coordinates[0], coordinates[1]);
   else coordinates.forEach((c) => eachVertex(c, visit));
+}
+
+function geometryBounds(geometry) {
+  const bounds = [Infinity, Infinity, -Infinity, -Infinity];
+  eachVertex(geometry.coordinates, (lon, lat) => {
+    bounds[0] = Math.min(bounds[0], lon);
+    bounds[1] = Math.min(bounds[1], lat);
+    bounds[2] = Math.max(bounds[2], lon);
+    bounds[3] = Math.max(bounds[3], lat);
+  });
+  return bounds;
+}
+
+function representativePoint(feature) {
+  const [west, south, east, north] = geometryBounds(feature.geometry);
+  const candidates = [[(west + east) / 2, (south + north) / 2]];
+  for (const polygon of geometryPolygons(feature.geometry)) {
+    const ring = polygon[0].slice(0, -1);
+    if (!ring.length) continue;
+    const average = ring.reduce(([lon, lat], point) => [lon + point[0] / ring.length, lat + point[1] / ring.length], [0, 0]);
+    candidates.push(average);
+  }
+  for (const point of candidates) if (featureContains(feature, point[0], point[1])) return point;
+
+  for (let row = 1; row < 10; row++) {
+    for (let column = 1; column < 10; column++) {
+      const point = [west + ((east - west) * column) / 10, south + ((north - south) * row) / 10];
+      if (featureContains(feature, point[0], point[1])) return point;
+    }
+  }
+  throw new Error(`Could not find an interior point for ${feature.properties.shapeName ?? 'an ADM4 area'}.`);
 }
 
 // ---------- BMD location list (PCODEs) ----------
@@ -168,6 +203,8 @@ const admin0 = readJson('bgd_admin0.geojson');
 const admin2 = readJson('bgd_admin2.geojson');
 const admin3 = readJson('bgd_admin3.geojson');
 const adminPoints = readJson('bgd_adminpoints.geojson');
+const admin4 = JSON.parse((await cached('geoboundaries_bgd_adm4.geojson', () => download(ADM4_URL))).toString('utf8'));
+if (!Array.isArray(admin4.features) || !admin4.features.length) throw new Error('The Bangladesh ADM4 boundary data contains no areas.');
 
 const bmdNames = await loadBmdLocations();
 const districtCodes = new Set([...bmdNames.keys()].map((c) => c.slice(0, 4)));
@@ -263,6 +300,62 @@ const districts = admin2.features.map((f) => {
 }).sort((a, b) => a.pcode.localeCompare(b.pcode));
 const divisions = [...new Set(districts.map((d) => d.division))].sort();
 
+// ADM4 areas use the weather series of the ADM3 parent that contains their representative point.
+const admin3WithBounds = polygonFeatures.map((feature) => ({ feature, bounds: geometryBounds(feature.geometry) }));
+const areas = admin4.features.map((feature, index) => {
+  const name = feature.properties.shapeName;
+  const id = feature.properties.shapeID ?? `BGD-ADM4-${index + 1}`;
+  if (!name) throw new Error(`ADM4 feature ${id} has no shapeName.`);
+  const [lon, lat] = representativePoint(feature);
+  const candidates = admin3WithBounds.filter(({ bounds }) => (
+    lon >= bounds[0] && lon <= bounds[2] && lat >= bounds[1] && lat <= bounds[3]
+  ));
+  const exactParent = candidates.find(({ feature: candidate }) => featureContains(candidate, lon, lat))?.feature;
+  const districtFeature = admin2.features.find((candidate) => featureContains(candidate, lon, lat));
+  const districtCode = districtFeature?.properties.adm2_pcode.replace(/^BD/, '');
+  const localParents = admin3WithBounds.filter(({ feature: candidate }) => (
+    candidate.properties.adm2_pcode.replace(/^BD/, '') === districtCode
+  ));
+  const nearest = (features) => features
+    .sort((a, b) => {
+      const center = (entry) => [
+        +(entry.feature.properties.center_lon ?? (entry.bounds[0] + entry.bounds[2]) / 2),
+        +(entry.feature.properties.center_lat ?? (entry.bounds[1] + entry.bounds[3]) / 2),
+      ];
+      const [aLon, aLat] = center(a);
+      const [bLon, bLat] = center(b);
+      return haversineKm(lat, lon, aLat, aLon) - haversineKm(lat, lon, bLat, bLon);
+    })[0]?.feature;
+  const parent = exactParent ?? nearest(candidates) ?? nearest(localParents) ?? nearest(admin3WithBounds);
+  if (!parent) throw new Error(`Could not match ADM4 area "${name}" to an upazila boundary.`);
+  return {
+    id: `ADM4-${id}`,
+    name,
+    parentPid: parent.properties.pid,
+    parentName: parent.properties.adm3_name,
+    parentKind: /city corporation/i.test(parent.properties.adm3_name) ? 'city corporation' : 'upazila',
+    parentApprox: !exactParent,
+    district: parent.properties.adm2_pcode.replace(/^BD/, ''),
+    lat: +lat.toFixed(5),
+    lon: +lon.toFixed(5),
+  };
+});
+const mugdaParent = polygonFeatures.find((feature) => feature.properties.adm3_name === 'Dhaka South City Corporation');
+if (!mugdaParent) throw new Error('Could not match Mugda to Dhaka South City Corporation.');
+areas.push({
+  id: OSM_MUGDA.id,
+  name: OSM_MUGDA.name,
+  nameBn: OSM_MUGDA.nameBn,
+  parentPid: mugdaParent.properties.pid,
+  parentName: mugdaParent.properties.adm3_name,
+  parentKind: 'city corporation',
+  parentApprox: false,
+  boundaryApprox: true,
+  district: '3026',
+  lat: OSM_MUGDA.lat,
+  lon: OSM_MUGDA.lon,
+});
+
 // ---------- simplified static boundaries ----------
 async function simplify(featureCollection, percent) {
   const output = await mapshaper.applyCommands(
@@ -292,6 +385,25 @@ const nationalGeo = await simplify({
   type: 'FeatureCollection',
   features: admin0.features.map((f) => ({ type: 'Feature', properties: { name: 'Bangladesh' }, geometry: f.geometry })),
 }, 3);
+const areaGeo = await simplify({
+  type: 'FeatureCollection',
+  features: admin4.features.map((feature, index) => ({
+    type: 'Feature',
+    properties: { pid: areas[index].id, name: areas[index].name, parentPid: areas[index].parentPid, parentApprox: areas[index].parentApprox },
+    geometry: feature.geometry,
+  })),
+}, 1);
+areaGeo.features.push({
+  type: 'Feature',
+  properties: {
+    pid: OSM_MUGDA.id,
+    name: OSM_MUGDA.name,
+    parentPid: mugdaParent.properties.pid,
+    parentApprox: false,
+    boundaryApprox: true,
+  },
+  geometry: { type: 'Point', coordinates: [OSM_MUGDA.lon, OSM_MUGDA.lat] },
+});
 
 // ---------- Mode B lightning circles ----------
 const bounds = { minLat: 90, maxLat: -90, minLon: 180, maxLon: -180 };
@@ -333,9 +445,20 @@ const generated = new Date().toISOString();
 const meta = {
   generated,
   boundaries: 'OCHA/HDX COD-AB Bangladesh (CC BY-IGO), BBS-sourced',
+  areaBoundaries: {
+    source: 'geoBoundaries BGD ADM4, BBS/OCHA ROAP',
+    yearRepresented: 2020,
+    license: 'CC BY 3.0 IGO',
+    url: 'https://www.geoboundaries.org/api/current/gbOpen/BGD/ADM4/',
+  },
+  approximateAreaPoints: [{ name: OSM_MUGDA.name, source: 'OpenStreetMap', license: 'ODbL 1.0', url: 'https://www.openstreetmap.org/node/9026037312' }],
   counts: {
     upazilaPolygons: upazilaPolygonCount,
     cityCorporationPolygons: ccCount,
+    admin4Areas: admin4.features.length,
+    additionalAreaLocations: areas.length - admin4.features.length,
+    admin4ParentMatchesApproximate: areas.filter((area) => area.parentApprox).length,
+    areasWithoutBoundary: areas.filter((area) => area.boundaryApprox).length,
     districts: districts.length,
     divisions: divisions.length,
     bmdLocations: locations.length,
@@ -352,8 +475,9 @@ const write = (dir, name, data) => fs.writeFile(path.join(dir, name), typeof dat
 
 await write(CLIENT_OUT, 'bd-upazila.geojson', upazilaGeo);
 await write(CLIENT_OUT, 'bd-district.geojson', districtGeo);
+await write(CLIENT_OUT, 'bd-admin4.geojson', areaGeo);
 await write(CLIENT_OUT, 'bd-national.geojson', nationalGeo);
-const catalogue = { meta, divisions, districts, locations, polygons };
+const catalogue = { meta, divisions, districts, locations, polygons, areas };
 await write(CLIENT_OUT, 'locations.json', catalogue);
 await write(SERVER_OUT, 'locations.json', catalogue);
 await write(SERVER_OUT, 'lightning-circles.json', {
@@ -372,4 +496,4 @@ console.table(meta.counts);
 console.log(`Lightning Mode B cover: ${centers.length} circles @ ${API_RADIUS_KM} km, farthest boundary vertex ${worstKm.toFixed(1)} km from a centre (${allVertices.length.toLocaleString()} vertices checked)`);
 console.log(`Lightning Mode A locations: ${upazilaCenters.length} upazila centres`);
 console.log(`Bangla names: ${upazilaBn.size} upazilas, ${districtBn.size} districts`);
-console.log(`client/public/data: upazila ${await kb(CLIENT_OUT, 'bd-upazila.geojson')}, district ${await kb(CLIENT_OUT, 'bd-district.geojson')}, national ${await kb(CLIENT_OUT, 'bd-national.geojson')}, locations ${await kb(CLIENT_OUT, 'locations.json')}`);
+console.log(`client/public/data: ADM4 ${await kb(CLIENT_OUT, 'bd-admin4.geojson')}, upazila ${await kb(CLIENT_OUT, 'bd-upazila.geojson')}, district ${await kb(CLIENT_OUT, 'bd-district.geojson')}, national ${await kb(CLIENT_OUT, 'bd-national.geojson')}, locations ${await kb(CLIENT_OUT, 'locations.json')}`);

@@ -33,7 +33,7 @@ const pageFromApp = (pathname, hash = '') => {
 
 test('index.html picks the same page as the app for every path and for old shared map links', () => {
   assert.ok(inlineScript, 'the inline script exists');
-  const paths = ['/', '', '/map', '/map/', '/alert', '/alert/', '/admin', '/admin/', '/admin/login', '/admin/login/', '/administrator', '/maps', '/nope', '/map/extra', '//'];
+  const paths = ['/', '', '/map', '/map/', '/route', '/route/', '/alert', '/alert/', '/admin', '/admin/', '/admin/login', '/admin/login/', '/administrator', '/maps', '/nope', '/map/extra', '//'];
   const hashes = ['', '#features', '#top', '#view=23.7,90.4,8z', '#layer=rain', '#o=radar', '#a=1&view=1', '#xview=1', '#view', '#vie=2'];
   for (const path of paths) {
     for (const hash of hashes) assert.equal(pageFromBoot(path, hash), pageFromApp(path, hash), `${path}${hash}`);
@@ -42,7 +42,7 @@ test('index.html picks the same page as the app for every path and for old share
 
 test('the browser bar colour follows the page: olive over the map, Soft White everywhere else', () => {
   assert.match(html, /<meta name="theme-color" content="#2E3D28"/, 'olive until the early script says otherwise');
-  for (const [path, hash, expected] of [['/', '', '#E8E9DF'], ['/alert', '', '#E8E9DF'], ['/admin/login', '', '#E8E9DF'], ['/map', '', '#2E3D28'], ['/', '#view=1,2,7z', '#2E3D28'], ['/nope', '', '#E8E9DF']]) {
+  for (const [path, hash, expected] of [['/', '', '#E8E9DF'], ['/route', '', '#E8E9DF'], ['/alert', '', '#E8E9DF'], ['/admin/login', '', '#E8E9DF'], ['/map', '', '#2E3D28'], ['/', '#view=1,2,7z', '#2E3D28'], ['/nope', '', '#E8E9DF']]) {
     assert.equal(bootResult(path, hash).themeColor, expected, `${path}${hash}`);
   }
 });
@@ -51,7 +51,7 @@ test('the first frame is painted in the right colours before any stylesheet or s
   assert.ok(inlineStyle, 'the critical style exists');
   // Deep Olive only for the map; Soft White for every page that scrolls
   assert.match(inlineStyle, /html\s*\{\s*background:\s*#2E3D28/i);
-  assert.match(inlineStyle, /html\[data-page='landing'\],\s*html\[data-page='alert'\],\s*html\[data-page='admin'\]\s*\{\s*background:\s*#E8E9DF/i);
+  assert.match(inlineStyle, /html\[data-page='landing'\],\s*html\[data-page='route'\],\s*html\[data-page='alert'\],\s*html\[data-page='admin'\]\s*\{\s*background:\s*#E8E9DF/i);
   // the script that sets data-page runs before the stylesheet and the app
   assert.ok(html.indexOf('<script>') < html.indexOf('<style>'), 'data-page is set before the first style is read');
   assert.ok(html.indexOf('<script>') < html.indexOf('type="module"'));
