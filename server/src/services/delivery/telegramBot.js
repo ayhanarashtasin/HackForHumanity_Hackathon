@@ -12,7 +12,7 @@ import {
 import { consumeTelegramLink, telegramLanguage, unlinkTelegramChat } from './linking.js';
 
 // The bot's side of the conversation. /start <code> connects this chat to an alert profile, /stop disconnects it, /help lists the commands,
-// and the weather commands (/update, /heat, /rain, /wind, /thunderstorm, /lightning, /forecast, /alerts, /status) answer from the stored
+// and the weather commands (/update, /heat, /rain, /wind, /thunderstorm, /lightning, /forecast, /route, /alerts, /status) answer from the stored
 // forecast (botReports/). Anything else gets the help text. It never asks for or stores a name, number or location.
 const WEB = () => esc(`${env.channels.publicUrl}/alert`);
 

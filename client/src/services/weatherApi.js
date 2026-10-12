@@ -9,6 +9,12 @@ export const weatherApi = {
   lightningStatus: (signal) => request('/lightning/status', { signal }),
   lightningSummaries: (signal) => request('/lightning/summaries', { signal }),
   lightningForUpazila: (pcode, signal) => request(`/lightning/upazila/${pcode}`, { signal }),
+  route: (start, end, signal) => request('/weather/route', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ start, end }),
+    signal,
+  }),
 };
 
 export async function loadCatalogue(signal) {

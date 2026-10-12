@@ -5,15 +5,24 @@ import { findPlaces, placeById, placesForAreas } from './places.js';
 import { forecastFor } from './readings.js';
 import {
   COMMAND_NAMES, buttonsFor, renderAlerts, renderAmbiguous, renderAskPlace, renderForecast, renderHeat, renderLightning, renderNotFound, renderRain,
-  renderStatus, renderThunderstorm, renderUpdate, renderWind,
+  renderRoute, renderRoutePlaceError, renderRoutePrompt, renderStatus, renderThunderstorm, renderUpdate, renderWind,
 } from './text.js';
 
 // The bot's weather commands: parse the message, find the person's language and place, read the stored forecast, word the reply.
 // A command never calls a weather provider, never stores anything about the person and never puts profile answers (work, crop, shift)
 // into a reply: the only profile fact used is the saved area, and only to choose where to look.
-export const REPORT_COMMANDS = new Set(['update', 'heat', 'rain', 'wind', 'thunderstorm', 'lightning', 'forecast']);
+export const REPORT_COMMANDS = new Set(['update', 'heat', 'rain', 'wind', 'thunderstorm', 'lightning', 'forecast', 'route']);
 export const ALL_COMMANDS = new Set(COMMAND_NAMES);
 const ALIASES = new Map([['weather', 'update'], ['thunder', 'thunderstorm'], ['storm', 'thunderstorm'], ['days', 'forecast']]);
+
+function splitRouteQuery(query) {
+  const match = String(query).match(/\s+(?:to|theke|থেকে|->|→)\s+/i);
+  if (!match) return null;
+  const index = match.index;
+  const start = query.slice(0, index).trim();
+  const end = query.slice(index + match[0].length).trim();
+  return start && end ? { start, end } : null;
+}
 
 // "/heat@AkshSathiBot" -> "heat"; aliases are folded in; anything that is not a weather command gives null.
 export function canonicalCommand(word) {
@@ -96,6 +105,24 @@ export async function answerCommand({
   if (command === 'status') {
     const engine = await deps.engineStatus();
     return { messages: [{ text: renderStatus({ lang, nowMs, statuses: (deps.statuses ?? allStatuses)(nowMs), engine }) }], action: 'status', lang };
+  }
+
+  if (command === 'route') {
+    const routeQuery = splitRouteQuery(parsed.query);
+    if (!routeQuery) return { messages: [{ text: renderRoutePrompt(lang) }], action: 'ask-route', lang };
+    const from = findPlaces(routeQuery.start);
+    if (from.matches.length !== 1) return { messages: [{ text: renderRoutePlaceError(lang, routeQuery.start, from.matches) }], action: from.matches.length ? 'ambiguous-start' : 'not-found-start', lang };
+    const to = findPlaces(routeQuery.end);
+    if (to.matches.length !== 1) return { messages: [{ text: renderRoutePlaceError(lang, routeQuery.end, to.matches) }], action: to.matches.length ? 'ambiguous-end' : 'not-found-end', lang };
+    try {
+      const route = await deps.routeWeather({ start: from.matches[0], end: to.matches[0], nowMs });
+      return { messages: [{ text: renderRoute(route, { lang, nowMs }) }], action: 'route', lang };
+    } catch (error) {
+      const text = /No road route|Route service/.test(error?.message)
+        ? error.message
+        : renderRoutePrompt(lang);
+      return { messages: [{ text }], action: 'route-error', lang };
+    }
   }
 
   let places;

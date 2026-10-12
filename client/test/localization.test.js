@@ -48,6 +48,13 @@ test('whole-sentence translation supports Bangla order, numbers, identifiers, an
   assert.equal(translate('bn', null), null);
 });
 
+test('route planner labels, summaries and errors translate with Bangla digits', () => {
+  assert.equal(translate('bn', 'Route weather', {}, MAP), 'পথের আবহাওয়া');
+  assert.equal(translate('bn', '{distance} km · about {duration}', { distance: 273.0, duration: '3 ঘণ্টা 34 মিনিট' }, MAP), '২৭৩ কিমি · আনুমানিক 3 ঘণ্টা 34 মিনিট');
+  assert.equal(translate('bn', 'Route service is unavailable. Please try again.', {}, MAP), 'পথ খোঁজার সেবা পাওয়া যাচ্ছে না। আবার চেষ্টা করুন।');
+  assert.equal(translate('en', 'Show route weather'), 'Show route weather');
+});
+
 test('weather signs and descriptions are translated, while unknown diagnostics fail clearly in either language', () => {
   for (const text of [...Object.values(WMO_LABELS), ...Object.values(SIGN_LAYERS).flatMap((layer) => [layer.label, layer.note])]) {
     assert.notEqual(translate('bn', text, {}, MAP), text, text);

@@ -6,6 +6,7 @@ import { circlesCovering } from '../../alerts/lightningGate.js';
 import { effectiveLightningStatus, loadSnapshots } from '../../alerts/snapshots.js';
 import { buildUpazilaSummaries, loadGeoData } from '../../lightningCampaign.js';
 import { subscriberForChat } from '../linking.js';
+import { buildRouteWeather } from '../../routeWeather.js';
 import { representativePcode } from './places.js';
 import { chooseLightning, loadForecast } from './readings.js';
 
@@ -83,6 +84,7 @@ export async function engineStatus() {
 // Tests replace any of these.
 export const defaultDeps = {
   loadForecast,
+  routeWeather: buildRouteWeather,
   subscriberForChat,
   lightningFor,
   alertsFor,

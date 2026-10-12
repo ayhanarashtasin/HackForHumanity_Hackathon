@@ -1,4 +1,4 @@
-import { AttributionControl, LngLat, MapLibreMap, NavigationControl, setWorkerUrl } from 'maplibre-gl';
+import { AttributionControl, LngLat, LngLatBounds, MapLibreMap, NavigationControl, setWorkerUrl } from 'maplibre-gl';
 import { circlePolygon, clampToBounds, imageCoordinates, outsideMask } from '../lib/geometry.js';
 import { registerIcons } from '../lib/icons.js';
 import { LABELS_ANCHOR, buildBaseStyle } from '../lib/mapStyle.js';
@@ -158,6 +158,7 @@ export class WeatherMap {
     map.addSource('selection', { type: 'geojson', data: EMPTY });
     map.addSource('lightning', { type: 'geojson', data: EMPTY });
     map.addSource('user-position', { type: 'geojson', data: EMPTY });
+    map.addSource('route', { type: 'geojson', data: EMPTY });
 
     const before = LABELS_ANCHOR;
     const add = (layer, beforeId = before) => map.addLayer(layer, beforeId);
@@ -235,6 +236,9 @@ export class WeatherMap {
       id: 'user-position-dot', type: 'circle', source: 'user-position', filter: ['==', ['geometry-type'], 'Point'],
       paint: { 'circle-radius': 6, 'circle-color': PALETTE.olive, 'circle-stroke-color': PALETTE.cream, 'circle-stroke-width': 3 },
     });
+    map.addLayer({ id: 'route-casing', type: 'line', source: 'route', filter: ['==', ['get', 'role'], 'path'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': PALETTE.cream, 'line-width': 8, 'line-opacity': 0.95 } });
+    map.addLayer({ id: 'route-line', type: 'line', source: 'route', filter: ['==', ['get', 'role'], 'path'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': PALETTE.sage, 'line-width': 4.5 } });
+    map.addLayer({ id: 'route-points', type: 'circle', source: 'route', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 7, 'circle-color': PALETTE.sage, 'circle-stroke-color': PALETTE.cream, 'circle-stroke-width': 3 } });
 
     map.on('click', (event) => this.onClick(event));
     map.on('mousemove', (event) => this.onMouseMove(event));
@@ -617,6 +621,23 @@ export class WeatherMap {
       features.unshift({ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: circlePolygon(position.lat, position.lon, position.accuracy / 1000) } });
     }
     this.map.getSource('user-position').setData({ type: 'FeatureCollection', features });
+  }
+
+  setRoute(route) {
+    if (!this.ready) return;
+    const features = route?.coordinates?.length ? [
+      { type: 'Feature', properties: { role: 'path' }, geometry: { type: 'LineString', coordinates: route.coordinates } },
+      { type: 'Feature', properties: { role: 'endpoint' }, geometry: { type: 'Point', coordinates: [route.start.lon, route.start.lat] } },
+      { type: 'Feature', properties: { role: 'endpoint' }, geometry: { type: 'Point', coordinates: [route.end.lon, route.end.lat] } },
+    ] : [];
+    this.map.getSource('route').setData({ type: 'FeatureCollection', features });
+    if (features.length) this.fitRoute(route.coordinates);
+  }
+
+  fitRoute(coordinates) {
+    if (!coordinates?.length) return;
+    const bounds = coordinates.reduce((result, coordinate) => result.extend(coordinate), new LngLatBounds(coordinates[0], coordinates[0]));
+    this.map.fitBounds(bounds, { padding: viewPadding(this.map.getContainer()), maxZoom: 10, duration: 800 });
   }
 
   flyTo({ lat, lon, zoom }) {

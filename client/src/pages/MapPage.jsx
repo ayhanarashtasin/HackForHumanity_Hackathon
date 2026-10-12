@@ -6,6 +6,7 @@ import { LightningPanel } from '../components/LightningPanel.jsx';
 import { Link } from '../components/Link.jsx';
 import { LocationPanel } from '../components/LocationPanel.jsx';
 import { LocationAccess } from '../components/LocationAccess.jsx';
+import { RoutePlanner } from '../components/RoutePlanner.jsx';
 import { LogoMark } from '../components/Logo.jsx';
 import { MapView } from '../components/MapView.jsx';
 import { SearchBox } from '../components/SearchBox.jsx';
@@ -70,6 +71,7 @@ export default function MapPage() {
   const [selectedTime, setSelectedTime] = useState(null);
   const [playing, setPlaying] = useState(false);
   const [selection, setSelection] = useState(null);
+  const [routeResult, setRouteResult] = useState(null);
   const [hover, setHover] = useState(null);
   const [flyRequest, setFlyRequest] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -340,6 +342,7 @@ export default function MapPage() {
               radarItems={radarItems}
               satelliteSpec={satelliteSpec}
               lightning={lightning}
+              route={routeResult}
               selection={selection}
               flyRequest={flyRequest}
               userPosition={location.match ? location.position : null}
@@ -356,6 +359,7 @@ export default function MapPage() {
           </div>
 
           {bannerText && <p className="banner" role="status">{tr(bannerText)}</p>}
+          <RoutePlanner catalogue={catalogue} onRoute={setRouteResult} onInteraction={() => setHover(null)} />
           <div className={`right-stack${showLightningPanel ? ' with-lightning' : ''}`}>
             <LayerMenu
               open={menuOpen}

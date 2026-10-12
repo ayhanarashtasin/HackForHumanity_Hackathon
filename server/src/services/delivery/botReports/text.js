@@ -17,7 +17,7 @@ import {
 const MAX_LENGTH = 3800;
 const MAX_TIMELINE_LINES = 4;
 
-export const COMMAND_NAMES = ['update', 'heat', 'rain', 'wind', 'thunderstorm', 'lightning', 'forecast', 'alerts', 'status'];
+export const COMMAND_NAMES = ['update', 'heat', 'rain', 'wind', 'thunderstorm', 'lightning', 'forecast', 'route', 'alerts', 'status'];
 
 export const esc = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const bold = (value) => `<b>${esc(value)}</b>`;
@@ -508,6 +508,7 @@ const COMMAND_HELP = {
     ['thunderstorm', 'thunderstorm outlook'],
     ['lightning', 'lightning that was recorded'],
     ['forecast', 'the days ahead'],
+    ['route', 'weather between two places'],
     ['alerts', 'your active alerts'],
     ['status', 'how fresh the data is'],
   ],
@@ -519,6 +520,7 @@ const COMMAND_HELP = {
     ['thunderstorm', 'বজ্রঝড়ের পূর্বাভাস'],
     ['lightning', 'রেকর্ড হওয়া বজ্রপাত'],
     ['forecast', 'আগামী দিনগুলো'],
+    ['route', 'দুই জায়গার মাঝের আবহাওয়া'],
     ['alerts', 'আপনার সক্রিয় সতর্কবার্তা'],
     ['status', 'তথ্য কতটা নতুন'],
   ],
@@ -538,8 +540,8 @@ export function renderHelp(lang, { webUrl = env.channels.publicUrl } = {}) {
       list,
       '',
       T.s(
-        'Example: /heat Badda\nNo place name → your saved area.\nLanguage: add bn or en.',
-        'উদাহরণ: /heat বাড্ডা\nএলাকার নাম না দিলে → সংরক্ষিত এলাকা।\nভাষা: শেষে bn বা en লিখুন।',
+        'Example: /heat Badda\n/route Savar to Chattogram\nNo place name → your saved area.\nLanguage: add bn or en.',
+        'উদাহরণ: /heat বাড্ডা\n/route Savar থেকে Chattogram\nএলাকার নাম না দিলে → সংরক্ষিত এলাকা।\nভাষা: শেষে bn বা en লিখুন।',
       ),
       '',
       T.s(
@@ -565,6 +567,45 @@ export function renderNotFound(lang, query) {
     `I could not find a place called "${esc(query)}".\nTry an upazila, thana or district, e.g. Badda or Savar, Dhaka.`,
     `"${esc(query)}" নামে কোনো জায়গা পাইনি।\nউপজেলা, থানা বা জেলার নাম দিন, যেমন বাড্ডা বা Savar, Dhaka।`,
   );
+}
+
+export function renderRoutePrompt(lang) {
+  const T = makeText(lang, 0);
+  return T.s('Add both places, for example: /route Savar to Chattogram', 'দুই জায়গার নাম দিন, যেমন: /route Savar থেকে Chattogram');
+}
+
+export function renderRoutePlaceError(lang, query, matches = []) {
+  const T = makeText(lang, 0);
+  const suggestions = matches.map((place) => {
+    const parent = parentOf(place);
+    const parentName = parent ? (T.L === 'bn' ? parent.nameBn || parent.name : parent.name) : '';
+    return parentName ? `${nameOf(place, T.L)}, ${parentName}` : nameOf(place, T.L);
+  });
+  if (suggestions.length) {
+    return T.s(`More than one place matches "${esc(query)}". Add its district: ${suggestions.join('; ')}`, `"${esc(query)}" একাধিক জায়গার সঙ্গে মেলে। জেলার নাম যোগ করুন: ${suggestions.join('; ')}`);
+  }
+  return T.s(`I could not find "${esc(query)}". Use an upazila, thana or district name.`, `"${esc(query)}" খুঁজে পাইনি। উপজেলা, থানা বা জেলার নাম দিন।`);
+}
+
+export function renderRoute(route, { lang, nowMs }) {
+  const T = makeText(lang, nowMs);
+  const { summary } = route;
+  const duration = route.durationMinutes < 60
+    ? T.s(`${T.n(route.durationMinutes)} min`, `${T.n(route.durationMinutes)} মিনিট`)
+    : T.s(`${T.n(Math.floor(route.durationMinutes / 60))} h ${T.n(route.durationMinutes % 60)} min`, `${T.n(Math.floor(route.durationMinutes / 60))} ঘণ্টা ${T.n(route.durationMinutes % 60)} মিনিট`);
+  const lines = [
+    bold(T.s('Fastest road route · weather summary', 'দ্রুততম সড়কপথ · আবহাওয়ার সারাংশ')),
+    `${esc(route.start.name)} → ${esc(route.end.name)} · ${T.n(route.distanceKm, 1)} km · ${duration}`,
+    `${T.s('Heat index', 'হিট ইনডেক্স')}: ${T.c(summary.maxHeatIndexC)}`,
+    `${T.s('Rain', 'বৃষ্টি')}: ${T.mm(summary.maxRainMm)} · ${T.s('chance', 'সম্ভাবনা')} ${T.pct(summary.maxRainChancePct)}`,
+    `${T.s('Strongest wind', 'সর্বোচ্চ বাতাস')}: ${T.kph(summary.maxWindKph)}`,
+    `${T.s('Thunderstorm potential', 'বজ্রঝড়ের সম্ভাবনা')}: ${T.n(summary.maxThunderPotential)}/3`,
+    T.s(`Forecast coverage: ${T.n(summary.coveredCount)} of ${T.n(summary.sampleCount)} route samples.`, `পূর্বাভাসের আওতা: পথে ${T.n(summary.sampleCount)}টি নমুনার ${T.n(summary.coveredCount)}টি।`),
+  ];
+  if (summary.rainUnitUnverified) lines.push(`⚠ ${T.s('BMD rain units have not been verified.', 'BMD-এর বৃষ্টির একক যাচাই করা হয়নি।')}`);
+  if (summary.forecastStatus !== 'ok') lines.push(`⚠ ${T.s('Some route forecast data is stale or unavailable.', 'পথের কিছু পূর্বাভাস পুরনো বা পাওয়া যাচ্ছে না।')}`);
+  lines.push(italic(T.s('Model forecast, not station readings. Conditions between sampled locations may differ.', 'এটি মডেলের পূর্বাভাস, স্টেশনের সরাসরি মাপ নয়। নমুনার মাঝের আবহাওয়া ভিন্ন হতে পারে।')));
+  return fit(lines.join('\n'));
 }
 
 export function renderAmbiguous(lang, matches, total, command) {

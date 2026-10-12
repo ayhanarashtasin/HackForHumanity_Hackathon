@@ -60,6 +60,36 @@
 .sidebar-location-message { margin: 16px 20px 0 !important; }
 .map-toolbar { position: absolute; top: 16px; left: 16px; right: 16px; display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; pointer-events: none; z-index: 5; }
 .map-toolbar > * { pointer-events: auto; }
+.route-planner { position: absolute; top: 78px; left: 16px; z-index: 7; }
+.route-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; padding: 0 14px; border: 1px solid var(--map-rule); color: var(--olive); font-size: .78rem; font-weight: 650; box-shadow: var(--shadow); }
+.route-toggle:hover { background: var(--sage-soft); }
+.route-panel { width: min(360px, calc(100vw - 64px)); max-height: min(620px, calc(100dvh - 350px)); overflow-y: auto; margin-top: 8px; padding: 16px; border: 1px solid var(--map-rule); box-shadow: var(--shadow); }
+.route-panel > header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+.route-panel > header strong, .route-panel > header small { display: block; }
+.route-panel > header strong { font-size: .9rem; }
+.route-panel > header small { margin-top: 3px; color: var(--map-muted); font-size: .6875rem; }
+.route-close { width: 36px; height: 36px; border: 0; border-radius: 8px; background: transparent; font-size: 1.3rem; }
+.route-panel form { display: grid; gap: 10px; }
+.route-field { position: relative; display: grid; gap: 5px; }
+.route-field label { font-size: .72rem; font-weight: 650; }
+.route-field input { width: 100%; min-height: 44px; padding: 9px 11px; border: 1px solid var(--map-rule); border-radius: 9px; color: var(--olive); background: var(--cream); font-size: .78rem; }
+.route-results { position: absolute; top: calc(100% + 3px); left: 0; right: 0; z-index: 3; max-height: 220px; overflow-y: auto; margin: 0; padding: 4px; list-style: none; border: 1px solid var(--map-rule); border-radius: 9px; background: var(--cream-strong); box-shadow: var(--shadow); }
+.route-results button { display: grid; gap: 3px; width: 100%; min-height: 48px; padding: 7px 9px; border: 0; border-radius: 6px; background: transparent; text-align: left; }
+.route-results button:hover { background: var(--sage-soft); }
+.route-results button span { font-size: .77rem; font-weight: 600; }
+.route-results button em { font-style: normal; font-weight: 400; }
+.route-results button small { color: var(--map-muted); font-size: .6875rem; }
+.route-submit { min-height: 44px; border: 1px solid var(--olive); border-radius: 9px; color: var(--cream); background: var(--olive); font-size: .78rem; font-weight: 650; }
+.route-submit:disabled { opacity: .55; cursor: not-allowed; }
+.route-error { margin: 10px 0 0; padding: 9px; border-radius: 8px; color: var(--olive); background: rgba(216, 123, 73, .14); font-size: .72rem; line-height: 1.5; }
+.route-summary { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--map-rule); }
+.route-stats { font-size: .82rem; font-weight: 700; }
+.route-summary dl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.route-summary dl div { min-width: 0; padding: 8px; border-radius: 8px; background: rgba(169, 190, 135, .14); }
+.route-summary dt { color: var(--map-muted); font-size: .6875rem; }
+.route-summary dd { margin-top: 4px; font-size: .78rem; font-weight: 650; overflow-wrap: anywhere; }
+.route-coverage, .route-disclaimer, .route-provider-note { margin-top: 10px; color: var(--map-muted); font-size: .6875rem; line-height: 1.55; }
+.route-disclaimer { padding-top: 9px; border-top: 1px solid var(--map-rule); }
 .map-context { display: flex; gap: 10px; align-items: center; padding: 10px 14px; min-height: 52px; max-width: calc(100% - 110px); }
 .map-context > svg { flex: none; }
 .map-context strong { display: block; font-size: .85rem; line-height: 1.3; }
@@ -222,6 +252,8 @@
   .location-access { max-width: 440px; margin: 0 auto; padding: 28px 24px; }
   .location-access h2 { max-width: 300px; }
   .map-toolbar { top: 12px; left: 12px; right: 12px; gap: 8px; }
+  .route-planner { top: 70px; left: 12px; }
+  .route-panel { width: min(340px, calc(100vw - 44px)); max-height: min(560px, calc(100dvh - 350px)); }
   .map-context { padding: 9px 11px; min-height: 48px; max-width: calc(100% - 104px); }
   .map-context strong { font-size: .78rem; }
   .map-context span { font-size: 0.6875rem; }

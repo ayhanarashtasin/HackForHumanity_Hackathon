@@ -34,11 +34,11 @@ AkashSathi, meaning "sky companion," helps people understand how local weather m
 
 | Capability | Description |
 | --- | --- |
-| Interactive weather map | Temperature, computed heat index, rainfall, wind, and thunderstorm potential across 64 districts and 544 BMD forecast locations, with radar and satellite overlays. |
+| Interactive weather map | Temperature, computed heat index, rainfall, wind, and thunderstorm potential across 64 districts and 544 BMD forecast locations, with radar, satellite, and automatic route-weather summaries. |
 | Occupation-aware alerts | Scenario-based guidance using a subscriber's occupation, selected areas, activity, and work context. Cards include severity, evidence, source, validity, and recommended actions. |
 | Anonymous profiles | Browser-based registration without an account, name, email address, or phone number. Profiles support editing, pausing, deletion, and temporary activity changes. |
 | Optional external delivery | Telegram, WhatsApp, and SMS copies of inbox alerts, with verified connections, quiet hours, delivery limits, and retries. |
-| Telegram weather reports | English and Bangla weather commands, interactive report buttons, and a scheduled morning forecast for connected profiles. |
+| Telegram weather reports | English and Bangla weather commands, including `/route start to destination`, interactive report buttons, and a scheduled morning forecast for connected profiles. |
 | Administrator dashboard | Alert previews, manual declarations, messages, withdrawals, severity holds, hazard switches, delivery health, and isolated demo audiences. |
 | Bilingual interface | Persistent বাংলা / English switching across public and admin screens, localized dates and numbers, and a self-hosted Bengali font with responsive text layouts. |
 | Cached forecasts and history | Background collection, persisted snapshots, per-source freshness indicators, and compact district-level forecast history. |
@@ -202,9 +202,12 @@ For a demonstration, use **Settings** to create a demo audience in a selected up
 - **Radar:** Dhaka and Rangpur BMD radar, with 10-minute frames covering the last three hours.
 - **Satellite:** Himawari-9 infrared and visible imagery via NASA GIBS; imagery is delayed, not instantaneous.
 - **Timeline:** switch between imagery playback and three-hourly forecasts for approximately four days.
+- **Route weather:** choose a start and destination from the Bangladesh place list. The app selects the fastest driving route automatically, draws it on the map, and summarizes heat index, rain, wind, and thunderstorm potential along the journey. The route service receives the selected place coordinates; this is a fastest-road route, not a weather-optimized route.
+- **Telegram route report:** send `/route Savar to Chattogram` or `/route Savar থেকে Chattogram`. The bot returns estimated distance/time and weather at sampled route locations. Add the district when a place name is ambiguous.
 - **Search and sharing:** search in English or Bangla; the URL hash preserves the map view and selected layers. Legacy `/#view=...` links redirect to `/map`.
 - **Language:** search, controls, tooltips, and area details support Bangla. Map canvas labels remain English because the hosted glyphs and WebGL text shaping do not support Bengali reliably. Delivered messages and official quotations retain their original language; Bengali copy still needs fluent-human review.
 - **Data interpretation:** grey means no data. Forecasts are not station observations, thunderstorm potential is not a detected strike, and computed heat index is not an on-site WBGT measurement.
+- **Route provider:** road geometry comes from the public OSRM routing service. It can be unavailable and has no project-controlled uptime; route distances, ETAs, and sampled weather are estimates.
 
 ## Architecture
 
