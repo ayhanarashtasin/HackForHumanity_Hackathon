@@ -282,7 +282,9 @@ Weather commands are available with or without a connected profile and read stor
 
 | Command | Report |
 | --- | --- |
-| `/update [place]` | Current three-hour forecast step, next 12 hours, latest lightning check, stale-data warnings when applicable, and report buttons. |
+| `/update [place]` | Current three-hour forecast step, next 12 hours, latest lightning check, stale-data warnings when applicable, and report buttons. Without a place it prefers the recently shared area, then saved areas; it offers a one-time location-share button when using saved areas. |
+| `/follow` | In a linked private chat, ask for a live location share within five minutes to follow movement for alerts. |
+| `/unfollow` | Stop Telegram location following without disconnecting saved-area alerts. |
 | `/heat [place]` | Temperature, heat index, next-24-hour peak, category, and practical guidance. |
 | `/rain [place]` | Next-24-hour total and wettest interval, plus a three-hourly timeline for the next 12 hours with rainfall probability. |
 | `/wind [place]` | Wind, gusts, and the strongest forecast gust in the next 24 hours. |
@@ -292,7 +294,7 @@ Weather commands are available with or without a connected profile and read stor
 | `/alerts` | Active inbox alerts for the connected profile. |
 | `/status` | Source freshness and the alert engine's latest run. |
 
-Examples: `/heat Badda`, `/rain বাড্ডা`, `/wind Savar, Dhaka`, or `/forecast Badda bn`. Places may be upazilas, city thanas, districts, or city corporations; ambiguous names return candidates. Connected chats can omit the place to use up to two saved areas. Aliases include `/weather`, `/thunder`, `/storm`, and `/days`.
+Examples: `/heat Badda`, `/rain বাড্ডা`, `/wind Savar, Dhaka`, or `/forecast Badda bn`. Places may be upazilas, city thanas, districts, or city corporations; ambiguous names return candidates. A connected chat without a typed place uses a fresh current area, otherwise up to two saved areas. A one-time Telegram location share answers a weather report only; it does not turn on tracking. `/follow` requires explicitly sharing **Live Location** through Telegram's location attachment; edited live updates refresh a short-lived area code (15-minute expiry) for relevant personal alerts, never raw coordinates. Stop Telegram sharing or send `/unfollow` to end it. The bot cannot read GPS merely because `/update` was sent, and its checks still use cached forecasts. Aliases include `/weather`, `/thunder`, `/storm`, and `/days`.
 
 A trailing `bn` or `en` selects the language; otherwise the bot uses profile, place-script, or Telegram language preferences. Compact report headings identify forecasts, stale data carries an update-time warning, and `/status` lists source freshness and age. Missing values are never presented as zero, and "no active alert" is not an all-clear. Rain amounts prefer current Open-Meteo data because BMD rainfall units remain unconfirmed. The default request limit is 30 commands per chat per 10 minutes (`TELEGRAM_COMMAND_LIMIT`).
 

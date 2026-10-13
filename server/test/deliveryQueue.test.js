@@ -590,8 +590,9 @@ dbTest('the weather commands for a connected chat use its saved area and active 
   const inputs = forecastInputs();
   const deps = { ...defaultDeps, loadForecast: () => loadForecast({ ...inputs, now: FORECAST_NOW }) };
   const ask = async (text, updateId, language) => {
+    const next = channels.telegram.sent.length;
     await handleTelegramUpdate({ update_id: updateId, message: { chat: { id: 4242, type: 'private' }, text, from: { language_code: language } } }, { channels, deps, now: new Date(now) });
-    return channels.telegram.sent.at(-1).content;
+    return channels.telegram.sent[next].content;
   };
 
   const update = await ask('/update', 10);

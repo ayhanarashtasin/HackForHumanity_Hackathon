@@ -68,6 +68,7 @@ export const SENDER_LABELS = {
 };
 
 export const AREA_ROLE_WORDS = {
+  current: { en: 'your current area', bn: 'আপনার বর্তমান এলাকা' },
   home: { en: 'your home area', bn: 'আপনার বাসস্থানের এলাকা' },
   work: { en: 'your work area', bn: 'আপনার কর্মএলাকা' },
   field: { en: 'your field', bn: 'আপনার জমি' },

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import {
-  deleteMe, getCoverage, getInbox, getMe, getSchema, getSession, getStatus, readAll, readOne, subscribe, updateActivity, updateMe, updateStatus,
+  deleteMe, getCoverage, getInbox, getMe, getSchema, getSession, getStatus, readAll, readOne, subscribe, updateActivity, updateCurrentArea, updateMe, updateStatus,
 } from '../controllers/alertController.js';
 import {
   getChannels, linkTelegram, startVerification, unlinkChannel, verifyChannel,
@@ -30,6 +30,7 @@ export function createAlertRoutes({ subscribeLimit = { windowMs: HOUR, max: 10 }
   routes.delete('/me', deleteMe);
   routes.put('/me/activity', updateActivity);
   routes.put('/me/status', updateStatus);
+  routes.put('/me/current-area', rateLimit({ windowMs: HOUR, max: 120 }), updateCurrentArea);
   routes.get('/me/coverage', getCoverage);
   routes.get('/me/channels', getChannels);
   routes.post('/me/channels/telegram/link', rateLimit({ ...codeLimit, message: 'Too many Telegram links were requested. Please try again later.' }), linkTelegram);

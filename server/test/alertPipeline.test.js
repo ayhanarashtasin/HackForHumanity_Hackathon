@@ -9,14 +9,16 @@ import { Notification } from '../src/models/Notification.js';
 import { Subscriber } from '../src/models/Subscriber.js';
 import { WeatherSnapshot } from '../src/models/WeatherSnapshot.js';
 import { EngineSettings } from '../src/models/EngineSettings.js';
+import { topForecastAreas } from '../src/services/alerts/cycle.js';
 import {
-  evaluateSubscriberNow, reevaluateSubscriber, runTick,
+  evaluateSubscriberNow, expireCurrentAreas, monitoredAreas, reevaluateSubscriber, runTick,
 } from '../src/services/alerts/engine.js';
 import { expireEnded, withdrawEvent } from '../src/services/alerts/events.js';
 import { listInbox, markAllRead, markRead } from '../src/services/alerts/inbox.js';
+import { monitoredCircles } from '../src/services/alerts/lightningGate.js';
 import { applyEvent } from '../src/services/alerts/notify.js';
 import { resetSettingsCache, updateSettings } from '../src/services/alerts/settings.js';
-import { createSubscriber, updateProfile } from '../src/services/alerts/subscribers.js';
+import { createSubscriber, setCurrentArea, updateProfile } from '../src/services/alerts/subscribers.js';
 import {
   BADDA, DHAKA, HOUR, NOW, SAVAR,
 } from './support/alertFixtures.js';
@@ -300,6 +302,49 @@ dbTest('send-now by role reaches only that role and reports what the engine alre
 });
 
 // ---------- people, profiles and areas ----------
+dbTest('moving away withdraws only the travel alert; returning reuses it, and an expired heartbeat withdraws it', async () => {
+  const worker = await signUp('rickshaw_labourer', RICKSHAW);
+  const nowMs = Date.now();
+  const now = new Date(nowMs);
+  const event = await HazardEvent.create({
+    eventKey: `lightning:travel:${randomUUID()}`,
+    hazardType: 'OBSERVED_LIGHTNING', source: { provider: 'xweather' },
+    coverage: { scope: 'upazila', upazilaPcodes: [SAVAR], matchMethod: 'representative_point' },
+    level: 2, evidence: { metrics: { count: 3, nearestKm: 8, lastStrikeAtMs: nowMs - 60_000 }, rule: { key: 'OBSERVED_LIGHTNING', version: 'prototype-1', status: 'prototype' } },
+    validFrom: new Date(nowMs - 60_000), validUntil: new Date(nowMs + HOUR),
+    firstDetectedAt: now, lastConfirmedAt: now, lastUpdatedAt: now,
+  });
+  assert.equal((await applyEvent(event, { nowMs, settings: {} })).inserted, 0);
+
+  await setCurrentArea(worker, SAVAR, now);
+  assert.ok((await monitoredAreas(nowMs)).includes(SAVAR));
+  assert.ok((await topForecastAreas()).includes(SAVAR));
+  assert.ok([...((await monitoredCircles(nowMs)).circles.values())].some((entry) => entry.pcodes.includes(SAVAR)));
+  await reevaluateSubscriber(worker._id, { nowMs });
+  let [note] = await notificationsOf(worker);
+  assert.equal(note.status, 'active');
+  assert.equal(note.evidence.matchedArea.role, 'current');
+  const originalId = String(note._id);
+
+  await setCurrentArea(worker, BADDA, now);
+  await reevaluateSubscriber(worker._id, { nowMs: nowMs + 1000 });
+  [note] = await notificationsOf(worker);
+  assert.equal(note.status, 'withdrawn');
+  assert.equal(note.withdrawalReason, 'location-changed');
+
+  await setCurrentArea(worker, SAVAR, now);
+  await reevaluateSubscriber(worker._id, { nowMs: nowMs + 2000 });
+  [note] = await notificationsOf(worker);
+  assert.equal(String(note._id), originalId);
+  assert.equal(note.status, 'active');
+  assert.equal(await Notification.countDocuments({ subscriberId: worker._id }), 1);
+
+  await expireCurrentAreas(nowMs + 16 * 60_000);
+  [note] = await notificationsOf(worker);
+  assert.equal(note.status, 'withdrawn');
+  assert.equal((await Subscriber.findById(worker._id).lean()).currentArea, null);
+});
+
 dbTest('a new subscriber sees an alert that is already active (backfill), and a profile edit withdraws alerts that no longer apply', async () => {
   await signUp('rickshaw_labourer', RICKSHAW);
   await tick(makeSources({ rain: { 1: 9 }, pop: { 1: 80 } }));

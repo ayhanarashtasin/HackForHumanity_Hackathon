@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import { containsPoint } from '../../geoPoint.js';
+import { haversineKm } from '../../time.js';
 import {
   districts, locationByPcode, locations, polygons,
 } from '../../geo.js';
@@ -62,6 +65,23 @@ function ensure() {
 export function placeById(id) {
   ensure();
   return byId.get(String(id)) ?? null;
+}
+
+let boundaries = null;
+
+// The same boundary generated for the browser is also packaged with the API; no GPS fix is saved or sent to a forecast provider.
+export function placeForPoint(lat, lon) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  boundaries ??= JSON.parse(fs.readFileSync(new URL('../../../../data/bd-upazila.geojson', import.meta.url), 'utf8'));
+  const feature = boundaries.features.find((item) => containsPoint(item.geometry, lon, lat));
+  const polygon = polygons[feature?.properties?.pid];
+  if (!polygon?.src?.length) return null;
+  const members = polygon.src.map((code) => locationByPcode.get(code)).filter(Boolean);
+  if (!members.length) return null;
+  const nearest = polygon.approx ? members[0] : members.reduce((best, item) => (
+    haversineKm(lat, lon, item.lat, item.lon) < haversineKm(lat, lon, best.lat, best.lon) ? item : best
+  ));
+  return placeById(nearest.pcode);
 }
 
 export function parentOf(place) {

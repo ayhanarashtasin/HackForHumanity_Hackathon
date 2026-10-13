@@ -1,5 +1,4 @@
 import { env } from '../../config/env.js';
-import { Subscriber } from '../../models/Subscriber.js';
 import { locationByPcode } from '../geo.js';
 import { loadGeoData } from '../lightningCampaign.js';
 import { dhakaParts, haversineKm } from '../time.js';
@@ -7,6 +6,7 @@ import { fetchStrikes, fetchThreats, probeCircle } from '../xweatherLightning.js
 import { thunderInForecast } from '../xweatherForecast.js';
 import { loadForecastInputs, loadSnapshots } from './snapshots.js';
 import { loadSources } from './normalize.js';
+import { monitoredAreas } from './engine.js';
 
 // Lightning monitoring is gated and tiered so it fits the Xweather allowance (ALERT_ENGINE_PLAN.md section 14.3):
 //   Tier 1  summary probe of the 100 km circle (1 token), every 5 minutes while the gate is open, hourly in the daytime baseline
@@ -26,7 +26,7 @@ export const circlesCovering = (geo, location) => geo.circles.filter((circle) =>
 
 // pcode -> circles, for the monitored areas; and circle id -> the pcodes it serves.
 export async function monitoredCircles(nowMs = Date.now()) {
-  const pcodes = await Subscriber.distinct('relevantUpazilas', { status: 'active', expiresAt: { $gt: new Date(nowMs) } });
+  const pcodes = await monitoredAreas(nowMs);
   const geo = loadGeoData();
   const circles = new Map();
   for (const pcode of pcodes) {

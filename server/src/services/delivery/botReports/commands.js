@@ -10,7 +10,7 @@ import {
 
 // The bot's weather commands: parse the message, find the person's language and place, read the stored forecast, word the reply.
 // A command never calls a weather provider, never stores anything about the person and never puts profile answers (work, crop, shift)
-// into a reply: the only profile fact used is the saved area, and only to choose where to look.
+// into a reply: only the fresh current area (if any), else the saved areas, chooses where to look.
 export const REPORT_COMMANDS = new Set(['update', 'heat', 'rain', 'wind', 'thunderstorm', 'lightning', 'forecast', 'route']);
 export const ALL_COMMANDS = new Set(COMMAND_NAMES);
 const ALIASES = new Map([['weather', 'update'], ['thunder', 'thunderstorm'], ['storm', 'thunderstorm'], ['days', 'forecast']]);
@@ -90,7 +90,7 @@ function pickRenderer(command) {
 
 // -> { messages: [{ text, buttons? }], action, lang }. `placeId` (from a button) replaces the typed place.
 export async function answerCommand({
-  command, rest = [], placeId = null, langOverride = null, chatId, languageCode = null, nowMs = Date.now(), deps = defaultDeps,
+  command, rest = [], placeId = null, langOverride = null, chatId, languageCode = null, sharedPlace = false, nowMs = Date.now(), deps = defaultDeps,
 }) {
   const subscriber = await deps.subscriberForChat(chatId, new Date(nowMs));
   const parsed = parseArgs(rest);
@@ -135,9 +135,11 @@ export async function answerCommand({
     if (matches.length > 1) return { messages: [{ text: renderAmbiguous(lang, matches, total, command) }], action: 'ambiguous', lang };
     places = matches;
   } else {
-    places = subscriber ? placesForAreas(subscriber.areas, 2) : [];
+    const current = subscriber?.currentArea?.expiresAt && +new Date(subscriber.currentArea.expiresAt) > nowMs
+      ? placeById(subscriber.currentArea.upazilaPcode) : null;
+    places = current ? [current] : (subscriber ? placesForAreas(subscriber.areas, 2) : []);
   }
-  if (!places.length) return { messages: [{ text: renderAskPlace(lang) }], action: 'ask-place', lang };
+  if (!places.length) return { messages: [{ text: renderAskPlace(lang), ...(command === 'update' ? { requestLocation: true } : {}) }], action: 'ask-place', lang };
 
   const ctx = deps.loadForecast({ now: nowMs });
   const render = pickRenderer(command);
@@ -157,5 +159,19 @@ export async function answerCommand({
     messages.push({ text });
   }
   if (command === 'update') messages[0].buttons = buttonsFor(places[0], lang);
+  if (command === 'update' && !placeId && !parsed.query) {
+    const current = subscriber?.currentArea?.expiresAt && +new Date(subscriber.currentArea.expiresAt) > nowMs;
+    messages[0].text = `${current
+      ? (lang === 'bn' ? '📍 আপনার সাম্প্রতিক অবস্থানের এলাকা (নতুন GPS পাঠানো হয়নি)।' : '📍 Your recently shared area (not a new GPS reading).')
+      : (lang === 'bn' ? '📍 সংরক্ষিত এলাকা।' : '📍 Saved area.')}
+\n${messages[0].text}`;
+    if (!current) messages.push({ text: lang === 'bn' ? 'বর্তমান আবহাওয়ার জন্য অবস্থান পাঠান। এতে স্বয়ংক্রিয় অবস্থান অনুসরণ চালু হবে না।' : 'Share your location for current-area weather. This does not turn on live tracking.', requestLocation: true });
+  }
+  if (sharedPlace && command === 'update') {
+    messages[0].text = `${lang === 'bn' ? '📍 আপনি এখন যে অবস্থান পাঠিয়েছেন তার নিকটতম পূর্বাভাস এলাকার তথ্য।' : '📍 Forecast for the nearest available area to the location you just shared.'}\n${messages[0].text}`;
+    messages.push({ text: sharedPlace === 'live'
+      ? (lang === 'bn' ? 'লাইভ অবস্থান অনুসরণ চালু আছে। থামাতে /unfollow পাঠান বা Telegram-এ শেয়ারিং বন্ধ করুন।' : 'Live location following is on. Send /unfollow or stop sharing in Telegram to end it.')
+      : (lang === 'bn' ? 'এই অবস্থান শুধু এই প্রতিবেদনের জন্য ব্যবহৃত হয়েছে; সতর্কবার্তা অনুসরণ চালু হয়নি।' : 'This location was used only for this report; alert following was not enabled.'), removeKeyboard: true });
+  }
   return { messages, action: command, lang };
 }

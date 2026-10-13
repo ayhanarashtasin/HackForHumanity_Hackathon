@@ -55,6 +55,8 @@ export function createTelegramChannel({ config = env.channels.telegram, fetchImp
       const payload = { chat_id: String(to), text: content.text, disable_web_page_preview: true };
       if (content.parseMode) payload.parse_mode = content.parseMode;
       if (content.buttons?.length) payload.reply_markup = { inline_keyboard: content.buttons.map((row) => row.map((button) => ({ text: button.text, callback_data: button.data }))) };
+      else if (content.requestLocation) payload.reply_markup = { keyboard: [[{ text: content.locationLabel ?? '📍 Share location', request_location: true }]], resize_keyboard: true, one_time_keyboard: true };
+      else if (content.removeKeyboard) payload.reply_markup = { remove_keyboard: true };
       const result = await call('sendMessage', payload);
       return { providerMessageId: result?.message_id === undefined ? null : String(result.message_id) };
     },
@@ -73,10 +75,10 @@ export function createTelegramChannel({ config = env.channels.telegram, fetchImp
 
     getUpdates: (offset, timeoutSeconds = 25, signal = null) => call(
       'getUpdates',
-      { offset, timeout: timeoutSeconds, allowed_updates: ['message', 'callback_query'] },
+      { offset, timeout: timeoutSeconds, allowed_updates: ['message', 'edited_message', 'callback_query'] },
       { timeoutMs: (timeoutSeconds + 10) * 1000, signal },
     ),
-    setWebhook: (url, secretToken) => call('setWebhook', { url, secret_token: secretToken, allowed_updates: ['message', 'callback_query'], drop_pending_updates: false }),
+    setWebhook: (url, secretToken) => call('setWebhook', { url, secret_token: secretToken, allowed_updates: ['message', 'edited_message', 'callback_query'], drop_pending_updates: false }),
     deleteWebhook: () => call('deleteWebhook', { drop_pending_updates: false }),
 
     // Stops the spinner on a pressed inline button. Best effort: the reply message is what matters.

@@ -3,6 +3,7 @@ import { env } from '../../config/env.js';
 import { Delivery } from '../../models/Delivery.js';
 import { Notification } from '../../models/Notification.js';
 import { Subscriber } from '../../models/Subscriber.js';
+import { reevaluateSubscriber } from '../alerts/engine.js';
 import { ChannelError } from './errors.js';
 import { renderMessage } from './format.js';
 import {
@@ -116,6 +117,10 @@ export async function enqueueDeliveries({ channels, nowMs = Date.now() }) {
 // Takes a channel away from a profile (the person asked, or the channel told us it can no longer reach them) and drops its waiting messages.
 export async function unlinkChannel(subscriberId, channel, reason = 'channel_unlinked') {
   await Subscriber.updateOne({ _id: subscriberId }, { $unset: { [`channels.${channel}`]: '' } });
+  if (channel === 'telegram') {
+    const cleared = await Subscriber.updateOne({ _id: subscriberId, 'currentArea.source': 'telegram' }, { $set: { currentArea: null } });
+    if (cleared.modifiedCount) await reevaluateSubscriber(subscriberId);
+  }
   await Delivery.updateMany(
     { subscriberId, channel, status: { $in: ['pending', 'sending'] } },
     { $set: { status: 'skipped', skippedReason: reason, leaseUntil: null } },

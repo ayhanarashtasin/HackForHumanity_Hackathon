@@ -5,7 +5,7 @@ import { defaultDeps } from './botReports/data.js';
 import {
   REPORT_COMMANDS, answerCommand, canonicalCommand, createRateLimiter, resolveLanguage,
 } from './botReports/commands.js';
-import { placeById } from './botReports/places.js';
+import { placeById, placeForPoint } from './botReports/places.js';
 import {
   commandMenu, esc, renderBusy, renderError, renderHelp, toPlain,
 } from './botReports/text.js';
@@ -13,7 +13,7 @@ import { consumeTelegramLink, telegramLanguage, unlinkTelegramChat } from './lin
 
 // The bot's side of the conversation. /start <code> connects this chat to an alert profile, /stop disconnects it, /help lists the commands,
 // and the weather commands (/update, /heat, /rain, /wind, /thunderstorm, /lightning, /forecast, /route, /alerts, /status) answer from the stored
-// forecast (botReports/). Anything else gets the help text. It never asks for or stores a name, number or location.
+// forecast (botReports/). A shared location is resolved to an area immediately; coordinates are never stored.
 const WEB = () => esc(`${env.channels.publicUrl}/alert`);
 
 const REPLIES = {
@@ -53,9 +53,9 @@ export function resetBotForTests() {
 }
 
 // A reply with formatting. If Telegram refuses the markup (it should not), the same words go out as plain text instead of nothing.
-async function sendReport(channels, chatId, { text, buttons = null }) {
+async function sendReport(channels, chatId, { text, buttons = null, requestLocation = false, removeKeyboard = false }) {
   try {
-    await channels.telegram.send({ to: chatId, content: { text, parseMode: 'HTML', buttons } });
+    await channels.telegram.send({ to: chatId, content: { text, parseMode: 'HTML', buttons, requestLocation, removeKeyboard } });
   } catch (error) {
     if (error?.kind !== 'permanent') return;
     try {
@@ -119,15 +119,61 @@ async function handleButton(update, { channels, now, deps }) {
 export async function handleTelegramUpdate(update, { channels = sharedChannels(), now = new Date(), deps = defaultDeps } = {}) {
   if (update?.callback_query) return handleButton(update, { channels, now, deps });
 
-  const message = update?.message;
+  const message = update?.message ?? update?.edited_message;
   // Groups and channels are ignored: alerts go to one person's private chat only.
-  if (!message || message.chat?.type !== 'private' || typeof message.text !== 'string') return { handled: false };
+  if (!message || message.chat?.type !== 'private' || (typeof message.text !== 'string' && !message.location)) return { handled: false };
   if (seen(update.update_id)) return { handled: false, duplicate: true };
 
   const chatId = String(message.chat.id);
+  const reply = (text) => sendReport(channels, chatId, { text });
+
+  if (message.location) {
+    const point = message.location;
+    // A Telegram update can be forged at the webhook boundary only with the webhook secret; still validate every GPS value.
+    const valid = Number.isFinite(point.latitude) && Number.isFinite(point.longitude)
+      && (point.horizontal_accuracy === undefined || (Number.isFinite(point.horizontal_accuracy) && point.horizontal_accuracy <= 10_000));
+    const place = valid ? placeForPoint(point.latitude, point.longitude) : null;
+    if (update.edited_message) {
+      const subscriber = await deps.subscriberForChat(chatId, now);
+      if (!subscriber) return { handled: true, action: 'ignored' };
+      const reportedAt = new Date((message.edit_date ?? message.date) * 1000);
+      if (!Number.isFinite(+reportedAt)) return { handled: true, action: 'ignored' };
+      if (!point.live_period) {
+        await deps.refreshTelegramFollow(subscriber, { pcode: null, messageId: message.message_id, reportedAt, stopped: true }, now);
+        return { handled: true, action: 'location-stopped' };
+      }
+      if (!place) return { handled: true, action: 'location-unmatched' };
+      await deps.refreshTelegramFollow(subscriber, { pcode: place?.id ?? null, messageId: message.message_id, reportedAt,
+      }, now);
+      return { handled: true, action: 'location-refreshed' };
+    }
+    if (!place) {
+      await reply('Could not match that position to a Bangladesh area (or it is too imprecise). Choose an area by name.\nবাংলাদেশের কোনো এলাকার সঙ্গে অবস্থান মেলানো যায়নি।');
+      return { handled: true, action: 'location-unmatched' };
+    }
+    const subscriber = await deps.subscriberForChat(chatId, now);
+    const reportedAt = new Date(message.date * 1000);
+    if (!Number.isFinite(+reportedAt) || +reportedAt < +now - 15 * 60_000 || +reportedAt > +now + 60_000) {
+      await reply('That location update is too old. Share it again.\nঅবস্থানের তথ্য পুরনো। আবার পাঠান।');
+      return { handled: true, action: 'location-stale' };
+    }
+    let live = false;
+    if (subscriber && point.live_period) {
+      try {
+        live = await deps.beginTelegramFollow(subscriber, { pcode: place.id, messageId: message.message_id, livePeriod: point.live_period, reportedAt }, now);
+      } catch (error) {
+        if (error?.status !== 409) throw error;
+      }
+      if (!live && subscriber.currentArea && subscriber.currentArea.source !== 'telegram' && subscriber.currentArea.expiresAt > now) {
+        await reply(subscriber.language === 'bn' ? 'ওয়েব পাতায় অবস্থান অনুসরণ চলছে। Telegram-এ অনুসরণ শুরুর আগে সেখানে থামান।' : 'The web page is following your location. Stop it there before following in Telegram.');
+      }
+    }
+    return runWeatherCommand(channels, chatId, { command: 'update', placeId: place.id, sharedPlace: live ? 'live' : 'once', languageCode: message.from?.language_code }, { now, deps });
+  }
+  if (update.edited_message) return { handled: true, action: 'ignored' };
+
   const [first = '', ...rest] = message.text.trim().split(/\s+/);
   const command = first.split('@')[0].toLowerCase();
-  const reply = (text) => sendReport(channels, chatId, { text });
 
   if (command === '/start' && rest[0]) {
     const result = await consumeTelegramLink(rest[0], chatId, now);
@@ -136,9 +182,39 @@ export async function handleTelegramUpdate(update, { channels = sharedChannels()
   }
 
   if (command === '/stop') {
+    const subscriber = await deps.subscriberForChat(chatId, now);
+    if (subscriber) await deps.stopTelegramFollow?.(subscriber, now);
     const result = await unlinkTelegramChat(chatId);
     await reply(result.count ? say('stopped', result.language) : say('nothing', null));
     return { handled: true, action: 'stopped' };
+  }
+
+  if (command === '/follow' || command === '/unfollow') {
+    if (command === '/follow') {
+      const verdict = limiter.hit(chatId, +now);
+      if (!verdict.allowed) {
+        if (verdict.announce) await replyPlain(channels, chatId, renderBusy(resolveLanguage({ languageCode: message.from?.language_code })));
+        return { handled: true, action: 'rate-limited' };
+      }
+    }
+    const subscriber = await deps.subscriberForChat(chatId, now);
+    if (!subscriber) {
+      await reply(say('nothing', null));
+      return { handled: true, action: 'not-linked' };
+    }
+    if (command === '/unfollow') {
+      await deps.stopTelegramFollow(subscriber, now);
+      await reply(subscriber.language === 'bn' ? 'অবস্থান অনুসরণ বন্ধ হয়েছে। সংরক্ষিত এলাকার সতর্কবার্তা চালু থাকবে।' : 'Location following stopped. Saved-area alerts remain on.');
+      return { handled: true, action: 'unfollowed' };
+    }
+    if (!(await deps.requestTelegramFollow(subscriber, now))) {
+      await reply(subscriber.language === 'bn' ? 'ওয়েব পাতায় অবস্থান অনুসরণ চলছে। Telegram-এ অনুসরণ শুরুর আগে সেখানে থামান।' : 'The web page is following your location. Stop it there before following in Telegram.');
+      return { handled: true, action: 'follow-conflict' };
+    }
+    await reply(subscriber.language === 'bn'
+      ? 'পরবর্তী ৫ মিনিটের মধ্যে Telegram-এর 📎 Location → Share Live Location বেছে নিন। শুধু এলাকা কোড ১৫ মিনিটের জন্য রাখা হয়; স্থানাঙ্ক রাখা হয় না। লাইভ শেয়ারিং বন্ধ হলে এলাকা নিজে মেয়াদোত্তীর্ণ হবে। থামাতে /unfollow।'
+      : 'Within 5 minutes, use Telegram 📎 Location → Share Live Location. Only an area code is kept for 15 minutes after each update; coordinates are discarded. Sharing stops updating when Telegram ends it. Send /unfollow to stop.');
+    return { handled: true, action: 'follow-requested' };
   }
 
   const name = canonicalCommand(command);

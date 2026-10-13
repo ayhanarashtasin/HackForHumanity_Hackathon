@@ -194,6 +194,26 @@ dbTest('completing the form creates a subscriber with an HttpOnly device cookie,
   assert.equal(session.headers.get('cache-control'), 'no-store');
 });
 
+dbTest('current area is opt-in, temporary, validated and leaves saved areas intact', async () => {
+  const client = new Client();
+  assert.equal((await client.call('/alerts/me/current-area', { method: 'PUT', body: { upazilaPcode: SAVAR } })).status, 401);
+  assert.equal((await client.call('/alerts/subscribe', { method: 'POST', body: labourerForm() })).status, 201);
+  for (const body of [{ upazilaPcode: '999999' }, { upazilaPcode: SAVAR, lat: 23.8 }, {}, { upazilaPcode: 123 }]) {
+    assert.equal((await client.call('/alerts/me/current-area', { method: 'PUT', body })).status, 400);
+  }
+  const start = await client.call('/alerts/me/current-area', { method: 'PUT', body: { upazilaPcode: SAVAR } });
+  assert.equal(start.status, 200);
+  assert.equal(start.json.data.profile.currentArea.upazilaPcode, SAVAR);
+  assert.equal(start.json.data.profile.areas[0].upazilaPcode, BADDA);
+  const stored = await Subscriber.findOne().lean();
+  assert.equal(stored.currentArea.districtPcode, '3026');
+  assert.ok(stored.currentArea.expiresAt > new Date());
+  assert.equal(JSON.stringify(stored).includes('latitude'), false);
+  const stop = await client.call('/alerts/me/current-area', { method: 'PUT', body: { upazilaPcode: null } });
+  assert.equal(stop.status, 200);
+  assert.equal(stop.json.data.profile.currentArea, null);
+});
+
 dbTest('the "who am I?" check is never an error: no cookie or a dead cookie gives profile null (and clears the dead cookie)', async () => {
   const anonymous = new Client();
   const none = await anonymous.call('/alerts/session');

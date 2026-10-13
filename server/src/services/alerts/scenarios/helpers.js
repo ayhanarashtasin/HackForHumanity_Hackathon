@@ -11,8 +11,11 @@ export function covers(event, area) {
   return event.coverage.upazilaPcodes?.includes(area.upazilaPcode) || event.coverage.districtPcodes?.includes(area.districtPcode) || false;
 }
 
-export function matchAreas(subscriber, event, roles) {
-  const matched = subscriber.areas.filter((area) => roles.includes(area.role) && covers(event, area));
+export function matchAreas(subscriber, event, roles, nowMs = Date.now()) {
+  const current = subscriber.currentArea?.expiresAt > new Date(nowMs)
+    ? { ...subscriber.currentArea, role: 'current', matchMethod: 'gps_nearest' } : null;
+  const matched = [...subscriber.areas, ...(current && roles.includes('current') ? [current] : [])]
+    .filter((area) => roles.includes(area.role) && covers(event, area));
   // The most specific role first (the order of `roles`), so the notification names the area the person works in.
   return matched.sort((a, b) => roles.indexOf(a.role) - roles.indexOf(b.role));
 }

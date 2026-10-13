@@ -187,20 +187,28 @@ export function RoutePlanner({ catalogue, onRoute }) {
   return (
     <div className="route-planner route-planner--page">
       <section className="route-panel panel" aria-label={tr('Plan a route')}>
-        <header><div><strong>{tr('Route weather')}</strong><small>{tr('Shortest-distance road route')}</small></div></header>
+        <header><div><strong>{tr('Where are you going?')}</strong><small>{tr('Choose two places to see your road route and weather.')}</small></div></header>
         <form onSubmit={submit}>
-          <PlaceField field="start" label={tr('Start')} catalogue={catalogue} value={start} onChange={updateStart} onSelect={updateStart} />
-          <div className="route-field-actions">
-            <button type="button" className="route-secondary" onClick={locate} disabled={!catalogue || locating}>
-              <Icon name="locate" size={16} /> {locating ? tr('Finding your location…') : tr('Use my location as start')}
-            </button>
-            <button type="button" className="route-secondary" onClick={swap} disabled={!start && !end} aria-label={tr('Swap start and destination')}>
-              ⇅ {tr('Swap')}
-            </button>
+          <div className="route-journey-inputs">
+            <div className="route-input-stop route-input-stop--start">
+              <span className="route-input-marker" aria-hidden="true" />
+              <PlaceField field="start" label={tr('Start')} catalogue={catalogue} value={start} onChange={updateStart} onSelect={updateStart} />
+            </div>
+            <div className="route-field-actions">
+              <button type="button" className="route-secondary" onClick={locate} disabled={!catalogue || locating}>
+                <Icon name="locate" size={16} /> {locating ? tr('Finding your location…') : tr('Use my location as start')}
+              </button>
+              <button type="button" className="route-secondary route-swap" onClick={swap} disabled={!start && !end} aria-label={tr('Swap start and destination')}>
+                <Icon name="refresh" size={16} /> {tr('Swap')}
+              </button>
+            </div>
+            <div className="route-input-stop route-input-stop--end">
+              <span className="route-input-marker" aria-hidden="true" />
+              <PlaceField field="end" label={tr('Destination')} catalogue={catalogue} value={end} onChange={updateEnd} onSelect={updateEnd} />
+            </div>
           </div>
-          <PlaceField field="end" label={tr('Destination')} catalogue={catalogue} value={end} onChange={updateEnd} onSelect={updateEnd} />
           <button type="submit" className="route-submit" disabled={!start || !end || loading}>
-            {loading ? tr('Finding route…') : tr('Check route')}
+            <Icon name="route" size={18} /> {loading ? tr('Finding route…') : tr('Show my route')}
           </button>
         </form>
         {error && <p className="route-error" role="alert">{error}</p>}

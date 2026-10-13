@@ -502,6 +502,8 @@ export function renderStatus({
 const COMMAND_HELP = {
   en: [
     ['update', 'weather now and the next hours'],
+    ['follow', 'follow shared live location for alerts'],
+    ['unfollow', 'stop live location following'],
     ['heat', 'heat index and advice'],
     ['rain', 'rain, next 24 hours'],
     ['wind', 'wind and gusts'],
@@ -514,6 +516,8 @@ const COMMAND_HELP = {
   ],
   bn: [
     ['update', 'এখনকার আবহাওয়া ও পরের কয়েক ঘণ্টা'],
+    ['follow', 'লাইভ অবস্থান দিয়ে সতর্কবার্তা'],
+    ['unfollow', 'অবস্থান অনুসরণ বন্ধ'],
     ['heat', 'হিট ইনডেক্স ও পরামর্শ'],
     ['rain', 'বৃষ্টি, পরবর্তী ২৪ ঘণ্টা'],
     ['wind', 'বাতাস ও দমকা হাওয়া'],
@@ -540,8 +544,8 @@ export function renderHelp(lang, { webUrl = env.channels.publicUrl } = {}) {
       list,
       '',
       T.s(
-        'Example: /heat Badda\n/route Savar to Chattogram\nNo place name → your saved area.\nLanguage: add bn or en.',
-        'উদাহরণ: /heat বাড্ডা\n/route Savar থেকে Chattogram\nএলাকার নাম না দিলে → সংরক্ষিত এলাকা।\nভাষা: শেষে bn বা en লিখুন।',
+        'Example: /heat Badda\n/route Savar to Chattogram\nNo place name → recent shared area, else saved areas. /update can request a one-time location. /follow requires sharing live location.\nLanguage: add bn or en.',
+        'উদাহরণ: /heat বাড্ডা\n/route Savar থেকে Chattogram\nএলাকার নাম না দিলে → সাম্প্রতিক অবস্থান, না থাকলে সংরক্ষিত এলাকা। /update একবারের অবস্থান চাইতে পারে। /follow-এর জন্য লাইভ অবস্থান শেয়ার করুন।\nভাষা: শেষে bn বা en লিখুন।',
       ),
       '',
       T.s(

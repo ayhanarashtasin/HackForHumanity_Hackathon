@@ -7,7 +7,7 @@ import {
   ALL_COMMANDS, answerCommand, canonicalCommand, createRateLimiter, parseArgs, resolveLanguage,
 } from '../src/services/delivery/botReports/commands.js';
 import {
-  findPlaces, placeById, placesForAreas, representativePcode,
+  findPlaces, placeById, placeForPoint, placesForAreas, representativePcode,
 } from '../src/services/delivery/botReports/places.js';
 import {
   chooseLightning, dailySummaries, forecastFor, gustClass, heatCategory, loadForecast, peakOf, rainClass, sumOf,
@@ -131,6 +131,12 @@ test('places: a saved profile gives its areas once each, in order, at most two',
   assert.deepEqual(placesForAreas([]), []);
   assert.equal(representativePcode(placeById(BADDA)), BADDA);
   assert.equal(representativePcode(placeById(DHAKA)), null, 'a district has no single location');
+});
+
+test('places: a shared GPS position resolves inside a real boundary, never to a made-up location outside Bangladesh', () => {
+  assert.equal(placeForPoint(23.85, 90.26)?.id, SAVAR);
+  assert.equal(placeForPoint(0, 0), null);
+  assert.equal(placeForPoint(23.85, NaN), null);
 });
 
 // ---------- readings ----------
@@ -302,14 +308,30 @@ test('answers: a saved profile gives its area (two at most) and the reply never 
     areas: [{ role: 'field', upazilaPcode: BADDA }, { role: 'home', upazilaPcode: SAVAR }, { role: 'work', upazilaPcode: AMTALI }],
   };
   const result = await ask('update', [], { bmdOverrides: HOT, meteoOverrides: STORMY }, { subscriberForChat: async () => subscriber, alertsFor: async () => ({ items: [] }) });
-  assert.equal(result.messages.length, 2);
+  assert.equal(result.messages.length, 3, 'saved forecasts plus the optional share-location prompt');
   assert.match(result.messages[0].text, /Badda/);
   assert.match(result.messages[1].text, /Savar/);
   assert.ok(!/Amtali/.test(textOf(result)), 'a third area is not shown');
   for (const word of ['farmer', 'harvest', 'crop', 'workload', 'field', 'home', 'shift', 'occupation']) assert.ok(!new RegExp(word, 'i').test(plain(result)), `no "${word}"`);
   assert.ok(result.messages[0].buttons?.length, 'buttons under the first report');
   assert.equal(result.messages[1].buttons, undefined);
+  assert.equal(result.messages[2].requestLocation, true);
   assert.match(textOf(result), /No active AkashSathi alert/);
+});
+
+test('answers: a fresh current area wins over saved areas; typed place wins over current; expiry falls back', async () => {
+  const subscriber = { _id: 's', language: 'en', areas: [{ upazilaPcode: BADDA }], currentArea: { upazilaPcode: SAVAR, expiresAt: new Date(NOW + 60_000) } };
+  const deps = { subscriberForChat: async () => subscriber };
+  const current = await ask('update', [], { pcodes: [BADDA, SAVAR] }, deps);
+  assert.equal(current.messages.length, 1);
+  assert.match(current.messages[0].text, /Savar/);
+  assert.match(current.messages[0].text, /recently shared/);
+  assert.equal(current.messages[0].requestLocation, undefined);
+  assert.match((await ask('update', ['Badda'], { pcodes: [BADDA, SAVAR] }, deps)).messages[0].text, /Badda/);
+  subscriber.currentArea.expiresAt = new Date(NOW);
+  const expired = await ask('update', [], { pcodes: [BADDA, SAVAR] }, deps);
+  assert.match(expired.messages[0].text, /Badda/);
+  assert.equal(expired.messages.at(-1).requestLocation, true);
 });
 
 test('answers: the saved profile\'s language wins; a typed bn/en wins over it; Telegram\'s language is the last resort', async () => {
@@ -593,6 +615,48 @@ test('bot: a weather command is answered as formatted text and /update brings bu
   assert.equal(channels.telegram.answered.length, 6, 'every press stops the button\'s spinner');
 });
 
+test('bot: /update offers a one-time location share; a shared location reports nearby weather without opting into tracking', async () => {
+  const channels = fakeChannels();
+  const deps = depsFor({ pcodes: [BADDA, SAVAR] });
+  const now = new Date(NOW);
+  assert.equal((await handleTelegramUpdate(message('/update', { updateId: 1 }), { channels, now, deps })).action, 'ask-place');
+  assert.equal(channels.telegram.sent[0].content.requestLocation, true);
+  const location = { update_id: 2, message: { chat: { id: 4242, type: 'private' }, from: {}, date: NOW / 1000, message_id: 15,
+    location: { latitude: 23.85, longitude: 90.26 } } };
+  assert.equal((await handleTelegramUpdate(location, { channels, now, deps })).action, 'update');
+  assert.match(channels.telegram.sent[1].content.text, /Savar/);
+  assert.match(channels.telegram.sent[2].content.text, /only for this report/);
+  assert.equal(channels.telegram.sent[2].content.removeKeyboard, true);
+  assert.equal((await handleTelegramUpdate(location, { channels, now, deps })).duplicate, true);
+  assert.equal((await handleTelegramUpdate({ ...location, update_id: 3, message: { ...location.message, chat: { id: 4242, type: 'group' } } }, { channels, now, deps })).handled, false);
+});
+
+test('bot: /follow requires an explicitly shared live location; only its edited updates refresh alerts', async () => {
+  const channels = fakeChannels();
+  const calls = [];
+  const subscriber = { _id: 's', language: 'en', areas: [{ upazilaPcode: BADDA }] };
+  const deps = depsFor({ pcodes: [BADDA, SAVAR] }, {
+    subscriberForChat: async () => subscriber,
+    requestTelegramFollow: async () => { calls.push('requested'); return true; },
+    beginTelegramFollow: async (_s, { pcode }) => { calls.push(`begin:${pcode}`); return true; },
+    refreshTelegramFollow: async (_s, { pcode, stopped }) => { calls.push(stopped ? 'stopped' : `refresh:${pcode}`); },
+    stopTelegramFollow: async () => { calls.push('unfollow'); },
+  });
+  const now = new Date(NOW);
+  assert.equal((await handleTelegramUpdate(message('/follow', { updateId: 10 }), { channels, now, deps })).action, 'follow-requested');
+  assert.deepEqual(calls, ['requested']);
+  const start = { update_id: 11, message: { chat: { id: 4242, type: 'private' }, from: {}, date: NOW / 1000, message_id: 99,
+    location: { latitude: 23.85, longitude: 90.26, live_period: 3600 } } };
+  assert.equal((await handleTelegramUpdate(start, { channels, now, deps })).action, 'update');
+  assert.ok(calls.includes(`begin:${SAVAR}`));
+  assert.match(channels.telegram.sent.at(-1).content.text, /Live location following is on/);
+  const edited = { update_id: 12, edited_message: { ...start.message, edit_date: NOW / 1000 + 30 } };
+  assert.equal((await handleTelegramUpdate(edited, { channels, now: new Date(NOW + 30_000), deps })).action, 'location-refreshed');
+  assert.ok(calls.includes(`refresh:${SAVAR}`));
+  assert.equal((await handleTelegramUpdate(message('/unfollow', { updateId: 13 }), { channels, now, deps })).action, 'unfollowed');
+  assert.ok(calls.includes('unfollow'));
+});
+
 test('bot: a button that does not parse, names an unknown place or comes from a group is ignored', async () => {
   const channels = fakeChannels();
   const deps = depsFor();
@@ -702,18 +766,23 @@ test('adapter: formatted messages carry parse mode and inline buttons; plain ale
   await channel.send({ to: 5, content: { text: 'no buttons', parseMode: 'HTML', buttons: null } });
   assert.equal(calls[2].body.reply_markup, undefined);
 
+  await channel.send({ to: 5, content: { text: 'Share location', requestLocation: true } });
+  assert.equal(calls[3].body.reply_markup.keyboard[0][0].request_location, true);
+  await channel.send({ to: 5, content: { text: 'Done', removeKeyboard: true } });
+  assert.deepEqual(calls[4].body.reply_markup, { remove_keyboard: true });
+
   await channel.getUpdates(0, 1);
-  assert.deepEqual(calls[3].body.allowed_updates, ['message', 'callback_query']);
+  assert.deepEqual(calls[5].body.allowed_updates, ['message', 'edited_message', 'callback_query']);
   await channel.setWebhook('https://x.test/hook', 'a'.repeat(20));
-  assert.deepEqual(calls[4].body.allowed_updates, ['message', 'callback_query']);
+  assert.deepEqual(calls[6].body.allowed_updates, ['message', 'edited_message', 'callback_query']);
 
   await channel.answerCallbackQuery('cb1');
-  assert.deepEqual(calls[5], { url: 'https://telegram.test/botTOKEN/answerCallbackQuery', body: { callback_query_id: 'cb1' } });
+  assert.deepEqual(calls[7], { url: 'https://telegram.test/botTOKEN/answerCallbackQuery', body: { callback_query_id: 'cb1' } });
 
   await channel.setCommands([{ command: 'heat', description: 'Heat' }]);
   await channel.setCommands([{ command: 'heat', description: 'গরম' }], 'bn');
-  assert.deepEqual(calls[6].body, { commands: [{ command: 'heat', description: 'Heat' }] });
-  assert.equal(calls[7].body.language_code, 'bn');
+  assert.deepEqual(calls[8].body, { commands: [{ command: 'heat', description: 'Heat' }] });
+  assert.equal(calls[9].body.language_code, 'bn');
   assert.ok(calls.every((call) => call.url.startsWith('https://telegram.test/botTOKEN/')));
 });
 

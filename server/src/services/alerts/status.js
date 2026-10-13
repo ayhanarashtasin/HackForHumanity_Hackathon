@@ -13,6 +13,7 @@ import { BN_REVIEWED } from './schema.js';
 import { PRODUCTS, bulletinStatus } from '../bmdBulletins.js';
 import { primarySource } from './hazards.js';
 import { getSettings } from './settings.js';
+import { monitoredAreas } from './engine.js';
 import { buildAreaForecast, loadSources, toDataStatus } from './normalize.js';
 import {
   effectiveLightningStatus, loadForecastInputs, loadMarineInput, loadSnapshots,
@@ -47,7 +48,7 @@ const circlesCovering = (geo, location) => geo.circles.filter((circle) => havers
 
 // ---------- per-subscriber coverage ----------
 export async function coverageFor(subscriber, nowMs = Date.now()) {
-  const upazilas = subscriber.relevantUpazilas;
+  const upazilas = [...new Set([...subscriber.relevantUpazilas, ...(subscriber.currentArea?.expiresAt > new Date(nowMs) ? [subscriber.currentArea.upazilaPcode] : [])])];
   const sources = loadSources(nowMs);
   const geo = loadGeoData();
   const circleKeys = [...new Set(upazilas.flatMap((pcode) => circlesCovering(geo, locationByPcode.get(pcode) ?? { lat: 0, lon: 0 }).map((circle) => `c:${circle.id}`)))];
@@ -182,7 +183,7 @@ export async function publicStatus(nowMs = Date.now()) {
   // Every read goes out at once: each is a round trip to the database, and run one after another they made this endpoint take ~200 ms.
   const [settings, areaCodes, engineState, budget, sources, bulletins] = await Promise.all([
     getSettings({ now: nowMs }),
-    Subscriber.distinct('relevantUpazilas', { status: 'active', expiresAt: { $gt: new Date(nowMs) } }),
+    monitoredAreas(nowMs),
     JobState.findOne({ key: 'alert-engine' }).lean(),
     createXweatherBudget().summary(),
     sourceRows(nowMs),

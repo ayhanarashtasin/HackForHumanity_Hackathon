@@ -474,6 +474,7 @@ await fs.mkdir(SERVER_OUT, { recursive: true });
 const write = (dir, name, data) => fs.writeFile(path.join(dir, name), typeof data === 'string' ? data : JSON.stringify(data));
 
 await write(CLIENT_OUT, 'bd-upazila.geojson', upazilaGeo);
+await write(SERVER_OUT, 'bd-upazila.geojson', upazilaGeo);
 await write(CLIENT_OUT, 'bd-district.geojson', districtGeo);
 await write(CLIENT_OUT, 'bd-admin4.geojson', areaGeo);
 await write(CLIENT_OUT, 'bd-national.geojson', nationalGeo);

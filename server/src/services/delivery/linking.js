@@ -86,12 +86,17 @@ export async function consumeTelegramLink(code, chatId, now = new Date()) {
     'channels.telegram.linkCodeHash': hashToken(code),
     'channels.telegram.linkExpiresAt': { $gt: now },
     expiresAt: { $gt: now },
-  }, { language: 1 }).lean();
+  }, { language: 1, currentArea: 1, 'channels.telegram.chatId': 1 }).lean();
   if (!subscriber) return { ok: false };
 
   const chat = String(chatId);
   const others = await Subscriber.find({ _id: { $ne: subscriber._id }, 'channels.telegram.chatId': chat }, { _id: 1 }).lean();
   for (const other of others) await unlinkChannel(other._id, 'telegram', 'chat_moved');
+
+  // A newly linked chat never inherits the previous chat's live-location consent.
+  if (subscriber.currentArea?.source === 'telegram' || (subscriber.channels?.telegram?.chatId && subscriber.channels.telegram.chatId !== chat)) {
+    await unlinkChannel(subscriber._id, 'telegram', 'chat_moved');
+  }
 
   // Replacing the whole sub-document also removes the one-time code.
   await Subscriber.updateOne({ _id: subscriber._id }, { $set: { 'channels.telegram': { chatId: chat, linkedAt: now } } });
@@ -106,9 +111,11 @@ export async function unlinkTelegramChat(chatId) {
   return { count: linked.length, language: linked[0]?.language ?? null };
 }
 
-// The profile a private chat is connected to (at most one), with just what the weather commands need: language and saved areas.
+// The profile a private chat is connected to (at most one). Coordinates are never stored here.
 export async function subscriberForChat(chatId, now = new Date()) {
-  return Subscriber.findOne({ 'channels.telegram.chatId': String(chatId), expiresAt: { $gt: now } }, { language: 1, areas: 1 }).lean();
+  return Subscriber.findOne({ 'channels.telegram.chatId': String(chatId), expiresAt: { $gt: now } }, {
+    language: 1, areas: 1, currentArea: 1, 'channels.telegram': 1,
+  }).lean();
 }
 
 export async function telegramLanguage(chatId) {

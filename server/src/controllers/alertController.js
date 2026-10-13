@@ -6,7 +6,7 @@ import {
 import { publicSchema } from '../services/alerts/schema.js';
 import { coverageFor, publicStatus } from '../services/alerts/status.js';
 import {
-  createSubscriber, deleteSubscriber, profileView, setActivity, setStatus, updateProfile,
+  createSubscriber, deleteSubscriber, profileView, setActivity, setCurrentArea, setStatus, updateProfile,
 } from '../services/alerts/subscribers.js';
 
 // Subscriber-facing handlers. Every one reads MongoDB or memory only; none of them can trigger a provider request.
@@ -62,6 +62,17 @@ export async function updateActivity(req, res) {
 
 export async function updateStatus(req, res) {
   const updated = await setStatus(req.subscriber, req.body?.status);
+  res.json({ data: { profile: profileView(updated) } });
+}
+
+export async function updateCurrentArea(req, res) {
+  const body = req.body;
+  if (!body || Array.isArray(body) || Object.keys(body).some((key) => key !== 'upazilaPcode') || !Object.hasOwn(body, 'upazilaPcode')) {
+    return res.status(400).json({ message: 'Send an area code, or null to stop following.' });
+  }
+  const previous = req.subscriber.currentArea?.expiresAt > new Date() ? req.subscriber.currentArea.upazilaPcode : null;
+  const updated = await setCurrentArea(req.subscriber, body.upazilaPcode);
+  if (previous !== body.upazilaPcode) await reevaluateSubscriber(updated._id);
   res.json({ data: { profile: profileView(updated) } });
 }
 

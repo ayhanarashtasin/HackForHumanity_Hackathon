@@ -34,6 +34,7 @@ const sameInstant = (a, b) => +new Date(a) === +new Date(b);
 function differs(existing, content) {
   return existing.message !== content.message
     || existing.title !== content.title
+    || existing.reasonForSelection !== content.reasonForSelection
     || existing.severity !== content.severity
     || !sameInstant(existing.validFrom, content.validFrom)
     || !sameInstant(existing.validUntil, content.validUntil)
@@ -170,7 +171,22 @@ export async function applyEvent(event, {
       }
 
       // ----- finished notifications are never resurrected -----
-      if (FINAL.has(current.status)) { summary.unchanged += 1; continue; }
+      if (FINAL.has(current.status) && !(current.status === 'withdrawn' && current.withdrawalReason === 'location-changed')) {
+        summary.unchanged += 1;
+        continue;
+      }
+
+      // Coming back during the same event reuses the original notification (unique subscriber/event/rule key).
+      // Do not resend an already delivered external notification for the same stage.
+      if (current.status === 'withdrawn') {
+        if (['STALE', 'UNAVAILABLE'].includes(event.dataStatus)) { summary.unchanged += 1; continue; }
+        summary.updated += 1;
+        if (!dryRun) ops.push({ updateOne: { filter: { _id: current._id, status: 'withdrawn', withdrawalReason: 'location-changed' }, update: {
+          $set: { ...pickContent(content), status: 'active', withdrawalReason: null, reasonForSelection: content.reasonForSelection },
+          $push: { lifecycle: { $each: [{ at: now, type: 'updated', note: 'The current area matches this alert again.' }], $slice: -20 } },
+        } } });
+        continue;
+      }
 
       const set = {};
       const push = [];

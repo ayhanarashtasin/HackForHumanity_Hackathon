@@ -62,8 +62,9 @@ export async function topForecastAreas(limit = env.alerts.maxForecastAreas) {
   if (limit <= 0) return [];
   const rows = await Subscriber.aggregate([
     { $match: { status: 'active', expiresAt: { $gt: new Date() } } },
-    { $unwind: '$relevantUpazilas' },
-    { $group: { _id: '$relevantUpazilas', n: { $sum: 1 } } },
+    { $project: { areas: { $setUnion: ['$relevantUpazilas', { $cond: [{ $gt: ['$currentArea.expiresAt', new Date()] }, ['$currentArea.upazilaPcode'], []] }] } } },
+    { $unwind: '$areas' },
+    { $group: { _id: '$areas', n: { $sum: 1 } } },
     { $sort: { n: -1, _id: 1 } },
     { $limit: limit },
   ]);

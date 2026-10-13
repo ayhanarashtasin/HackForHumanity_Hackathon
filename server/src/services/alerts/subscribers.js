@@ -4,7 +4,7 @@ import { Delivery } from '../../models/Delivery.js';
 import { Notification } from '../../models/Notification.js';
 import { Subscriber } from '../../models/Subscriber.js';
 import { districts, locationByPcode } from '../geo.js';
-import { badRequest, serviceUnavailable } from './errors.js';
+import { HttpError, badRequest, serviceUnavailable } from './errors.js';
 import {
   CONSENT_VERSION, SCHEMA_VERSION, initialActivity, validateActivity, validateSubscription,
 } from './schema.js';
@@ -13,6 +13,7 @@ import { hashToken, newToken } from './tokens.js';
 // Subscribers: people who completed the alert form. No accounts: the browser holds an opaque token, only its hash is stored here.
 const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;
+export const CURRENT_AREA_TTL_MS = 15 * 60_000;
 const districtByPcode = new Map(districts.map((district) => [district.pcode, district]));
 
 const expiryFrom = (now) => new Date(now.getTime() + notifyRules.inactivityExpiryDays * DAY_MS);
@@ -121,6 +122,28 @@ export async function setStatus(subscriber, status) {
   return Subscriber.findByIdAndUpdate(subscriber._id, { $set: { status } }, { returnDocument: 'after' }).lean();
 }
 
+// A short-lived travel area, never a replacement for home, field, market or work.
+export async function setCurrentArea(subscriber, pcode, now = new Date(), { source = 'web', reportedAt = now } = {}) {
+  if (pcode !== null && (typeof pcode !== 'string' || !locationByPcode.has(pcode))) throw badRequest('Choose a valid area.');
+  if (source === 'web' && subscriber.currentArea?.source === 'telegram' && subscriber.currentArea.expiresAt > now) {
+    throw new HttpError(409, 'Telegram is following your location. Stop it there before enabling web following.');
+  }
+  const location = pcode === null ? null : locationByPcode.get(pcode);
+  const filter = source === 'web' ? { _id: subscriber._id, $or: [
+    { 'currentArea.source': { $ne: 'telegram' } }, { 'currentArea.expiresAt': { $lte: now } },
+  ] } : source === 'telegram' && location ? { _id: subscriber._id, $or: [
+    { currentArea: null }, { 'currentArea.source': 'telegram' }, { 'currentArea.expiresAt': { $lte: now } },
+  ] } : { _id: subscriber._id };
+  const updated = await Subscriber.findOneAndUpdate(filter, {
+    $set: { currentArea: location ? {
+      upazilaPcode: pcode, districtPcode: location.district, expiresAt: new Date(+now + CURRENT_AREA_TTL_MS), source, reportedAt,
+    } : null },
+  }, { returnDocument: 'after' }).lean();
+  if (!updated && source === 'web') throw new HttpError(409, 'Telegram is following your location. Stop it there before enabling web following.');
+  if (!updated && source === 'telegram') throw new HttpError(409, 'This profile is following location from the web page. Stop it there before enabling Telegram following.');
+  return updated;
+}
+
 // "Delete my alert profile": the subscriber and everything stored for them.
 export async function deleteSubscriber(subscriber) {
   await Delivery.deleteMany({ subscriberId: subscriber._id });
@@ -141,6 +164,11 @@ export function profileView(subscriber, now = new Date()) {
     status: subscriber.status,
     createdAt: subscriber.createdAt,
     activeActivity: activity ? { key: activity.key, since: activity.since, expiresAt: activity.expiresAt } : null,
+    currentArea: subscriber.currentArea?.expiresAt > now ? {
+      upazilaPcode: subscriber.currentArea.upazilaPcode,
+      expiresAt: subscriber.currentArea.expiresAt,
+      source: subscriber.currentArea.source ?? 'web',
+    } : null,
     areas: subscriber.areas.map((area) => {
       const location = locationByPcode.get(area.upazilaPcode);
       const district = districtByPcode.get(area.districtPcode);

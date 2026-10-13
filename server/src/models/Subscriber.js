@@ -19,6 +19,10 @@ const telegramChannelSchema = new mongoose.Schema(
   {
     chatId: { type: String },
     linkedAt: { type: Date },
+    followPendingUntil: { type: Date },
+    liveMessageId: { type: Number },
+    liveUntil: { type: Date },
+    liveReportedAt: { type: Date },
     linkCodeHash: { type: String },
     linkExpiresAt: { type: Date },
   },
@@ -67,6 +71,17 @@ const subscriberSchema = new mongoose.Schema(
     // Denormalised from `areas` on every save: they carry the (occupation, area) indexes the recipient search uses.
     relevantUpazilas: { type: [String], default: [] },
     relevantDistricts: { type: [String], default: [] },
+    // Short-lived area only; the browser resolves GPS locally and never sends coordinates.
+    currentArea: {
+      type: new mongoose.Schema({
+        upazilaPcode: { type: String, required: true },
+        districtPcode: { type: String, required: true },
+        expiresAt: { type: Date, required: true },
+        source: { type: String, enum: ['web', 'telegram'], default: 'web' },
+        reportedAt: { type: Date },
+      }, { _id: false }),
+      default: null,
+    },
     activeActivity: {
       type: new mongoose.Schema(
         {
@@ -113,6 +128,8 @@ subscriberSchema.index({ occupation: 1, relevantDistricts: 1 });
 // The engine finds recipients by area first (an event is occupation-neutral); the compound indexes above serve role-specific counts.
 subscriberSchema.index({ relevantUpazilas: 1, status: 1 });
 subscriberSchema.index({ relevantDistricts: 1, status: 1 });
+subscriberSchema.index({ 'currentArea.upazilaPcode': 1, 'currentArea.expiresAt': 1 });
+subscriberSchema.index({ 'currentArea.districtPcode': 1, 'currentArea.expiresAt': 1 });
 // One Telegram chat belongs to one profile; the partial filter keeps profiles without Telegram out of the index.
 subscriberSchema.index(
   { 'channels.telegram.chatId': 1 },

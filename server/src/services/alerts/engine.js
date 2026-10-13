@@ -18,7 +18,12 @@ import { loadForecastInputs, loadMarineInput } from './snapshots.js';
 const enabled = (settings, type) => settings.hazardEnabled?.[type] !== false;
 
 export async function monitoredAreas(nowMs = Date.now()) {
-  return Subscriber.distinct('relevantUpazilas', { status: 'active', expiresAt: { $gt: new Date(nowMs) } });
+  const active = { status: 'active', expiresAt: { $gt: new Date(nowMs) } };
+  const [saved, current] = await Promise.all([
+    Subscriber.distinct('relevantUpazilas', active),
+    Subscriber.distinct('currentArea.upazilaPcode', { ...active, 'currentArea.expiresAt': { $gt: new Date(nowMs) } }),
+  ]);
+  return [...new Set([...saved, ...current.filter(Boolean)])];
 }
 
 export async function monitoredMarineZones(nowMs = Date.now()) {
@@ -105,6 +110,7 @@ export async function detectAll({ nowMs = Date.now(), sources = null, extraStage
 
 // One full pass: detect, notify every active event's recipients, then end whatever has run out of time.
 export async function runTick({ nowMs = Date.now(), sources = null, extraStages = [] } = {}) {
+  await expireCurrentAreas(nowMs);
   const { settings, stats } = await detectAll({ nowMs, sources, extraStages });
   await notifyForEvents({ nowMs, settings, stats });
   stats.expired = await expireEnded(nowMs);
@@ -118,8 +124,9 @@ export async function evaluateSubscriberNow(subscriberId, { nowMs = Date.now() }
   if (!subscriber) return null;
   const settings = await getSettings({ now: nowMs });
 
-  const upazilas = subscriber.relevantUpazilas;
-  const districts = subscriber.relevantDistricts;
+  const current = subscriber.currentArea?.expiresAt > new Date(nowMs) ? subscriber.currentArea : null;
+  const upazilas = [...subscriber.relevantUpazilas, ...(current ? [current.upazilaPcode] : [])];
+  const districts = [...subscriber.relevantDistricts, ...(current ? [current.districtPcode] : [])];
   const events = await HazardEvent.find({
     lifecycle: 'active',
     validUntil: { $gt: new Date(nowMs) },
@@ -154,17 +161,27 @@ export async function reevaluateSubscriber(subscriberId, { nowMs = Date.now() } 
     const event = events.get(String(notification.hazardEventId));
     if (!event || notification.origin === 'admin-message') continue;
     // Judged at the time it was created, so a lead window or a finished shift cannot make a still-valid alert look unmatched.
-    const stillMatches = evaluateSubscriber({ subscriber, event, nowMs: +new Date(notification.createdAt) })
+    const effective = subscriber.currentArea?.expiresAt > now ? subscriber : { ...subscriber, currentArea: null };
+    const stillMatches = evaluateSubscriber({ subscriber: effective, event, nowMs: +new Date(notification.createdAt) })
       .some((entry) => entry.scenario.id === notification.scenarioId);
     if (stillMatches) continue;
 
     await Notification.updateOne({ _id: notification._id }, {
-      $set: { status: notification.status === 'draft' ? 'discarded' : 'withdrawn', withdrawalReason: 'profile-changed' },
-      $push: { lifecycle: lifecycleEntry('withdrawn', 'Your profile changed, so this alert no longer applies to you. This is not an all-clear.', now) },
+      $set: { status: notification.status === 'draft' ? 'discarded' : 'withdrawn', withdrawalReason: notification.evidence?.matchedArea?.role === 'current' ? 'location-changed' : 'profile-changed' },
+      $push: { lifecycle: lifecycleEntry('withdrawn', 'Your area or profile changed, so this alert no longer applies to you. This is not an all-clear.', now) },
     });
     withdrawn += 1;
   }
 
   const added = await evaluateSubscriberNow(subscriberId, { nowMs });
   return { withdrawn, ...added };
+}
+
+// Expired heartbeats are cleared even when the browser never sends a final stop (closed tab, dead battery).
+export async function expireCurrentAreas(nowMs = Date.now()) {
+  const expired = await Subscriber.find({ 'currentArea.expiresAt': { $lte: new Date(nowMs) } }).select('_id').lean();
+  for (const { _id } of expired) {
+    const result = await Subscriber.updateOne({ _id, 'currentArea.expiresAt': { $lte: new Date(nowMs) } }, { $set: { currentArea: null } });
+    if (result.modifiedCount) await reevaluateSubscriber(_id, { nowMs });
+  }
 }

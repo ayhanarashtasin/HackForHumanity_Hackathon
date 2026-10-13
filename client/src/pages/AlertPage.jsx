@@ -8,6 +8,7 @@ import { AlertContext } from '../alert/context.js';
 import { CoveragePanel } from '../alert/CoveragePanel.jsx';
 import { t } from '../alert/i18n.js';
 import { Inbox } from '../alert/Inbox.jsx';
+import { LiveLocation } from '../alert/LiveLocation.jsx';
 import { ProfilePanel } from '../alert/ProfilePanel.jsx';
 import { SavedScreen } from '../alert/SavedScreen.jsx';
 import { useAlertSession } from '../alert/useAlertSession.js';
@@ -55,6 +56,7 @@ export default function AlertPage() {
   const coverage = usePolled(alertApi.coverage, COVERAGE_POLL_MS, { enabled: ready });
   const status = usePolled(alertApi.status, COVERAGE_POLL_MS, { enabled: ready });
   const unread = useUnreadFromInbox(inbox);
+  const refreshLive = useCallback(() => { inbox.reload(); coverage.reload(); status.reload(); }, [inbox.reload, coverage.reload, status.reload]);
 
   // Switching language also switches the language new alerts are written in (a profile edit); it is reverted if that fails.
   const setLang = useCallback(async (code) => {
@@ -162,6 +164,7 @@ export default function AlertPage() {
             <BulletinPanel bulletins={status.data?.bulletins ?? null} error={status.error} />
           </div>
           <aside className="alert-col-side">
+            <LiveLocation profile={profile} onProfile={session.setProfile} onUpdated={refreshLive} />
             <ActivityControl profile={profile} onChange={session.setProfile} />
             <ChannelsPanel />
             <ProfilePanel profile={profile} onEdit={() => { setNotice(null); setView('edit'); }} onProfile={session.setProfile} onDeleted={deleted} />
