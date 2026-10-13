@@ -1,5 +1,6 @@
 # Downloaded and generated data: rebuild with scripts/fetch_history.py and scripts/build_dataset.py
 data/raw/
 data/processed/
+models/
 __pycache__/
 .venv/
