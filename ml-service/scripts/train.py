@@ -27,7 +27,7 @@ DATASET = ROOT / 'data' / 'processed' / 'heavy_rain_dataset.csv'
 MODEL_FILE = ROOT / 'models' / 'heavy_rain_rf.joblib'
 REPORTS = ROOT / 'reports'
 
-MODEL_VERSION = 'heavy-rain-rf-0.1.0'
+MODEL_VERSION = 'heavy-rain-rf-0.2.0'
 FEATURES = [
     'f_rain24_mm',            # sum of the 3-hour blocks (rule input)
     'f_rain3h_block_max_mm',  # wettest 3-hour block (rule input)
@@ -126,6 +126,13 @@ def main():
             'best_csi': float(max(np.quantile(scores, np.linspace(0.9, 0.999, 200)), key=lambda t: counts(scores >= t, y)['csi'] or 0)),
         }
 
+    # Confidence bands for rule alerts (Level >= 2): the risk-score terciles of the 2024-2025 alerts, per lead.
+    bands = {}
+    for lead in sorted(train['lead_day'].unique()):
+        mask = ((train['lead_day'] == lead) & (train['rule_heavy'] == 1)).to_numpy()
+        low, high = np.quantile(oof[mask], [1 / 3, 2 / 3])
+        bands[int(lead)] = {'medium_from': float(low), 'high_from': float(high)}
+
     # 3. Final model on all of 2024-2025, then the one and only look at 2026.
     model = forest(params).fit(train[FEATURES], train['label'])
     test['risk'] = model.predict_proba(test[FEATURES])[:, 1]
@@ -179,6 +186,14 @@ def main():
         'of_which_ml_below_same_budget': int((false_by_rule['risk'] < t1['same_budget']).sum()),
     }
 
+    band_check = {}
+    for lead, cut in bands.items():
+        alerts = test[(test['lead_day'] == lead) & (test['rule_heavy'] == 1)]
+        named = np.where(alerts['risk'] >= cut['high_from'], 'high', np.where(alerts['risk'] >= cut['medium_from'], 'medium', 'low'))
+        band_check[lead] = {name: {'alerts': int((named == name).sum()),
+                                   'came_true': round(float(alerts['label'][named == name].mean()), 3) if (named == name).any() else None}
+                            for name in ('high', 'medium', 'low')}
+
     importance = permutation_importance(model, lead1[FEATURES], y1, scoring='average_precision', n_repeats=5, random_state=SEED, n_jobs=-1)
     ranked = sorted(zip(FEATURES, importance.importances_mean), key=lambda item: -item[1])
 
@@ -188,6 +203,8 @@ def main():
         'train_period': f"{train['date'].min()} .. {train['date'].max()}", 'test_period': f"{test['date'].min()} .. {test['date'].max()}",
         'features': FEATURES, 'params': params, 'model_search': search,
         'thresholds': {lead: {k: round(v, 4) for k, v in t.items()} for lead, t in thresholds.items()},
+        'confidence_bands': {lead: {k: round(v, 4) for k, v in cut.items()} for lead, cut in bands.items()},
+        'confidence_bands_2026': band_check,
         'results': results, 'by_division_lead1': by_division, 'shadow_lead1': shadow,
         'calibration': {'brier': round(brier, 5), 'brier_climatology': round(brier_clim, 5),
                         'brier_skill': round(1 - brier / brier_clim, 3), 'reliability': rel, 'validated': calibration_ok},
@@ -195,7 +212,7 @@ def main():
     }
 
     MODEL_FILE.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump({'model': model, 'calibrator': calibrator, 'features': FEATURES, 'thresholds': thresholds,
+    joblib.dump({'model': model, 'calibrator': calibrator, 'features': FEATURES, 'thresholds': thresholds, 'bands': bands,
                  'calibration_validated': calibration_ok, 'version': MODEL_VERSION, 'provider': report['provider']}, MODEL_FILE, compress=3)
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / 'evaluation.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
@@ -238,6 +255,12 @@ def markdown(r):
               '## By division (1 day ahead, same budget)', '', '| Division | Heavy days | Rule precision | ML precision | Rule recall | ML recall |', '|---|---|---|---|---|---|']
     for name, d in r['by_division_lead1'].items():
         lines.append(f"| {name} | {d['heavy_days']} | {pct(d['rule']['precision'])} | {pct(d['ml_same_budget']['precision'])} | {pct(d['rule']['recall'])} | {pct(d['ml_same_budget']['recall'])} |")
+    lines += ['', '## Forecast confidence on rule alerts (Level >= 2), 2026', '',
+              'Bands are the risk-score terciles of the 2024-2025 rule alerts. "Came true" = share of the alerts in that band with real heavy rain.', '',
+              '| Lead | High: alerts / came true | Medium | Low |', '|---|---|---|---|']
+    for lead, check in r['confidence_bands_2026'].items():
+        cells = [f"{check[b]['alerts']} / {pct(check[b]['came_true'])}" for b in ('high', 'medium', 'low')]
+        lines.append(f"| {lead} | {' | '.join(cells)} |")
     c = r['calibration']
     lines += ['', '## Calibration (all leads, 2026)', '',
               f"Brier {c['brier']} vs climatology {c['brier_climatology']} (skill {c['brier_skill']}). "

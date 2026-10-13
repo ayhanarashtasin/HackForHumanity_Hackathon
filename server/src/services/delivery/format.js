@@ -1,5 +1,5 @@
 import { env } from '../../config/env.js';
-import { SENDER_LABELS, localizeDigits, whenText } from '../alerts/messages.js';
+import { SENDER_LABELS, confidenceLine, localizeDigits, whenText } from '../alerts/messages.js';
 
 // A short copy of a stored notification for a messaging channel. Built from the notification alone: no occupation, no "why you
 // received this", no profile answers (catalogue CTX-03: a shared or glanced-at phone must not reveal personal information).
@@ -85,14 +85,18 @@ export function renderMessage(channel, notification, { nowMs = Date.now(), siteU
   const ellipsis = lang === 'en' ? '...' : '…';
   const cut = (text, max) => (text.length > max ? `${text.slice(0, Math.max(max - ellipsis.length, 1)).trimEnd()}${ellipsis}` : text);
   const head = ascii(`AkashSathi ${tag}: ${title}`);
+  const confidence = ascii(stripEnd(confidenceLine(notification.evidence?.forecastConfidence?.band, lang).replace(/।$/, '')));
   const action = ascii(stripEnd(notification.recommendedActions?.[0]?.text));
   const tail = ascii(`${words.until(until)}. ${link}`);
-  let sms = [head, action, tail].filter(Boolean).join('. ');
+  // Drop the action first, then the confidence line, before cutting the title.
+  let sms = [head, confidence, action, tail].filter(Boolean).join('. ');
+  if (sms.length > limit) sms = [head, confidence, tail].filter(Boolean).join('. ');
   if (sms.length > limit) sms = [head, tail].join('. ');
   if (sms.length > limit) sms = `${cut(head, Math.max(limit - tail.length - 2, 20))}. ${tail}`;
 
   return {
     text: channel === 'sms' ? sms : full,
-    parts: [tag, title, `${String(notification.message ?? '').trim()} (${sender})`, until],
+    // WhatsApp template variables may not contain line breaks, so the confidence line joins the message with a space there.
+    parts: [tag, title, `${String(notification.message ?? '').trim().replace(/\s*\n\s*/g, ' ')} (${sender})`, until],
   };
 }

@@ -175,7 +175,7 @@
 .alert-page[data-lang='bn'] .alert-card h4 { letter-spacing: 0; }
 .alert-card-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0 0 8px; font-size: 0.84rem; color: var(--alert-muted); }
 .alert-card-meta span { display: inline-flex; align-items: center; gap: 6px; }
-.alert-card-message { margin: 10px 0; font-size: 0.95rem; line-height: 1.7; }
+.alert-card-message { margin: 10px 0; font-size: 0.95rem; line-height: 1.7; white-space: pre-line; }
 .alert-card-why p { margin: 0; font-size: 0.9rem; line-height: 1.65; }
 .alert-card-do ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
 .alert-card-do li { display: flex; align-items: flex-start; gap: 8px; font-size: 0.9rem; line-height: 1.55; font-weight: 550; }

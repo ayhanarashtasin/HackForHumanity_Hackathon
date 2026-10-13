@@ -1,4 +1,4 @@
-# Heavy rain classifier: evaluation (heavy-rain-rf-0.1.0)
+# Heavy rain classifier: evaluation (heavy-rain-rf-0.2.0)
 
 Train 2024-02-01 .. 2025-12-31 · Test 2026-01-01 .. 2026-10-06 (unseen) · Forecast open-meteo:best_match · Reference era5 (reanalysis, not gauges)
 
@@ -64,6 +64,16 @@ Ranking quality: ML ROC-AUC 0.92, average precision 0.245 · forecast only ROC-A
 | Rajshahi | 14 | 0% | 0% | 0% | 0% |
 | Rangpur | 62 | 23% | 16% | 18% | 11% |
 | Sylhet | 45 | 30% | 28% | 49% | 62% |
+
+## Forecast confidence on rule alerts (Level >= 2), 2026
+
+Bands are the risk-score terciles of the 2024-2025 rule alerts. "Came true" = share of the alerts in that band with real heavy rain.
+
+| Lead | High: alerts / came true | Medium | Low |
+|---|---|---|---|
+| 0 | 146 / 46% | 103 / 18% | 86 / 15% |
+| 1 | 160 / 40% | 82 / 22% | 54 / 9% |
+| 2 | 160 / 31% | 40 / 28% | 39 / 18% |
 
 ## Calibration (all leads, 2026)
 

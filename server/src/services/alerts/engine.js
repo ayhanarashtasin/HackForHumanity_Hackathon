@@ -6,6 +6,7 @@ import { dhakaIso } from '../time.js';
 import {
   expireEnded, lifecycleEntry, supersedeUnconfirmed, upsertDetectedEvent, upsertMarineEvent,
 } from './events.js';
+import { attachForecastConfidence } from './forecastConfidence.js';
 import { detectAreaHazards, detectMarine } from './hazards.js';
 import { applyEvent } from './notify.js';
 import { buildAreaForecast, loadSources } from './normalize.js';
@@ -33,12 +34,17 @@ export async function monitoredMarineZones(nowMs = Date.now()) {
 async function detectForecastHazards({ areas, nowMs, sources, settings, stats }) {
   const inputs = await loadForecastInputs(areas, nowMs);
 
+  const detected = [];
   for (const pcode of areas) {
     const area = buildAreaForecast(pcode, { now: nowMs, sources, xweather: inputs.get(pcode) ?? null });
-    if (!area) continue;
+    if (area) detected.push({ area, detections: detectAreaHazards(area, nowMs) });
+  }
+  // One batched call for the whole tick; it only adds a confidence label to Level 2+ heavy-rain detections.
+  await attachForecastConfidence(detected, { sources, nowMs });
 
+  for (const { area, detections } of detected) {
     const confirmed = [];
-    for (const detection of detectAreaHazards(area, nowMs)) {
+    for (const detection of detections) {
       if (!enabled(settings, detection.hazardType)) continue;
       const result = await upsertDetectedEvent({ detection, area, nowMs, settings });
       if (!result) { stats.blocked += 1; continue; }

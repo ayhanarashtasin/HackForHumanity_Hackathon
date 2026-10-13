@@ -1,6 +1,6 @@
 {
-  "model_version": "heavy-rain-rf-0.1.0",
-  "trained_at": "2026-10-13T10:08:07+00:00",
+  "model_version": "heavy-rain-rf-0.2.0",
+  "trained_at": "2026-10-13T12:47:00+00:00",
   "provider": "open-meteo:best_match",
   "reference": "era5",
   "train_period": "2024-02-01 .. 2025-12-31",
@@ -59,6 +59,64 @@
     "2": {
       "same_budget": 0.8581,
       "best_csi": 0.7814
+    }
+  },
+  "confidence_bands": {
+    "0": {
+      "medium_from": 0.7718,
+      "high_from": 0.8635
+    },
+    "1": {
+      "medium_from": 0.7787,
+      "high_from": 0.8849
+    },
+    "2": {
+      "medium_from": 0.7852,
+      "high_from": 0.8766
+    }
+  },
+  "confidence_bands_2026": {
+    "0": {
+      "high": {
+        "alerts": 146,
+        "came_true": 0.459
+      },
+      "medium": {
+        "alerts": 103,
+        "came_true": 0.175
+      },
+      "low": {
+        "alerts": 86,
+        "came_true": 0.151
+      }
+    },
+    "1": {
+      "high": {
+        "alerts": 160,
+        "came_true": 0.4
+      },
+      "medium": {
+        "alerts": 82,
+        "came_true": 0.22
+      },
+      "low": {
+        "alerts": 54,
+        "came_true": 0.093
+      }
+    },
+    "2": {
+      "high": {
+        "alerts": 160,
+        "came_true": 0.306
+      },
+      "medium": {
+        "alerts": 40,
+        "came_true": 0.275
+      },
+      "low": {
+        "alerts": 39,
+        "came_true": 0.179
+      }
     }
   },
   "results": {
