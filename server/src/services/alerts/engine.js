@@ -39,7 +39,7 @@ async function detectForecastHazards({ areas, nowMs, sources, settings, stats })
     const area = buildAreaForecast(pcode, { now: nowMs, sources, xweather: inputs.get(pcode) ?? null });
     if (area) detected.push({ area, detections: detectAreaHazards(area, nowMs) });
   }
-  // One batched call for the whole tick; it only adds a confidence label to Level 2+ heavy-rain detections.
+  // One batched call for the whole tick; it only adds a confidence label to rain detections.
   await attachForecastConfidence(detected, { sources, nowMs });
 
   for (const { area, detections } of detected) {

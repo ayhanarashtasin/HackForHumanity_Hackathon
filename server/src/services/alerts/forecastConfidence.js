@@ -3,15 +3,17 @@ import { env } from '../../config/env.js';
 import { dhakaDate } from '../time.js';
 import { inWindow, stepSeries } from './normalize.js';
 
-// Forecast confidence for heavy-rain alerts: a second opinion from the ML service (ml-service/), a Random Forest trained on past
-// Open-Meteo forecasts and the rain that actually fell (ERA5). It only labels Level 2+ alerts whose amounts come from Open-Meteo, the
-// provider it was trained on, as high / medium / low. It never creates, cancels, raises or lowers an alert, and when the service is
-// off, slow or failing the alerts go out exactly as before.
+// Forecast confidence for rain alerts: a second opinion from the ML service (ml-service/), Random Forests trained on past Open-Meteo
+// forecasts and the rain that actually fell (ERA5). Level 2+ alerts are rated by the heavy-rain model (did Level 2 rain happen?),
+// Level 1 alerts by the moderate-rain model (did Level 1 rain happen?), and only when the amounts come from Open-Meteo, the provider
+// both were trained on. It never creates, cancels, raises or lowers an alert, and when the service is off, slow or failing the
+// alerts go out exactly as before.
 const HOUR = 3_600_000;
 const COOL_OFF_MS = 5 * 60_000; // after a failure, skip the service for a while so a dead service cannot slow every tick
 // The rule looks at the next 24 hours from now; the closest training rows are the ones forecast on the day itself (lead 0).
 const LEAD_DAY = 0;
 const BANDS = new Set(['high', 'medium', 'low']);
+const TARGETS = new Set(['heavy', 'moderate']);
 
 let skipUntilMs = 0;
 
@@ -21,7 +23,7 @@ const round = (value, digits) => Math.round(value * 10 ** digits) / 10 ** digits
 // The model's inputs for one detection, or null when it does not apply. Rain amounts are the rule's own metrics; humidity and CAPE
 // come from the same Open-Meteo 3-hour blocks over the same window, which is how the training features were built.
 export function confidenceInput(detection, area, sources, nowMs) {
-  if (detection?.hazardType !== 'HEAVY_RAIN' || !(detection.level >= 2) || detection.source?.provider !== 'open-meteo') return null;
+  if (detection?.hazardType !== 'HEAVY_RAIN' || !(detection.level >= 1) || detection.source?.provider !== 'open-meteo') return null;
   const metrics = detection.evidence?.metrics;
   if (!present(area?.lat) || !present(area?.lon) || !present(metrics?.rain24hMm) || !present(metrics?.rain3hMm)) return null;
 
@@ -33,6 +35,8 @@ export function confidenceInput(detection, area, sources, nowMs) {
 
   return {
     id: area.pcode,
+    // Each model only answers the question its label asks: heavy rain for Level 2+, moderate rain for Level 1.
+    target: detection.level >= 2 ? 'heavy' : 'moderate',
     lat: area.lat,
     lon: area.lon,
     date: dhakaDate(new Date(nowMs)),
@@ -44,7 +48,7 @@ export function confidenceInput(detection, area, sources, nowMs) {
   };
 }
 
-// One request for every input of this tick -> Map(id -> { band, riskScore, predictedClass, modelVersion }). Never throws.
+// One request for every input of this tick -> Map(id -> { band, target, riskScore, predictedClass, modelVersion }). Never throws.
 export async function fetchConfidence(inputs, { fetchImpl = fetch, nowMs = Date.now(), url = env.alerts.mlServiceUrl, timeoutMs = env.alerts.mlTimeoutMs } = {}) {
   if (!url || !inputs.length || nowMs < skipUntilMs) return new Map();
   try {
@@ -61,9 +65,10 @@ export async function fetchConfidence(inputs, { fetchImpl = fetch, nowMs = Date.
       if (typeof item?.id !== 'string' || !BANDS.has(item.band)) continue;
       result.set(item.id, {
         band: item.band,
+        target: TARGETS.has(item.target) ? item.target : null,
         riskScore: present(item.risk_score) ? item.risk_score : null,
         predictedClass: item.predicted_class === 1 ? 1 : 0,
-        modelVersion: typeof json.model_version === 'string' ? json.model_version : null,
+        modelVersion: typeof item.model_version === 'string' ? item.model_version : null,
       });
     }
     return result;
@@ -89,7 +94,8 @@ export async function attachForecastConfidence(entries, { sources, nowMs, fetchI
   let attached = 0;
   for (const { detection, input } of pending) {
     const result = results.get(input.id);
-    if (!result) continue;
+    // An answer from the wrong model (an old service that ignores `target`) is not used.
+    if (!result || result.target !== input.target) continue;
     detection.evidence.forecastConfidence = {
       ...result,
       provider: 'open-meteo',

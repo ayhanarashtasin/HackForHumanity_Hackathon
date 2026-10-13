@@ -243,14 +243,14 @@ export function describeHazard(event, { areaName, nowMs, lang }) {
   }
 }
 
-// ---------- forecast confidence (heavy rain, ml-service) ----------
+// ---------- forecast confidence (rain, ml-service) ----------
 const CONFIDENCE_WORDS = {
   high: { en: 'High', bn: 'উচ্চ' },
   medium: { en: 'Medium', bn: 'মাঝারি' },
   low: { en: 'Low', bn: 'কম' },
 };
 
-// One line for a Level 2+ heavy-rain alert: how often similar past forecasts brought heavy rain, as a band. Never a percentage,
+// One line for a rain alert: how often similar past forecasts brought the rain the alert is about, as a band. Never a percentage,
 // because the model's probabilities did not pass the calibration check. An unknown band gives no line.
 export function confidenceLine(band, lang) {
   const word = pick(CONFIDENCE_WORDS[band], lang);

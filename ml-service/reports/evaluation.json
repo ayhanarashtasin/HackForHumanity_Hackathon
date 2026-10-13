@@ -1,6 +1,12 @@
 {
+  "target": "heavy",
+  "title": "Heavy rain classifier",
+  "label": "reference rainfall with wettest 3 h >= 23 mm or 24 h total >= 44 mm (Heavy Rain Level 2)",
+  "event": "heavy-rain",
+  "rule_name": "Level >= 2",
+  "band_name": "Level >= 2",
   "model_version": "heavy-rain-rf-0.2.0",
-  "trained_at": "2026-10-13T12:47:00+00:00",
+  "trained_at": "2026-10-13T21:48:19+00:00",
   "provider": "open-meteo:best_match",
   "reference": "era5",
   "train_period": "2024-02-01 .. 2025-12-31",
@@ -122,7 +128,7 @@
   "results": {
     "0": {
       "rows": 17856,
-      "heavy_days": 350,
+      "event_days": 350,
       "rule": {
         "warnings": 335,
         "hits": 98,
@@ -176,7 +182,7 @@
     },
     "1": {
       "rows": 17856,
-      "heavy_days": 350,
+      "event_days": 350,
       "rule": {
         "warnings": 296,
         "hits": 87,
@@ -230,7 +236,7 @@
     },
     "2": {
       "rows": 17856,
-      "heavy_days": 350,
+      "event_days": 350,
       "rule": {
         "warnings": 239,
         "hits": 67,
@@ -285,7 +291,7 @@
   },
   "by_division_lead1": {
     "Barishal": {
-      "heavy_days": 34,
+      "event_days": 34,
       "rule": {
         "warnings": 14,
         "hits": 7,
@@ -306,7 +312,7 @@
       }
     },
     "Chattogram": {
-      "heavy_days": 98,
+      "event_days": 98,
       "rule": {
         "warnings": 58,
         "hits": 28,
@@ -327,7 +333,7 @@
       }
     },
     "Dhaka": {
-      "heavy_days": 51,
+      "event_days": 51,
       "rule": {
         "warnings": 47,
         "hits": 8,
@@ -348,7 +354,7 @@
       }
     },
     "Khulna": {
-      "heavy_days": 28,
+      "event_days": 28,
       "rule": {
         "warnings": 16,
         "hits": 3,
@@ -369,7 +375,7 @@
       }
     },
     "Mymensingh": {
-      "heavy_days": 18,
+      "event_days": 18,
       "rule": {
         "warnings": 27,
         "hits": 8,
@@ -390,7 +396,7 @@
       }
     },
     "Rajshahi": {
-      "heavy_days": 14,
+      "event_days": 14,
       "rule": {
         "warnings": 14,
         "hits": 0,
@@ -411,7 +417,7 @@
       }
     },
     "Rangpur": {
-      "heavy_days": 62,
+      "event_days": 62,
       "rule": {
         "warnings": 47,
         "hits": 11,
@@ -432,7 +438,7 @@
       }
     },
     "Sylhet": {
-      "heavy_days": 45,
+      "event_days": 45,
       "rule": {
         "warnings": 73,
         "hits": 22,
@@ -454,7 +460,7 @@
     }
   },
   "shadow_lead1": {
-    "heavy_days_rule_missed": 263,
+    "event_days_rule_missed": 263,
     "of_which_ml_flagged_same_budget": 71,
     "of_which_ml_flagged_best_csi": 125,
     "rule_false_alarms": 209,

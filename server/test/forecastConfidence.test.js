@@ -18,29 +18,31 @@ function openMeteo({ rh = 88, cape = 1800 } = {}) {
 
 const heavyArea = (provider = 'open-meteo') => emptyArea({ rain: [rainSeries([10, 30, 8, 5, 2, 0, 0, 0], { provider })] });
 
-function reply(items, { ok = true, version = 'heavy-rain-rf-test' } = {}) {
+function reply(items, { ok = true } = {}) {
   const calls = [];
   const fetchImpl = async (url, init) => {
     calls.push({ url, body: JSON.parse(init.body) });
-    return { ok, status: ok ? 200 : 503, json: async () => ({ model_version: version, items }) };
+    return { ok, status: ok ? 200 : 503, json: async () => ({ items }) };
   };
   return { fetchImpl, calls };
 }
 
-test('only Level 2+ heavy rain from Open-Meteo is sent to the model, with the rule\'s own amounts', () => {
+test('rain alerts from Open-Meteo go to the model that matches their level, with the rule\'s own amounts', () => {
   const sources = { openMeteo: openMeteo() };
   const detection = detectHeavyRain(heavyArea(), NOW);
   assert.equal(detection.level, 2);
 
   const input = confidenceInput(detection, heavyArea(), sources, NOW);
   assert.deepEqual(
-    { id: input.id, lead: input.lead_day, rain24: input.rain24_mm, rain3h: input.rain3h_max_mm, rh: input.rh_mean, cape: input.cape_max },
-    { id: BADDA, lead: 0, rain24: detection.evidence.metrics.rain24hMm, rain3h: detection.evidence.metrics.rain3hMm, rh: 88, cape: 1800 },
+    { id: input.id, target: input.target, lead: input.lead_day, rain24: input.rain24_mm, rain3h: input.rain3h_max_mm, rh: input.rh_mean, cape: input.cape_max },
+    { id: BADDA, target: 'heavy', lead: 0, rain24: detection.evidence.metrics.rain24hMm, rain3h: detection.evidence.metrics.rain3hMm, rh: 88, cape: 1800 },
   );
   assert.match(input.date, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(confidenceInput({ ...detection, level: 3 }, heavyArea(), sources, NOW).target, 'heavy');
+  assert.equal(confidenceInput({ ...detection, level: 1 }, heavyArea(), sources, NOW).target, 'moderate', 'Level 1 asks the moderate-rain model');
 
-  assert.equal(confidenceInput(detectHeavyRain(heavyArea('xweather'), NOW), heavyArea(), sources, NOW), null, 'the model only knows Open-Meteo');
-  assert.equal(confidenceInput({ ...detection, level: 1 }, heavyArea(), sources, NOW), null);
+  assert.equal(confidenceInput(detectHeavyRain(heavyArea('xweather'), NOW), heavyArea(), sources, NOW), null, 'the models only know Open-Meteo');
+  assert.equal(confidenceInput({ ...detection, level: 0 }, heavyArea(), sources, NOW), null, 'no alert, no label');
   assert.equal(confidenceInput({ ...detection, hazardType: 'STRONG_WIND' }, heavyArea(), sources, NOW), null);
   assert.equal(confidenceInput(detection, heavyArea(), { openMeteo: { data: { steps: [], locations: {} } } }, NOW), null, 'no humidity, no input');
 });
@@ -65,27 +67,48 @@ test('the service is optional: off, failing or slow means no label and no error'
   assert.equal((await fetchConfidence(input, { fetchImpl: odd.fetchImpl, nowMs: NOW, url: ML_URL })).size, 0, 'unknown bands are ignored');
 });
 
-test('a tick sends one batch and labels the matching detection', async () => {
+async function attachWith(items, detection, area = heavyArea()) {
   resetConfidenceCoolOff();
-  const area = heavyArea();
-  const detection = detectHeavyRain(area, NOW);
-  const { fetchImpl, calls } = reply([{ id: BADDA, band: 'medium', risk_score: 0.81, predicted_class: 1 }]);
-  const process = await import('../src/config/env.js');
-  const saved = process.env.alerts.mlServiceUrl;
-  process.env.alerts.mlServiceUrl = ML_URL;
+  const { fetchImpl, calls } = reply(items);
+  const config = await import('../src/config/env.js');
+  const saved = config.env.alerts.mlServiceUrl;
+  config.env.alerts.mlServiceUrl = ML_URL;
   try {
     const attached = await attachForecastConfidence([{ area, detections: [detection] }], { sources: { openMeteo: openMeteo() }, nowMs: NOW, fetchImpl });
-    assert.equal(attached, 1);
+    return { attached, calls };
   } finally {
-    process.env.alerts.mlServiceUrl = saved;
+    config.env.alerts.mlServiceUrl = saved;
   }
+}
+
+test('a tick sends one batch and labels the matching detection', async () => {
+  const detection = detectHeavyRain(heavyArea(), NOW);
+  const { attached, calls } = await attachWith(
+    [{ id: BADDA, target: 'heavy', band: 'medium', risk_score: 0.81, predicted_class: 1, model_version: 'heavy-rain-rf-test' }], detection,
+  );
+  assert.equal(attached, 1);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, `${ML_URL}/predict`);
   assert.equal(calls[0].body.items.length, 1);
   assert.deepEqual(
-    { band: detection.evidence.forecastConfidence.band, score: detection.evidence.forecastConfidence.riskScore, version: detection.evidence.forecastConfidence.modelVersion },
-    { band: 'medium', score: 0.81, version: 'heavy-rain-rf-test' },
+    { band: detection.evidence.forecastConfidence.band, target: detection.evidence.forecastConfidence.target, score: detection.evidence.forecastConfidence.riskScore, version: detection.evidence.forecastConfidence.modelVersion },
+    { band: 'medium', target: 'heavy', score: 0.81, version: 'heavy-rain-rf-test' },
   );
+});
+
+test('an answer from the other model is never used', async () => {
+  const level1 = { ...detectHeavyRain(heavyArea(), NOW), level: 1 };
+  level1.evidence = { ...level1.evidence };
+  const wrong = await attachWith([{ id: BADDA, target: 'heavy', band: 'high' }], level1);
+  assert.equal(wrong.attached, 0);
+  assert.equal(level1.evidence.forecastConfidence, undefined);
+  const untagged = await attachWith([{ id: BADDA, band: 'high' }], level1);
+  assert.equal(untagged.attached, 0, 'an old service that ignores the target is not trusted');
+
+  const right = await attachWith([{ id: BADDA, target: 'moderate', band: 'low', model_version: 'moderate-rain-rf-test' }], level1);
+  assert.equal(right.calls[0].body.items[0].target, 'moderate');
+  assert.equal(right.attached, 1);
+  assert.deepEqual([level1.evidence.forecastConfidence.target, level1.evidence.forecastConfidence.band], ['moderate', 'low']);
 });
 
 function composeRain(evidence, lang) {

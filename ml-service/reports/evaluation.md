@@ -6,7 +6,7 @@ Label: reference rainfall with wettest 3 h >= 23 mm or 24 h total >= 44 mm (Heav
 * `equal warnings`: the ML's top N days in 2026, where N is the number of warnings the rule gave. Same alert count, so hits and false alarms compare directly.
 * `same budget`: threshold fixed in 2024-2025 so the ML warned as often as the rule did there (what a deployed model would do).
 * `best CSI`: threshold with the best CSI in 2024-2025.
-* `forecast only`: ranking days by how far the forecast is past the Level 2 line, i.e. the rule's own information.
+* `forecast only`: ranking days by how far the forecast is past the rule's line, i.e. the rule's own information.
 
 ## Test 2026, forecast 0 day(s) ahead: 350 heavy-rain days in 17,856
 
@@ -54,7 +54,7 @@ Ranking quality: ML ROC-AUC 0.92, average precision 0.245 · forecast only ROC-A
 
 ## By division (1 day ahead, same budget)
 
-| Division | Heavy days | Rule precision | ML precision | Rule recall | ML recall |
+| Division | Heavy-rain days | Rule precision | ML precision | Rule recall | ML recall |
 |---|---|---|---|---|---|
 | Barishal | 34 | 50% | 28% | 21% | 38% |
 | Chattogram | 98 | 48% | 34% | 29% | 67% |
@@ -67,7 +67,7 @@ Ranking quality: ML ROC-AUC 0.92, average precision 0.245 · forecast only ROC-A
 
 ## Forecast confidence on rule alerts (Level >= 2), 2026
 
-Bands are the risk-score terciles of the 2024-2025 rule alerts. "Came true" = share of the alerts in that band with real heavy rain.
+Bands are the risk-score terciles of the 2024-2025 rule alerts. "Came true" = share of the alerts in that band with real heavy-rain.
 
 | Lead | High: alerts / came true | Medium | Low |
 |---|---|---|---|

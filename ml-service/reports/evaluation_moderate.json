@@ -1,0 +1,571 @@
+{
+  "target": "moderate",
+  "title": "Moderate rain classifier",
+  "label": "reference rainfall with wettest 3 h >= 7.5 mm (Level 1, moderate rain)",
+  "event": "moderate-rain",
+  "rule_name": "Level >= 1",
+  "band_name": "Level 1",
+  "model_version": "moderate-rain-rf-0.1.0",
+  "trained_at": "2026-10-13T21:50:38+00:00",
+  "provider": "open-meteo:best_match",
+  "reference": "era5",
+  "train_period": "2024-02-01 .. 2025-12-31",
+  "test_period": "2026-01-01 .. 2026-10-06",
+  "features": [
+    "f_rain24_mm",
+    "f_rain3h_block_max_mm",
+    "f_rh_mean",
+    "f_cape_max",
+    "lat",
+    "lon",
+    "doy_sin",
+    "doy_cos",
+    "lead_day"
+  ],
+  "params": {
+    "min_samples_leaf": 400,
+    "max_features": "sqrt"
+  },
+  "model_search": [
+    {
+      "min_samples_leaf": 30,
+      "max_features": "sqrt",
+      "average_precision": 0.4523
+    },
+    {
+      "min_samples_leaf": 100,
+      "max_features": "sqrt",
+      "average_precision": 0.4688
+    },
+    {
+      "min_samples_leaf": 200,
+      "max_features": "sqrt",
+      "average_precision": 0.4713
+    },
+    {
+      "min_samples_leaf": 400,
+      "max_features": "sqrt",
+      "average_precision": 0.4725
+    },
+    {
+      "min_samples_leaf": 800,
+      "max_features": "sqrt",
+      "average_precision": 0.468
+    }
+  ],
+  "thresholds": {
+    "0": {
+      "same_budget": 0.7504,
+      "best_csi": 0.7939
+    },
+    "1": {
+      "same_budget": 0.8224,
+      "best_csi": 0.7925
+    },
+    "2": {
+      "same_budget": 0.8244,
+      "best_csi": 0.7986
+    }
+  },
+  "confidence_bands": {
+    "0": {
+      "medium_from": 0.7624,
+      "high_from": 0.8372
+    },
+    "1": {
+      "medium_from": 0.7967,
+      "high_from": 0.8678
+    },
+    "2": {
+      "medium_from": 0.7993,
+      "high_from": 0.8688
+    }
+  },
+  "confidence_bands_2026": {
+    "0": {
+      "high": {
+        "alerts": 724,
+        "came_true": 0.49
+      },
+      "medium": {
+        "alerts": 698,
+        "came_true": 0.385
+      },
+      "low": {
+        "alerts": 586,
+        "came_true": 0.22
+      }
+    },
+    "1": {
+      "high": {
+        "alerts": 661,
+        "came_true": 0.493
+      },
+      "medium": {
+        "alerts": 825,
+        "came_true": 0.39
+      },
+      "low": {
+        "alerts": 888,
+        "came_true": 0.261
+      }
+    },
+    "2": {
+      "high": {
+        "alerts": 752,
+        "came_true": 0.468
+      },
+      "medium": {
+        "alerts": 799,
+        "came_true": 0.347
+      },
+      "low": {
+        "alerts": 834,
+        "came_true": 0.254
+      }
+    }
+  },
+  "results": {
+    "0": {
+      "rows": 17856,
+      "event_days": 2329,
+      "rule": {
+        "warnings": 2343,
+        "hits": 968,
+        "false_alarms": 1375,
+        "misses": 1361,
+        "precision": 0.413,
+        "recall": 0.416,
+        "csi": 0.261
+      },
+      "ml_equal_warnings": {
+        "warnings": 2343,
+        "hits": 1069,
+        "false_alarms": 1274,
+        "misses": 1260,
+        "precision": 0.456,
+        "recall": 0.459,
+        "csi": 0.297
+      },
+      "ml_same_budget": {
+        "warnings": 2670,
+        "hits": 1170,
+        "false_alarms": 1500,
+        "misses": 1159,
+        "precision": 0.438,
+        "recall": 0.502,
+        "csi": 0.306
+      },
+      "ml_best_csi": {
+        "warnings": 1973,
+        "hits": 949,
+        "false_alarms": 1024,
+        "misses": 1380,
+        "precision": 0.481,
+        "recall": 0.407,
+        "csi": 0.283
+      },
+      "roc_auc": 0.845,
+      "average_precision": 0.442,
+      "forecast_only_roc_auc": 0.831,
+      "forecast_only_average_precision": 0.388,
+      "bootstrap": {
+        "average_precision_gain_95ci": [
+          0.033,
+          0.076
+        ],
+        "csi_gain_same_budget_95ci": [
+          0.023,
+          0.065
+        ]
+      }
+    },
+    "1": {
+      "rows": 17856,
+      "event_days": 2329,
+      "rule": {
+        "warnings": 2670,
+        "hits": 1086,
+        "false_alarms": 1584,
+        "misses": 1243,
+        "precision": 0.407,
+        "recall": 0.466,
+        "csi": 0.278
+      },
+      "ml_equal_warnings": {
+        "warnings": 2670,
+        "hits": 1174,
+        "false_alarms": 1496,
+        "misses": 1155,
+        "precision": 0.44,
+        "recall": 0.504,
+        "csi": 0.307
+      },
+      "ml_same_budget": {
+        "warnings": 1854,
+        "hits": 896,
+        "false_alarms": 958,
+        "misses": 1433,
+        "precision": 0.483,
+        "recall": 0.385,
+        "csi": 0.273
+      },
+      "ml_best_csi": {
+        "warnings": 2512,
+        "hits": 1114,
+        "false_alarms": 1398,
+        "misses": 1215,
+        "precision": 0.443,
+        "recall": 0.478,
+        "csi": 0.299
+      },
+      "roc_auc": 0.848,
+      "average_precision": 0.439,
+      "forecast_only_roc_auc": 0.833,
+      "forecast_only_average_precision": 0.407,
+      "bootstrap": {
+        "average_precision_gain_95ci": [
+          0.0,
+          0.063
+        ],
+        "csi_gain_same_budget_95ci": [
+          -0.03,
+          0.018
+        ]
+      }
+    },
+    "2": {
+      "rows": 17856,
+      "event_days": 2329,
+      "rule": {
+        "warnings": 2624,
+        "hits": 991,
+        "false_alarms": 1633,
+        "misses": 1338,
+        "precision": 0.378,
+        "recall": 0.426,
+        "csi": 0.25
+      },
+      "ml_equal_warnings": {
+        "warnings": 2624,
+        "hits": 1048,
+        "false_alarms": 1576,
+        "misses": 1281,
+        "precision": 0.399,
+        "recall": 0.45,
+        "csi": 0.268
+      },
+      "ml_same_budget": {
+        "warnings": 1899,
+        "hits": 823,
+        "false_alarms": 1076,
+        "misses": 1506,
+        "precision": 0.433,
+        "recall": 0.353,
+        "csi": 0.242
+      },
+      "ml_best_csi": {
+        "warnings": 2538,
+        "hits": 1025,
+        "false_alarms": 1513,
+        "misses": 1304,
+        "precision": 0.404,
+        "recall": 0.44,
+        "csi": 0.267
+      },
+      "roc_auc": 0.827,
+      "average_precision": 0.394,
+      "forecast_only_roc_auc": 0.815,
+      "forecast_only_average_precision": 0.356,
+      "bootstrap": {
+        "average_precision_gain_95ci": [
+          0.011,
+          0.066
+        ],
+        "csi_gain_same_budget_95ci": [
+          -0.032,
+          0.013
+        ]
+      }
+    }
+  },
+  "by_division_lead1": {
+    "Barishal": {
+      "event_days": 168,
+      "rule": {
+        "warnings": 189,
+        "hits": 70,
+        "false_alarms": 119,
+        "misses": 98,
+        "precision": 0.37,
+        "recall": 0.417,
+        "csi": 0.244
+      },
+      "ml_same_budget": {
+        "warnings": 149,
+        "hits": 74,
+        "false_alarms": 75,
+        "misses": 94,
+        "precision": 0.497,
+        "recall": 0.44,
+        "csi": 0.305
+      }
+    },
+    "Chattogram": {
+      "event_days": 342,
+      "rule": {
+        "warnings": 441,
+        "hits": 172,
+        "false_alarms": 269,
+        "misses": 170,
+        "precision": 0.39,
+        "recall": 0.503,
+        "csi": 0.282
+      },
+      "ml_same_budget": {
+        "warnings": 323,
+        "hits": 173,
+        "false_alarms": 150,
+        "misses": 169,
+        "precision": 0.536,
+        "recall": 0.506,
+        "csi": 0.352
+      }
+    },
+    "Dhaka": {
+      "event_days": 444,
+      "rule": {
+        "warnings": 483,
+        "hits": 192,
+        "false_alarms": 291,
+        "misses": 252,
+        "precision": 0.398,
+        "recall": 0.432,
+        "csi": 0.261
+      },
+      "ml_same_budget": {
+        "warnings": 301,
+        "hits": 141,
+        "false_alarms": 160,
+        "misses": 303,
+        "precision": 0.468,
+        "recall": 0.318,
+        "csi": 0.233
+      }
+    },
+    "Khulna": {
+      "event_days": 356,
+      "rule": {
+        "warnings": 348,
+        "hits": 143,
+        "false_alarms": 205,
+        "misses": 213,
+        "precision": 0.411,
+        "recall": 0.402,
+        "csi": 0.255
+      },
+      "ml_same_budget": {
+        "warnings": 210,
+        "hits": 99,
+        "false_alarms": 111,
+        "misses": 257,
+        "precision": 0.471,
+        "recall": 0.278,
+        "csi": 0.212
+      }
+    },
+    "Mymensingh": {
+      "event_days": 179,
+      "rule": {
+        "warnings": 249,
+        "hits": 102,
+        "false_alarms": 147,
+        "misses": 77,
+        "precision": 0.41,
+        "recall": 0.57,
+        "csi": 0.313
+      },
+      "ml_same_budget": {
+        "warnings": 171,
+        "hits": 82,
+        "false_alarms": 89,
+        "misses": 97,
+        "precision": 0.48,
+        "recall": 0.458,
+        "csi": 0.306
+      }
+    },
+    "Rajshahi": {
+      "event_days": 249,
+      "rule": {
+        "warnings": 251,
+        "hits": 95,
+        "false_alarms": 156,
+        "misses": 154,
+        "precision": 0.378,
+        "recall": 0.382,
+        "csi": 0.235
+      },
+      "ml_same_budget": {
+        "warnings": 171,
+        "hits": 75,
+        "false_alarms": 96,
+        "misses": 174,
+        "precision": 0.439,
+        "recall": 0.301,
+        "csi": 0.217
+      }
+    },
+    "Rangpur": {
+      "event_days": 357,
+      "rule": {
+        "warnings": 385,
+        "hits": 163,
+        "false_alarms": 222,
+        "misses": 194,
+        "precision": 0.423,
+        "recall": 0.457,
+        "csi": 0.282
+      },
+      "ml_same_budget": {
+        "warnings": 277,
+        "hits": 127,
+        "false_alarms": 150,
+        "misses": 230,
+        "precision": 0.458,
+        "recall": 0.356,
+        "csi": 0.25
+      }
+    },
+    "Sylhet": {
+      "event_days": 234,
+      "rule": {
+        "warnings": 324,
+        "hits": 149,
+        "false_alarms": 175,
+        "misses": 85,
+        "precision": 0.46,
+        "recall": 0.637,
+        "csi": 0.364
+      },
+      "ml_same_budget": {
+        "warnings": 252,
+        "hits": 125,
+        "false_alarms": 127,
+        "misses": 109,
+        "precision": 0.496,
+        "recall": 0.534,
+        "csi": 0.346
+      }
+    }
+  },
+  "shadow_lead1": {
+    "event_days_rule_missed": 1243,
+    "of_which_ml_flagged_same_budget": 152,
+    "of_which_ml_flagged_best_csi": 253,
+    "rule_false_alarms": 1584,
+    "of_which_ml_below_same_budget": 880
+  },
+  "calibration": {
+    "brier": 0.09236,
+    "brier_climatology": 0.11382,
+    "brier_skill": 0.189,
+    "reliability": [
+      {
+        "from": 0,
+        "to": 0.02,
+        "n": 18180,
+        "mean_predicted": 0.002,
+        "observed": 0.005
+      },
+      {
+        "from": 0.02,
+        "to": 0.05,
+        "n": 3271,
+        "mean_predicted": 0.036,
+        "observed": 0.037
+      },
+      {
+        "from": 0.05,
+        "to": 0.1,
+        "n": 7665,
+        "mean_predicted": 0.077,
+        "observed": 0.077
+      },
+      {
+        "from": 0.1,
+        "to": 0.2,
+        "n": 10091,
+        "mean_predicted": 0.153,
+        "observed": 0.133
+      },
+      {
+        "from": 0.2,
+        "to": 0.3,
+        "n": 4059,
+        "mean_predicted": 0.257,
+        "observed": 0.213
+      },
+      {
+        "from": 0.3,
+        "to": 0.5,
+        "n": 6791,
+        "mean_predicted": 0.36,
+        "observed": 0.326
+      },
+      {
+        "from": 0.5,
+        "to": 0.7,
+        "n": 2923,
+        "mean_predicted": 0.557,
+        "observed": 0.478
+      },
+      {
+        "from": 0.7,
+        "to": 1,
+        "n": 588,
+        "mean_predicted": 0.715,
+        "observed": 0.628
+      }
+    ],
+    "validated": true
+  },
+  "permutation_importance_lead1": [
+    {
+      "feature": "f_rain24_mm",
+      "drop_in_average_precision": 0.1556
+    },
+    {
+      "feature": "f_rain3h_block_max_mm",
+      "drop_in_average_precision": 0.0673
+    },
+    {
+      "feature": "f_rh_mean",
+      "drop_in_average_precision": 0.0417
+    },
+    {
+      "feature": "doy_cos",
+      "drop_in_average_precision": 0.0184
+    },
+    {
+      "feature": "doy_sin",
+      "drop_in_average_precision": 0.0131
+    },
+    {
+      "feature": "f_cape_max",
+      "drop_in_average_precision": 0.0053
+    },
+    {
+      "feature": "lon",
+      "drop_in_average_precision": 0.0013
+    },
+    {
+      "feature": "lat",
+      "drop_in_average_precision": 0.0012
+    },
+    {
+      "feature": "lead_day",
+      "drop_in_average_precision": 0.0
+    }
+  ]
+}

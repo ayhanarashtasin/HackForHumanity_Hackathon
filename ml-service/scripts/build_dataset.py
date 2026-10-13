@@ -2,9 +2,10 @@
 
 One row = one district x one local calendar day (Asia/Dhaka, 00:00-24:00) x one forecast lead (0, 1, 2 days).
   * Features come only from the forecast issued `lead_day` days before the target day.
-  * The label comes only from the reference rainfall of that same district and day:
-      label = 1 if reference max rolling 3 h rain >= 23 mm OR reference 24 h rain >= 44 mm, else 0
-    (Heavy Rain Level 2, server/src/config/alertRules.js). It is never taken from the rule's forecast output.
+  * The labels come only from the reference rainfall of that same district and day:
+      label          = 1 if reference max rolling 3 h rain >= 23 mm OR reference 24 h rain >= 44 mm, else 0 (Heavy Rain Level 2)
+      label_moderate = 1 if reference max rolling 3 h rain >= 7.5 mm, else 0 (Level 1, moderate rain)
+    (server/src/config/alertRules.js). They are never taken from the rule's forecast output.
   * rule_level / rule_heavy replay the existing rule on the forecast exactly as the live server computes it
     (3-hour blocks aligned to 00, 03, 06 ... local time), so the model can be compared against that baseline.
 
@@ -109,6 +110,8 @@ def main():
                     'rule_level': level, 'rule_heavy': int(level >= 2),
                     'reference': REFERENCE, 'ref_rain24_mm': r(y24), 'ref_rain3h_max_mm': r(y3),
                     'label': int(y3 >= LEVELS[2]['rain3h'] or y24 >= LEVELS[2]['rain24h']),
+                    # Level 1 (moderate rain) happened: the reference's wettest 3 hours reached the Level 1 amount.
+                    'label_moderate': int(y3 >= LEVELS[1]['rain3h']),
                 })
 
     if not rows:

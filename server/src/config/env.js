@@ -110,7 +110,7 @@ export const env = {
     dailyAdvisoryCap: numberFromEnv('ALERT_DAILY_ADVISORY_CAP', 3, { min: 1, integer: true }),
     // BMD rainfall amounts are only trusted as a second opinion once their unit is confirmed (spike S3).
     bmdRainVerified: process.env.ALERT_BMD_RAIN_VERIFIED === 'on',
-    // Heavy-rain forecast confidence from ml-service/ (one extra line on Level 2+ rain alerts). Empty = off; alerts are unchanged without it.
+    // Rain forecast confidence from ml-service/ (one extra line on rain alerts). Empty = off; alerts are unchanged without it.
     mlServiceUrl: (process.env.ML_SERVICE_URL || '').trim().replace(/\/$/, ''),
     mlTimeoutMs: numberFromEnv('ML_TIMEOUT_MS', 3000, { min: 200, max: 30_000, integer: true }),
   },

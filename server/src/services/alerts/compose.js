@@ -93,7 +93,7 @@ export function composeNotification({
   const advice = result.advice.map((item) => fill(pick(ADVICE[item.key], lang), { ...builtIn, ...(item.params ?? {}) }));
   // Bangla attaches its suffix to the plain place name ("বাড্ডা-এ"), so it gets the short name; English reads best with the district.
   const what = describeHazard(event, { areaName: lang === 'bn' ? shortName(affectedArea, lang) : areaName, nowMs, lang });
-  // Heavy-rain alerts with an ML confidence band get it as one last line; everything above it is unchanged.
+  // Rain alerts with an ML confidence band get it as one last line; everything above it is unchanged.
   const confidence = event.hazardType === 'HEAVY_RAIN' ? confidenceLine(event.evidence?.forecastConfidence?.band, lang) : '';
   const message = [[what, ...advice].filter(Boolean).join(' '), confidence].filter(Boolean).join('\n');
 
