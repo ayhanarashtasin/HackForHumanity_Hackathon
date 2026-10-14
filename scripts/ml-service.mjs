@@ -18,10 +18,16 @@ function fail(message) {
   process.exit(1);
 }
 
-function run(command, args) {
+function run(command, args, hint = '') {
   const result = spawnSync(command, args, { cwd: ML, stdio: 'inherit' });
-  if (result.status !== 0) fail(`"${command} ${args.join(' ')}" failed.`);
+  if (result.status !== 0) fail(`"${command} ${args.join(' ')}" failed.${hint}`);
 }
+
+// Windows refuses paths over 260 characters unless long paths are enabled; numpy's files are deep enough to hit it from a long folder.
+const LONG_PATH_HINT = WINDOWS
+  ? ' If the error says "filename or extension is too long", move the project to a shorter folder (for example C:\\projects\\)'
+    + ' or enable Windows long paths, then delete ml-service/.venv and run this again.'
+  : '';
 
 // The first Python 3.12+ on this machine (numpy and scipy, which the model needs, require 3.12).
 function findPython() {
@@ -50,7 +56,7 @@ const stamp = join(VENV, '.requirements.sha256');
 const hash = createHash('sha256').update(requirements).digest('hex');
 if (!existsSync(stamp) || readFileSync(stamp, 'utf8') !== hash) {
   console.log('[ml] Installing Python packages (a few minutes the first time)...');
-  run(venvPython, ['-m', 'pip', 'install', '--disable-pip-version-check', '-q', '-r', 'requirements.txt']);
+  run(venvPython, ['-m', 'pip', 'install', '--disable-pip-version-check', '-q', '-r', 'requirements.txt'], LONG_PATH_HINT);
   writeFileSync(stamp, hash);
 }
 
