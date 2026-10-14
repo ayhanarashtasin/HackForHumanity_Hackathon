@@ -61,6 +61,10 @@ ul { padding: 0; list-style: none; }
 .language-toggle button { min-height: 44px; min-width: 44px; padding: 5px 10px; border: 0; border-radius: 999px; background: transparent; color: inherit; font-size: 0.85rem; font-weight: 600; white-space: nowrap; }
 .language-toggle button[aria-pressed='true'] { background: var(--olive); color: var(--cream); }
 .language-toggle button:hover:not(:disabled):not([aria-pressed='true']) { background: var(--sage-soft); }
+/* Navbar variant: a quiet switch at the end of the bar, so it does not read as another primary button. */
+.language-toggle.is-subtle { background: transparent; }
+.language-toggle.is-subtle button { padding-inline: 8px; font-size: 0.8rem; }
+.language-toggle.is-subtle button[aria-pressed='true'] { background: var(--sage-soft); color: var(--olive); }
 /* Bengali conjuncts need room above/below the baseline, without English-style tracking or italics. */
 :lang(bn) { font-family: var(--font-bn); letter-spacing: normal; }
 html:lang(bn) { line-height: 1.6; }

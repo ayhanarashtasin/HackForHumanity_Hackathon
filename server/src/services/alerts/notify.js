@@ -6,7 +6,7 @@ import { dhakaDate, dhakaWallTime } from '../time.js';
 import { composeAdminMessage, composeNotification } from './compose.js';
 import { metricsChanged } from './events.js';
 import { findRecipients } from './recipients.js';
-import { evaluateSubscriber } from './scenarios/index.js';
+import { evaluateSubscriber, scenariosFor } from './scenarios/index.js';
 
 // Stage 4: compose, de-duplicate, publish and store. The unique index (subscriber, event, scenario) is the de-duplication key:
 // create once, update when the evidence or severity materially changes, re-notify only under the escalation rules.
@@ -110,6 +110,19 @@ export async function applyEvent(event, {
   const ids = recipients.map((subscriber) => subscriber._id);
   const existingRows = await Notification.find({ hazardEventId: event._id, subscriberId: { $in: ids } }).lean();
   const existing = new Map(existingRows.map((row) => [`${row.subscriberId}:${row.scenarioId}`, row]));
+  // Scenarios marked oncePerHazard (VEND-03) send one card per person for one hazard, even when it reaches several of their areas as
+  // separate events: a live card from another event whose validity overlaps this one already covers it.
+  const onceIds = scenariosFor(event.hazardType).filter((scenario) => scenario.oncePerHazard).map((scenario) => scenario.id);
+  const siblingRows = onceIds.length ? await Notification.find({
+    subscriberId: { $in: ids },
+    scenarioId: { $in: onceIds },
+    hazardType: event.hazardType,
+    hazardEventId: { $ne: event._id },
+    status: { $in: ['active', 'draft'] },
+    validUntil: { $gt: new Date(Math.max(nowMs, +new Date(event.validFrom))) },
+    validFrom: { $lt: new Date(event.validUntil) },
+  }, { subscriberId: 1, scenarioId: 1 }).lean() : [];
+  const covered = new Set(siblingRows.map((row) => `${row.subscriberId}:${row.scenarioId}`));
   const caps = bypassCap || dryRun ? new Map() : await advisoryCounts(ids, nowMs);
   const groups = new Map();
   const ops = [];
@@ -138,6 +151,7 @@ export async function applyEvent(event, {
       // ----- nothing yet: create it -----
       if (!current) {
         if (['STALE', 'UNAVAILABLE'].includes(event.dataStatus)) continue;
+        if (covered.has(`${subscriber._id}:${scenario.id}`)) { group.alreadySent += 1; summary.unchanged += 1; continue; }
         if (content.severity === 'ADVISORY' && !bypassCap && !dryRun) {
           const today = caps.get(String(subscriber._id)) ?? 0;
           if (today >= env.alerts.dailyAdvisoryCap) { group.capped += 1; summary.skippedCap += 1; continue; }

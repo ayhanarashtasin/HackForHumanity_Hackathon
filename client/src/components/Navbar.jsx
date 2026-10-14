@@ -14,7 +14,7 @@ const prefetchAlert = prefetchPage('alert');
 
 // The logo and section links sit on the left; Alert and Map form the far-right group.
 // "Data" lives in the footer and in the phone menu.
-const SECTION_LINKS = [{ id: 'features', label: 'Features' }, { id: 'who', label: "Who it's for" }];
+const SECTION_LINKS = [{ id: 'features', label: 'Features' }, { id: 'who', label: "Who It's For" }];
 const MENU_ONLY_LINKS = [{ id: 'data', label: 'Data' }];
 const MENU_BREAKPOINT = 860;
 
@@ -125,7 +125,7 @@ export function Navbar({ onLanguageChange, languageDisabled = false }) {
               </Link>
             </li>
             <li><Link {...mapProps} onClick={() => setOpen(false)}><Icon name="map" size={18} />{tr('Map')}</Link></li>
-            <li><Link {...routeProps} aria-current={route === 'route' ? 'page' : undefined} onClick={() => setOpen(false)}><Icon name="route" size={18} />{tr('Route')}</Link></li>
+            <li><Link {...routeProps} aria-current={route === 'route' ? 'page' : undefined} onClick={() => setOpen(false)}><Icon name="route" size={18} />{tr('Routes')}</Link></li>
           </ul>
         )}
 
@@ -149,20 +149,20 @@ export function Navbar({ onLanguageChange, languageDisabled = false }) {
         <ul className="nav-links nav-links--left">{SECTION_LINKS.map(sectionLink)}</ul>
 
         <ul className="nav-links nav-links--right">
-          <li className="nav-language"><LanguageToggle onChange={onLanguageChange} disabled={languageDisabled} /></li>
           <li className="nav-cta-item">
             <Link {...alertProps} className="nav-cta nav-cta--outline nav-alert" aria-label={alertLabel} aria-current={route === 'alert' ? 'page' : undefined}>
               <Icon name="bell" size={18} />
-              <span className="nav-alert-label">{tr('Alert')}</span>
+              <span className="nav-alert-label">{tr('Alerts')}</span>
               {unread > 0 && <span className="nav-badge" aria-hidden="true">{badge}</span>}
             </Link>
           </li>
           <li className="nav-cta-item">
             <Link {...mapProps} className="nav-cta"><Icon name="map" size={18} />{tr('Map')}</Link>
           </li>
-          <li className="nav-cta-item">
-            <Link {...routeProps} className="nav-cta" aria-current={route === 'route' ? 'page' : undefined}><Icon name="route" size={18} />{tr('Route')}</Link>
+          <li className="nav-cta-item nav-cta-route">
+            <Link {...routeProps} className="nav-cta" aria-current={route === 'route' ? 'page' : undefined}><Icon name="route" size={18} />{tr('Routes')}</Link>
           </li>
+          <li className="nav-language"><LanguageToggle subtle onChange={onLanguageChange} disabled={languageDisabled} /></li>
         </ul>
       </nav>
     </header>

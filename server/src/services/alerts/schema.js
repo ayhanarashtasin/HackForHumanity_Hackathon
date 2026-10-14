@@ -189,7 +189,9 @@ export const RULE_SUMMARIES = {
   'CONS-02': text('Heat during heavy work in protective gear', 'সুরক্ষা সরঞ্জাম পরে ভারী কাজের সময় গরম'),
   'CONS-03': text('Strong gusts while you work at height', 'উঁচু জায়গায় কাজের সময় প্রবল দমকা হাওয়া'),
   'VEND-01': text('Strong wind around an outdoor stall', 'খোলা জায়গার দোকানের কাছে প্রবল বাতাস'),
+  'CONS-04': text('Rain at your site, as a prompt to check for slippery surfaces', 'আপনার কাজের জায়গায় বৃষ্টি, পিচ্ছিল জায়গা পরীক্ষার অনুস্মারক'),
   'VEND-02': text('Heat in an open-air market', 'খোলা বাজারে গরম'),
+  'VEND-03': text('Rain at any of your markets, once per rain', 'আপনার যেকোনো বাজারে বৃষ্টি, প্রতি বৃষ্টিতে একবার'),
   'PUBLIC-01': text('Rain during your usual travel time', 'আপনার নিয়মিত যাতায়াতের সময় বৃষ্টি'),
   'PUBLIC-02': text('Lightning while you play or exercise outdoors', 'বাইরে খেলাধুলা বা ব্যায়ামের সময় বজ্রপাত'),
   'PUBLIC-03': text('Extra heat guidance if you chose it', 'আপনি চাইলে গরম সম্পর্কে বাড়তি নির্দেশনা'),
@@ -201,8 +203,8 @@ export const RULE_SUMMARIES = {
 export const OCCUPATION_RULES = {
   farmer: ['FARM-01', 'FARM-02', 'FARM-03', 'FARM-04', 'FARM-05'],
   fisherman: ['FISH-02', 'FISH-04', 'PUBLIC-03'],
-  construction: ['CONS-01', 'CONS-02', 'CONS-03'],
-  vendor: ['VEND-01', 'VEND-02'],
+  construction: ['CONS-01', 'CONS-02', 'CONS-03', 'CONS-04'],
+  vendor: ['VEND-01', 'VEND-02', 'VEND-03'],
   student_public: ['PUBLIC-01', 'PUBLIC-02', 'PUBLIC-03'],
   rickshaw_labourer: ['WORK-01', 'WORK-03', 'WORK-04'],
 };

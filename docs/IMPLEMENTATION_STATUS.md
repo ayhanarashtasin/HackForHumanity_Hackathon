@@ -24,7 +24,7 @@ The latest local verification used Node.js **24.14.0**. [GitHub CI](../.github/w
 | **M4** Xweather forecast and maritime, token governor | **Partial** | Forecast, maritime, governor and quick status exist. Missing: the Overview budget projection, and the lightning campaign writing into the shared ledger (the governor only reads campaign state). WORK-05 is folded into WORK-01. |
 | **M5** Lightning | **Partial** | Gate, tiers, episodes, fatigue rules and the critical live region exist. Missing: server-side polygon boundary data (matching uses the representative point). Parsers have only seen synthetic payloads. |
 | **M6** Official bulletins | **Partial** | North Bay marine notices create FISH-01/03. River-port, fleet C-90 and general bulletins are dated links only. The warning classifier has only run on synthetic text; the live PDFs inspected so far all said NO STORM WARNING. |
-| **M7** Hardening | **Mostly open** | No VEND-03 saved-market handling, CONS-04, recovery code, or rule editor. Bangla is unreviewed. Quiet hours are now enforced for external channels (see below). |
+| **M7** Hardening | **Mostly open** | CONS-04 and VEND-03 are now scenarios (14 October 2026). No recovery code or rule editor. Bangla is unreviewed. Quiet hours are now enforced for external channels (see below). |
 | **Delivery channels** (plan: "Later") | **Built** | Telegram bot, WhatsApp (templates) and SMS (Twilio or generic HTTP). Mocked-provider tests only; not run against live accounts. See the README. |
 | **Stored history** | **Built** | Per-district run summaries with a TTL, and `GET /api/weather/history`. |
 | **Telegram weather commands** | **Built** | `/update`, `/heat`, `/rain`, `/wind`, `/thunderstorm`, `/lightning`, `/forecast`, `/alerts`, `/status`, with a menu and buttons. See below. |
@@ -133,7 +133,7 @@ Plan requirements that the code does not meet, with where they live:
 | §17 banned-phrase lint | The lint patterns are English only, so the Bangla pass is vacuous. |
 | §15 | The subscriber cookie is not refreshed on use (one year from sign-up), and a missing `Origin` header is allowed (non-browser clients). |
 | §6.2 | Overview shows monitored areas but not circles, and no budget projection. |
-| §12 | FISH-05 and WORK-02/05 are flags inside other rules, not separate notifications; CONS-04 and VEND-03 have no implementation; PUBLIC-04/05 and CTX-01 are cross-cutting rather than rules; the `in_field` activity is consumed by nothing. |
+| §12 | FISH-05 and WORK-02/05 are flags inside other rules, not separate notifications; CONS-04 (rain at an open site, inspection advice, including six hours after the rain) and VEND-03 (rain at any market, one card per rain across markets via `oncePerHazard`) exist but VEND-03 has no per-market hours, it uses the 07:00-20:00 vendor default; PUBLIC-04/05 and CTX-01 are cross-cutting rather than rules; the `in_field` activity is consumed by nothing. |
 | `Area` collection | Seeded but unused by the hot path; `hasPolygon` and `coastal` do not exist. |
 | Admin preview | "Check current weather" runs detection, which can create hazard events; nothing is sent, but the preview is not audited. |
 

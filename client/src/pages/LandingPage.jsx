@@ -21,25 +21,25 @@ const FACTS = [
 ];
 
 const FEATURES = [
-  { icon: 'thermometer', title: 'The day, in detail.', text: 'Temperature, heat index, rain, wind and thunderstorm potential. A local forecast, down to your upazila.', label: 'Weather signs' },
+  { icon: 'thermometer', title: "Today's weather, in detail.", text: 'Temperature, heat index, rain, wind and thunderstorm potential. A local forecast, down to your upazila.', label: 'Weather forecast' },
   { icon: 'radar', title: 'Watch the rain move.', text: 'BMD ground radar from Dhaka and Rangpur. A new frame every 10 minutes, with three hours to look back.', label: 'BMD radar' },
-  { icon: 'cloud', title: 'A wider perspective.', text: 'Himawari-9 infrared and visible satellite imagery. About an hour behind real time, with the delay clearly shown.', label: 'Satellite clouds' },
-  { icon: 'bolt', title: 'Know the storm signals.', text: 'Lightning counts within 100 km search circles, sampled three times a day. A snapshot, not live strike tracking.', label: 'Lightning summaries' },
+  { icon: 'cloud', title: 'Clouds across the region.', text: 'Himawari-9 infrared and visible satellite imagery. About an hour behind real time, with the delay clearly shown.', label: 'Satellite imagery' },
+  { icon: 'bolt', title: 'Understand lightning activity.', text: 'Lightning counts within 100 km search circles, sampled three times a day. A snapshot, not live strike tracking.', label: 'Lightning summaries' },
   { icon: 'clock', title: 'Look back. Plan ahead.', text: "Replay recent radar and satellite frames, or explore BMD's next four days of forecasts in three-hour steps.", label: 'Weather timeline' },
-  { icon: 'search', title: 'Your place. Your language.', text: 'Search in Bangla or English, বাড্ডা included. Find your district or upazila and go straight to its forecast.', label: 'Local search' },
+  { icon: 'search', title: 'Your place. Your language.', text: 'Search for your district or upazila in Bangla or English and go straight to its forecast.', label: 'Local search' },
 ];
 
 const HOW_TO_READ = [
-  { title: 'Forecast, not measurement.', text: 'Temperature, rain and wind are BMD model values, not station readings. Heat index is computed from them.' },
-  { title: 'Observation or potential.', text: 'Radar and satellite are observations. Thunderstorm signs show potential, not lightning strikes.' },
-  { title: 'A source and a time.', text: 'Every value names where it came from. Stale data is muted and carries its last update time.' },
-  { title: 'Not an official warning.', text: 'Follow Bangladesh Meteorological Department warnings and local guidance.' },
+  { title: 'Forecasts Are Not Direct Measurements', text: 'Temperature, rainfall, and wind speed values are obtained from BMD weather models, not directly measured at weather stations. Heat index is calculated from these values.' },
+  { title: 'Observations and Predictions Are Different', text: 'Radar and satellite images show observed weather conditions. Thunderstorm indicators suggest potential activity but do not confirm that lightning is occurring.' },
+  { title: 'Every Data Point Includes Its Source and Time', text: 'The source of each value is displayed. Outdated information appears in a muted color, along with the time it was last updated.' },
+  { title: 'This Is Not an Official Weather Warning', text: 'Follow official warnings issued by the Bangladesh Meteorological Department and guidance from local authorities.' },
 ];
 
 const STATUSES = [
-  { key: 'ok', name: 'Fresh', text: 'Full color, with its source and data time.', color: STATUS_COLORS.ok, style: 'solid' },
-  { key: 'stale', name: 'Stale', text: 'Muted, with a “stale” badge and the last update time.', color: STATUS_COLORS.stale, style: 'solid' },
-  { key: 'unavailable', name: 'No data', text: 'Neutral grey and “Data unavailable”. Never a calm color.', color: STATUS_COLORS.unavailable, style: 'dotted' },
+  { key: 'ok', name: 'Latest Data', text: 'Displayed in full color, with its source and update time.', color: STATUS_COLORS.ok, style: 'solid' },
+  { key: 'stale', name: 'Outdated Data', text: 'Displayed in a muted color with a “Stale” label and the last update time.', color: STATUS_COLORS.stale, style: 'solid' },
+  { key: 'unavailable', name: 'No Data', text: 'Displayed in grey with an “Unavailable” label, so it is not mistaken for normal weather conditions.', color: STATUS_COLORS.unavailable, style: 'dotted' },
 ];
 
 const AUDIENCES = [
@@ -53,7 +53,7 @@ const AUDIENCES = [
 
 const FOOTER_LINKS = [
   { href: '#features', label: 'Features' },
-  { href: '#who', label: "Who it's for" },
+  { href: '#who', label: "Who It's For" },
   { href: '#data', label: 'Data' },
 ];
 
@@ -156,7 +156,7 @@ export function LandingPage() {
             </div>
             <p className="hero-note hero-note--right">{tr('Local weather.')}<br />{tr('Wider perspective.')}<br /><span>{tr('Clearer decisions.')}</span></p>
             <div className="hero-bottom">
-              <p><span>{number('01')} /</span> {tr('A little perspective')}</p>
+              <p><span>{number('01')} /</span> {tr('Overview')}</p>
               <a className="scroll-cue" href="#features" aria-label={tr('Scroll to features')}><Icon name="arrow" size={19} /></a>
               <div className="hero-bottom-right">
                 <p>{tr('Weather for the everyday.')}</p>
@@ -188,8 +188,8 @@ export function LandingPage() {
           <div className="container">
             <header className="section-head">
               <p className="eyebrow"><span className="section-number">{number('02')} /</span> {tr('The bigger picture')}</p>
-              <h2 id="features-title">{tr('Many signals.')}<br /><em>{tr('One clear picture.')}</em></h2>
-              <p className="lead">{tr('A little less switching between apps. A little more understanding the sky. All your weather layers, together on one map.')}</p>
+              <h2 id="features-title">{tr('Know the forecast,')}<br /><em>{tr('prepare for tomorrow.')}</em></h2>
+              <p className="lead">{tr('See forecasts, BMD radar, satellite imagery and lightning, from the whole country down to your upazila.')}</p>
             </header>
             <ul className="feature-grid">
               {FEATURES.map((feature, index) => (
@@ -212,7 +212,7 @@ export function LandingPage() {
             </div>
             <div className="coverage-copy">
               <p className="eyebrow"><span className="section-number">{number('03')} /</span> {tr('Closer to home')}</p>
-              <h2 id="coverage-title">{tr('The whole country.')}<br /><em>{tr('Your little corner.')}</em></h2>
+              <h2 id="coverage-title">{tr('Weather across the country.')}<br /><em>{tr('Your local weather.')}</em></h2>
               <p className="lead">{tr('From Rangpur to Chattogram, the sky tells a different story. Start with Bangladesh, zoom into your upazila, and find the forecast that belongs to your day.')}</p>
               <Link to="/map" className="text-link" onPointerEnter={prefetchMap} onFocus={prefetchMap}>{tr('Find your place')}<Icon name="arrow" size={20} /></Link>
               <div className="coverage-source">
@@ -228,9 +228,9 @@ export function LandingPage() {
           <div className="container data-grid">
             <div>
               <header className="section-head">
-                <p className="eyebrow"><span className="section-number">{number('04')} /</span> {tr('Clarity, not guesswork')}</p>
-                <h2 id="data-title">{tr('A little certainty.')}<br /><em>{tr('And honest uncertainty.')}</em></h2>
-                <p className="lead">{tr("Knowing what we don't know matters, too. Every source has a name, every update has a time, and missing data never looks like a calm sky.")}</p>
+                <p className="eyebrow"><span className="section-number">{number('04')} /</span> {tr('Data Reliability')}</p>
+                <h2 id="data-title">{tr('Reliable Information,')} <em>{tr('Informed Decisions.')}</em></h2>
+                <p className="lead">{tr('Understand where each piece of information comes from, how reliable it is, and what its limitations are before making decisions.')}</p>
               </header>
               <ul className="read-list">
                 {HOW_TO_READ.map((item) => (
@@ -243,8 +243,8 @@ export function LandingPage() {
             </div>
 
             <div className="status-card" role="group" aria-labelledby="status-title">
-              <p className="eyebrow">{tr('A note on the data')}</p>
-              <h3 id="status-title">{tr('Three states.')}<br />{tr('Nothing left to guess.')}</h3>
+              <p className="eyebrow">{tr('Color Indicators')}</p>
+              <h3 id="status-title">{tr('Three Data Statuses')}</h3>
               <ul>
                 {STATUSES.map((status) => (
                   <li key={status.key}>
@@ -256,7 +256,6 @@ export function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <p className="status-footnote">{tr('A clear grey where there is no data.')}<br />{tr('Always a source. Always a timestamp.')}</p>
             </div>
           </div>
         </section>
@@ -265,16 +264,16 @@ export function LandingPage() {
           <div className="container">
             <header className="section-head">
               <p className="eyebrow"><span className="section-number">{number('05')} /</span> {tr('Under the same sky')}</p>
-              <h2 id="who-title">{tr('Different days.')}<br /><em>{tr('The same sky.')}</em></h2>
+              <h2 id="who-title">{tr('Different jobs,')}<br /><em>{tr('different weather risks.')}</em></h2>
               <p className="lead">
-                {tr('The same forecast can mean different things for different jobs. Our catalogue includes 31 occupation-based scenarios; implemented prototype rules use your work, area and activity to choose relevant advice.')}
+                {tr('The same weather does not affect everyone’s work and daily life in the same way. AkashSathi includes 27 occupation-based scenarios with the precautions for each. Find advice that fits your occupation, area and current weather.')}
               </p>
-              <p className="badge-line"><span className="pill">{tr('Prototype alerts')}</span>{tr('Occupation-based alerts are available. The rules still need expert review; they do not replace official warnings.')}</p>
+              <p className="badge-line"><span className="pill">{tr('Prototype alerts')}</span>{tr('Occupation-based alerts are available. This advice is experimental and does not replace official warnings.')}</p>
             </header>
             <ul className="audience-grid">
               {AUDIENCES.map((audience) => (
                 <li key={audience.code} className="audience-card">
-                  <p className="audience-code"><span>{audience.code}</span>{tr('{n} scenarios', { n: audience.count })}</p>
+                  <p className="audience-code"><span>{tr(audience.code)}</span>{tr('{n} scenarios', { n: audience.count })}</p>
                   <h3>{tr(audience.title)}</h3>
                   <p>{tr(audience.text)}</p>
                 </li>

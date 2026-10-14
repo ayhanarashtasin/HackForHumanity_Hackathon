@@ -204,7 +204,43 @@ test('CONS-02: heavy work with protective equipment, judged over the shift', () 
   assert.equal(run(nightShift, heatEvent(29))['CONS-02'], undefined, 'the shift does not overlap the heat');
 });
 
+test('CONS-04: rain at an open or partly covered site asks for an inspection, including the hours after the rain', () => {
+  const open = makeSubscriber('construction', { siteExposure: 'open' });
+  const result = run(open, rainEvent(1))['CONS-04'];
+  assert.equal(result.severity, 'ADVISORY');
+  assert.ok(result.actions.includes('inspect_site'));
+  assert.equal(result.evidence.siteCheckRequired, true);
+  assert.equal(run(makeSubscriber('construction', { siteExposure: 'partly_covered' }), rainEvent(2))['CONS-04'].severity, 'ADVISORY', 'rain level does not make it urgent');
+  assert.equal(run(makeSubscriber('construction', { siteExposure: 'indoor' }), rainEvent(1))['CONS-04'], undefined);
+  // Rain 11:00-15:00 local: a 19:00 shift starts while surfaces can still be wet, a 22:00 shift starts after the six hours.
+  assert.ok(run(makeSubscriber('construction', { shiftStart: '19:00', shiftEnd: '21:30' }), rainEvent(1))['CONS-04']);
+  assert.equal(run(makeSubscriber('construction', { shiftStart: '22:00', shiftEnd: '05:00' }), rainEvent(1))['CONS-04'], undefined);
+  assert.equal(run(open, rainEvent(1, { from: 13, until: 16 }))['CONS-04'], undefined, 'beyond the 12 hour lead');
+  assert.equal(run(makeSubscriber('rickshaw_labourer'), rainEvent(1))['CONS-04'], undefined);
+});
+
 // ---------- vendors ----------
+test('VEND-03: rain at the main market, a saved market or the shared location, during market hours', () => {
+  const vendor = makeSubscriber('vendor', { marketAreaPcode: BADDA, savedMarketPcodes: [SAVAR] });
+  const main = run(vendor, rainEvent(1, { upazilas: [BADDA] }))['VEND-03'];
+  assert.equal(main.severity, 'ADVISORY');
+  assert.equal(main.details[0].en, 'this is your main market');
+  const saved = run(vendor, rainEvent(1, { upazilas: [SAVAR] }))['VEND-03'];
+  assert.equal(saved.details[0].en, 'this is one of the other markets you work at');
+  assert.equal(run(vendor, rainEvent(1, { upazilas: [AMTALI] }))['VEND-03'], undefined, 'not one of their markets');
+  assert.equal(run(vendor, rainEvent(1, { upazilas: [BADDA], from: 15, until: 18 }))['VEND-03'], undefined, 'beyond the 12 hour lead');
+
+  const travelling = { ...vendor, currentArea: { upazilaPcode: AMTALI, districtPcode: '1004', expiresAt: new Date(NOW + HOUR) } };
+  assert.equal(run(travelling, rainEvent(1, { upazilas: [AMTALI] }))['VEND-03'].details[0].en, 'you shared your location near this market');
+
+  const old = { ...vendor, currentArea: { upazilaPcode: AMTALI, districtPcode: '1004', expiresAt: new Date(NOW - HOUR) } };
+  assert.equal(run(old, rainEvent(1, { upazilas: [AMTALI] }))['VEND-03'], undefined, 'an old location is not used');
+  const flagged = run(old, rainEvent(1, { upazilas: [BADDA] }))['VEND-03'];
+  assert.equal(flagged.evidence.scopeUncertain, true);
+  assert.ok(flagged.advice.some((item) => item.key === 'location_old'));
+  assert.equal(run(makeSubscriber('construction'), rainEvent(1))['VEND-03'], undefined);
+});
+
 test('VEND-01: wind at an outdoor stall is a warning; an indoor stall is not told to rush out', () => {
   assert.equal(run(makeSubscriber('vendor', { outdoorStall: true }), windEvent(1))['VEND-01'].severity, 'WARNING');
   assert.equal(run(makeSubscriber('vendor', { outdoorStall: false }), windEvent(2))['VEND-01'], undefined);
@@ -300,8 +336,8 @@ test('a farmer is matched through the field area, not just the home area', () =>
 
 test('the catalogue rule IDs that are implemented as scenarios', () => {
   assert.deepEqual([...scenarioIds].sort(), [
-    'CONS-01', 'CONS-02', 'CONS-03', 'FARM-01', 'FARM-02', 'FARM-03', 'FARM-04', 'FARM-05', 'FISH-01', 'FISH-02', 'FISH-03', 'FISH-04',
-    'PUBLIC-01', 'PUBLIC-02', 'PUBLIC-03', 'VEND-01', 'VEND-02', 'WORK-01', 'WORK-03', 'WORK-04',
+    'CONS-01', 'CONS-02', 'CONS-03', 'CONS-04', 'FARM-01', 'FARM-02', 'FARM-03', 'FARM-04', 'FARM-05', 'FISH-01', 'FISH-02', 'FISH-03', 'FISH-04',
+    'PUBLIC-01', 'PUBLIC-02', 'PUBLIC-03', 'VEND-01', 'VEND-02', 'VEND-03', 'WORK-01', 'WORK-03', 'WORK-04',
   ]);
 });
 

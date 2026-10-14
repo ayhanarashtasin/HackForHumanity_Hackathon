@@ -270,6 +270,18 @@ export const ADVICE = {
     en: 'Rain is forecast during your working hours. Allow extra travel time and check road conditions locally. This is a rain forecast, not a report of road conditions.',
     bn: 'আপনার কাজের সময়ে বৃষ্টির পূর্বাভাস আছে। যাতায়াতে বাড়তি সময় রাখুন এবং রাস্তার অবস্থা স্থানীয়ভাবে দেখে নিন। এটি বৃষ্টির পূর্বাভাস, রাস্তার অবস্থার প্রতিবেদন নয়।',
   },
+  rain_site: {
+    en: 'Rain is forecast at your work site. Stairs, walkways, planks and scaffolding can stay slippery after the rain stops. Inspect them before work resumes; this message cannot tell whether the site is ready.',
+    bn: 'আপনার কাজের জায়গায় বৃষ্টির পূর্বাভাস আছে। বৃষ্টি থামার পরও সিঁড়ি, চলার পথ, তক্তা ও ভারা পিচ্ছিল থাকতে পারে। কাজ আবার শুরুর আগে এগুলো পরীক্ষা করে নিন; জায়গাটি কাজের উপযোগী কিনা এই বার্তা বলতে পারে না।',
+  },
+  rain_market: {
+    en: 'Rain is forecast at this market during market hours. If you plan to sell here, bring cover for your goods and check the forecast before you set up.',
+    bn: 'বাজার চলার সময় এই বাজারে বৃষ্টির পূর্বাভাস আছে। এখানে বিক্রির পরিকল্পনা থাকলে মালপত্র ঢাকার ব্যবস্থা সঙ্গে রাখুন এবং দোকান বসানোর আগে পূর্বাভাস দেখে নিন।',
+  },
+  location_old: {
+    en: 'The location you last shared is out of date, so this alert is based on your saved markets. Share your location again if you are somewhere else.',
+    bn: 'আপনার সর্বশেষ জানানো অবস্থান পুরোনো হয়ে গেছে, তাই এই সতর্কবার্তা আপনার সংরক্ষিত বাজারগুলোর ভিত্তিতে। অন্য কোথাও থাকলে আবার অবস্থান জানান।',
+  },
   dry_spell: {
     en: 'Check the moisture level in your field.',
     bn: 'আপনার জমির আর্দ্রতা কেমন তা দেখে নিন।',
@@ -392,7 +404,10 @@ export const ACTIONS = {
   move_cooler: { en: 'Move to a cooler place', bn: 'ঠান্ডা জায়গায় যান' },
   stop_elevated_work: { en: 'Stop unsafe work at height', bn: 'ঝুঁকিপূর্ণ উঁচু কাজ বন্ধ করুন' },
   secure_stall: { en: 'Secure your stall only if you can do it without going out in the storm', bn: 'ঝড়ে বাইরে না গিয়ে যতটুকু সম্ভব দোকান বেঁধে ফেলুন' },
-  stay_in: { en: 'Do not go out to rescue items once the storm starts', bn: 'ঝড় শুরু হলে মালপত্র বাঁচাতে বাইরে যাবেন না' },
+  inspect_site: { en: 'Inspect stairs, walkways and scaffolding before work resumes', bn: 'কাজ শুরুর আগে সিঁড়ি, চলার পথ ও ভারা পরীক্ষা করুন' },
+  cover_goods: { en: 'Bring cover for your goods', bn: 'মালপত্র ঢাকার ব্যবস্থা সঙ্গে রাখুন' },
+  share_location: { en: 'Share your location again if you are at another market', bn: 'অন্য বাজারে থাকলে আবার অবস্থান জানান' },
+  stay_in: { en:'Do not go out to rescue items once the storm starts', bn: 'ঝড় শুরু হলে মালপত্র বাঁচাতে বাইরে যাবেন না' },
   postpone_departure: { en: 'Postpone your departure', bn: 'রওনা পিছিয়ে দিন' },
   return_to_shore: { en: 'Head toward the shore or nearest shelter', bn: 'তীর বা নিকটতম আশ্রয়ের দিকে ফিরুন' },
   check_official_forecast: { en: 'Check the latest official BMD forecast', bn: 'বিএমডির সর্বশেষ সরকারি পূর্বাভাস দেখুন' },

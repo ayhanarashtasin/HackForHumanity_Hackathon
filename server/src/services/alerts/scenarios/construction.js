@@ -1,6 +1,7 @@
 import { timing } from '../../../config/alertRules.js';
+import { recurringWindowOverlap } from '../../time.js';
 import {
-  activityOf, eventUntilMs, heatClassFor, heatSeverity, heatTimingOk, shiftOf, withinLead,
+  DEFAULT_OUTDOOR, activityOf, eventFromMs, eventUntilMs, heatClassFor, heatSeverity, heatTimingOk, shiftOf, withinLead,
 } from './helpers.js';
 
 const ELEVATED_TYPES = ['roof', 'scaffolding', 'other_elevated'];
@@ -71,6 +72,30 @@ export const constructionScenarios = [
         actions: ['stop_elevated_work', 'check_forecast'],
         details: via === 'profile' ? [{ en: 'you work at height', bn: 'আপনি উঁচু জায়গায় কাজ করেন' }] : [],
         ...(via === 'profile' ? {} : { activityKey: via }),
+      };
+    },
+  },
+  {
+    // Stairs, walkways and planks can stay slippery after the rain stops. The advice is an inspection, never a claim about the site.
+    id: 'CONS-04',
+    hazards: ['HEAVY_RAIN'],
+    areaRoles: ['site'],
+    evaluate({ subscriber, event, nowMs }) {
+      if (subscriber.occupation !== 'construction' || !withinLead(event, timing.rainLeadHours, nowMs)) return null;
+      const exposure = subscriber.occupationData.siteExposure;
+      if (!['open', 'partly_covered'].includes(exposure)) return null;
+      // The shift must fall in the rain window or in the hours after it, while surfaces can still be wet.
+      const shift = shiftOf(subscriber.occupationData) ?? DEFAULT_OUTDOOR;
+      const wetUntilMs = eventUntilMs(event) + timing.slipperyAfterHours * 3_600_000;
+      if (!recurringWindowOverlap(shift, Math.max(nowMs, eventFromMs(event)), wetUntilMs)) return null;
+      return {
+        severity: 'ADVISORY',
+        advice: [{ key: 'rain_site' }],
+        actions: ['inspect_site', 'check_forecast'],
+        details: [exposure === 'open'
+          ? { en: 'your site is open to the sky', bn: 'আপনার কাজের জায়গা খোলা আকাশের নিচে' }
+          : { en: 'your site is partly covered', bn: 'আপনার কাজের জায়গা আংশিক ঢাকা' }],
+        evidence: { siteCheckRequired: true },
       };
     },
   },

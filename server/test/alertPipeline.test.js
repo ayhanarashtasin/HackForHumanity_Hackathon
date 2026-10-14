@@ -433,6 +433,36 @@ dbTest('at most three new ADVISORY notifications a day per subscriber; WARNING a
   assert.equal((await applyEvent(await rainEvent(6), { nowMs: NOW, settings: {}, bypassCap: true })).inserted, 1, 'an administrator send is not capped');
 });
 
+dbTest('VEND-03: the same rain at two of a vendor\'s markets is one card, and a later rain is a new one', async () => {
+  const vendor = await signUp('vendor', {
+    marketAreaPcode: BADDA, savedMarketPcodes: [SAVAR], outdoorStall: false, shelterAccess: 'full', hoursOutdoor: 'lt4',
+  });
+  const now = new Date(NOW);
+  const rainAt = (pcode, from, until) => HazardEvent.create({
+    eventKey: `fc:test:${pcode}:${from}`,
+    hazardType: 'HEAVY_RAIN',
+    origin: 'detected',
+    source: { provider: 'open-meteo' },
+    coverage: { scope: 'upazila', upazilaPcodes: [pcode], districtPcodes: [], matchMethod: 'representative_point' },
+    level: 1,
+    evidence: { metrics: { rain3hMm: 10, rain24hMm: 10, popPercent: 80 }, rule: { key: 'HEAVY_RAIN', version: 'prototype-1', status: 'prototype' } },
+    validFrom: new Date(NOW + from * HOUR),
+    validUntil: new Date(NOW + until * HOUR),
+    firstDetectedAt: now,
+    lastConfirmedAt: now,
+    lastUpdatedAt: now,
+  });
+
+  assert.equal((await applyEvent(await rainAt(BADDA, 1, 5), { nowMs: NOW, settings: {} })).inserted, 1);
+  const second = await applyEvent(await rainAt(SAVAR, 2, 6), { nowMs: NOW, settings: {} });
+  assert.equal(second.inserted, 0, 'the second market is covered by the first card');
+  assert.equal(await Notification.countDocuments({ subscriberId: vendor._id, scenarioId: 'VEND-03' }), 1);
+
+  // Rain that starts after the first card has ended is new information.
+  const later = await applyEvent(await rainAt(SAVAR, 7, 9), { nowMs: NOW, settings: {} });
+  assert.equal(later.inserted, 1);
+});
+
 // ---------- the inbox ----------
 dbTest('the inbox lists current alerts most severe first, pages earlier ones, and only the owner can mark them read', async () => {
   const farmer = await signUp('farmer', FARMER);

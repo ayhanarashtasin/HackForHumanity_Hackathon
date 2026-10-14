@@ -155,7 +155,7 @@ export const MAP = {
   'Live frames are not available right now.': 'এখন পর্যবেক্ষণের ছবি পাওয়া যাচ্ছে না।',
   'Forecast is not available right now.': 'এখন পূর্বাভাস পাওয়া যাচ্ছে না।',
   'Cannot reach the weather service. Showing the map without data.': 'আবহাওয়া সেবার সঙ্গে সংযোগ হচ্ছে না। আপাতত তথ্য ছাড়াই মানচিত্র দেখানো হচ্ছে।',
-  'No forecast data is available right now. Grey markers mean no data, not calm weather.': 'এখন পূর্বাভাসের তথ্য পাওয়া যাচ্ছে না। ধূসর চিহ্ন মানে তথ্য নেই—শান্ত আবহাওয়া নয়।',
+  'No forecast data is available right now. Grey markers mean no data, not calm weather.': 'এখন পূর্বাভাসের তথ্য পাওয়া যাচ্ছে না। ধূসর চিহ্ন মানে তথ্য নেই, শান্ত আবহাওয়া নয়।',
   'Finding your place.': 'আপনার এলাকা খোঁজা হচ্ছে।',
   'Let’s find your area.': 'আপনার এলাকা খুঁজে নেওয়া যাক।',
   'Your weather starts here.': 'নিজের এলাকার আবহাওয়া জানুন।',

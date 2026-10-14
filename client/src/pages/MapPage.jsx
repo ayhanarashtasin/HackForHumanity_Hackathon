@@ -292,7 +292,7 @@ export default function MapPage() {
         <button type="button" className="header-location-button" onClick={goToMyLocation} disabled={!catalogue || locating}><Icon name="locate" size={18} /><span>{tr(locating ? 'Locating…' : 'My weather')}</span></button>
         <LanguageToggle />
         <Link to="/alert" className="header-alert-link" aria-label={unreadAlerts > 0 ? tr('Alerts, {n} unread', { n: unreadAlerts }) : tr('Alerts')} title={tr('Alerts for your work and area')}>
-          <Icon name="bell" size={18} /><span>{tr('Alert')}</span>
+          <Icon name="bell" size={18} /><span>{tr('Alerts')}</span>
           {unreadAlerts > 0 && <b className="header-alert-badge" aria-hidden="true">{number(unreadAlerts > 9 ? '9+' : unreadAlerts)}</b>}
         </Link>
         <StatusPanel open={statusOpen} onToggle={() => setStatusOpen((open) => !open)} statuses={statuses} base={snapshot?.base} />

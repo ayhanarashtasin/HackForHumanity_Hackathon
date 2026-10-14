@@ -107,6 +107,7 @@ export const timing = {
   heatPeakLeadHours: 2, // ...and not later than this long before the forecast peak
   heatEarliestLocalHour: 6, // never before 06:00 local
   windLeadHours: 12,
+  slipperyAfterHours: 6, // CONS-04: stairs and walkways can stay slippery this long after the rain window ends
   marineLeadHours: 24,
   quickStatusStaleHours: 6, // an on-water status older than this makes the location uncertain (FISH-05)
 };
