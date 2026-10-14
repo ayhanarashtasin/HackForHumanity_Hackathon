@@ -44,7 +44,30 @@ async function createDemo(level) {
   }
   if (!env.alerts.mlServiceUrl) console.log('Note: ML_SERVICE_URL is empty in server/.env, so this alert will have no confidence line.');
 
-  const pcode = subscriber.areas.find((area) => area.role === 'home')?.upazilaPcode ?? subscriber.relevantUpazilas[0];
+  // Occupation advice is tied to an area role (a farmer's rain advice follows the field, not home), so try every area of the
+  // profile, work-type areas first, until one produces an alert.
+  const pcodes = [...new Set([
+    ...subscriber.areas.filter((area) => area.role !== 'home').map((area) => area.upazilaPcode),
+    ...subscriber.areas.filter((area) => area.role === 'home').map((area) => area.upazilaPcode),
+  ])].filter((pcode) => locationByPcode.has(pcode));
+
+  for (const pcode of pcodes) {
+    const result = await alertFor(subscriber, pcode, level, nowMs);
+    if (!result) continue;
+    const { notification, detection } = result;
+    const confidence = detection.evidence.forecastConfidence;
+    console.log(`Profile: ${subscriber.occupation} (${subscriber.language}), alert for ${locationByPcode.get(pcode).name}`);
+    console.log(`Rule: Level ${detection.level} | ML (${confidence?.target ?? '-'} model): ${confidence?.band ?? 'no answer'}`);
+    if (!confidence && env.alerts.mlServiceUrl) console.log(`Note: the ML service did not answer at ${env.alerts.mlServiceUrl}. Start it with "npm run dev" or "npm run ml".`);
+    console.log(`\n${notification.title}\n${notification.message}\n\nRefresh http://localhost:5173/alert to see it.`);
+    return;
+  }
+  console.log('No alert was created: this profile\'s occupation has no rain advice for its areas. A farmer, a student or a rickshaw puller gets rain alerts.');
+  process.exitCode = 1;
+}
+
+// One demo rain event over `pcode` and its notification for this subscriber, or null (the event is removed again) when none applies.
+async function alertFor(subscriber, pcode, level, nowMs) {
   const location = locationByPcode.get(pcode);
 
   // Made-up forecast: 3-hour blocks from now (mm), with humidity and CAPE for the same blocks.
@@ -59,8 +82,6 @@ async function createDemo(level) {
 
   const detection = detectHeavyRain(area, nowMs);
   await attachForecastConfidence([{ area, detections: [detection] }], { sources, nowMs });
-  const confidence = detection.evidence.forecastConfidence;
-  if (!confidence && env.alerts.mlServiceUrl) console.log(`Note: the ML service did not answer at ${env.alerts.mlServiceUrl}. Start it with "npm run ml".`);
 
   const now = new Date(nowMs);
   const event = await HazardEvent.create({
@@ -85,9 +106,7 @@ async function createDemo(level) {
 
   await applyEvent(event, { nowMs, settings: await getSettings({ force: true, now: nowMs }), subscriberIds: [subscriber._id], publishNow: true, bypassCap: true });
   const notification = await Notification.findOne({ hazardEventId: event._id, subscriberId: subscriber._id }).lean();
-
-  console.log(`Profile: ${subscriber.occupation} (${subscriber.language}) in ${location.name}`);
-  console.log(`Rule: Level ${detection.level} | ML (${confidence?.target ?? '-'} model): ${confidence?.band ?? 'no answer'}`);
-  if (notification) console.log(`\n${notification.title}\n${notification.message}\n\nRefresh http://localhost:5173/alert to see it.`);
-  else console.log('\nNo notification was created: this profile\'s occupation has no rain advice. Try a farmer at the harvest stage.');
+  if (notification) return { notification, detection };
+  await HazardEvent.deleteOne({ _id: event._id });
+  return null;
 }
