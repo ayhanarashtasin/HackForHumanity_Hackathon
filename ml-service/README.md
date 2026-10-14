@@ -20,12 +20,13 @@ alert. If the service is off or failing, alerts go out exactly as before.
 From the repository root (needs Python 3.12+; the trained models in `models/` are committed):
 
 ```
+npm run dev         # backend + frontend + ML service together (the usual way)
 npm run ml          # only the ML service, on http://127.0.0.1:8001
-npm run dev:ml      # backend + frontend + ML service together
 ```
 
-The first run creates `ml-service/.venv` and installs `requirements.txt`. Set `ML_SERVICE_URL=http://127.0.0.1:8001` in
-`server/.env` and restart the server; leave it empty to turn the feature off. `npm run demo:rain` adds a demo alert to see the line.
+The first run creates `ml-service/.venv` and installs `requirements.txt`. In development the backend uses http://127.0.0.1:8001 unless
+`server/.env` sets `ML_SERVICE_URL` (empty turns the feature off; production needs it set explicitly). `npm run demo:rain` adds a
+demo alert to see the line.
 
 Manual equivalent (Windows paths; use `.venv/bin/python` on macOS and Linux):
 
