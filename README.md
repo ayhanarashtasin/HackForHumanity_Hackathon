@@ -126,6 +126,16 @@ Vite proxies `/api` requests to the backend. Collection starts after the API con
 
 Generated boundaries and location catalogues are already committed. Geography builds are not required for normal setup.
 
+### 4. Rain forecast confidence (ML)
+
+Rain alerts end with one extra line from two Random Forest classifiers, for example `পূর্বাভাসের নির্ভরযোগ্যতা: উচ্চ।` / `Forecast confidence: High.` **`npm run dev` starts the ML service too**; it needs **Python 3.12 or later** (a stable release), and the trained models are committed. The first run creates `ml-service/.venv` and installs the Python packages, which takes a few minutes.
+
+Without Python the website still starts; rain alerts are then sent without the line, and the `[ml]` output says why.
+
+To see the line without waiting for real rain: create a profile at <http://localhost:5173/alert> (for example a farmer at the harvest stage), run `npm run demo:rain` (or `npm run demo:rain -- --level 1`), and refresh the page. Demo alerts stay in the inbox and are never sent to Telegram, WhatsApp or SMS. `npm run demo:rain -- --remove` deletes them.
+
+How the models were built and tested: [`ml-service/README.md`](ml-service/README.md).
+
 ## Configuration
 
 Server configuration is loaded from `server/.env`. The complete template is [`server/.env.example`](server/.env.example); validation and additional tuning options are defined in [`server/src/config/env.js`](server/src/config/env.js). Restart the backend after changing environment variables.
@@ -436,9 +446,11 @@ Run these commands from the repository root.
 
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` | Start the backend watcher and frontend development server together. |
+| `npm run dev` | Start the backend watcher, frontend development server and rain confidence ML service together (ML needs Python 3.12+; the rest runs without it). |
 | `npm run dev:server` | Start only the backend watcher. |
 | `npm run dev:client` | Start only the frontend development server. |
+| `npm run ml` | Start only the rain confidence ML service on port 8001; sets up `ml-service/.venv` on first run. |
+| `npm run demo:rain` | Add a demo rain alert with the confidence line to the newest local profile (`-- --level 1`, `-- --remove`). |
 | `npm run build` | Build the frontend into `client/dist`. |
 | `npm run preview` | Preview the frontend build on port 4173 with an `/api` proxy; start the backend separately. |
 | `npm start` | Start the API without a watcher; does not serve the frontend. |

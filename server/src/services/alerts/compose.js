@@ -1,7 +1,7 @@
 import { RULE_STATUS, RULE_VERSION } from '../../config/alertRules.js';
 import { districts, locationByPcode } from '../geo.js';
 import {
-  ACTIONS, ADVICE, PROVIDER_LABELS, activityLabelFor, areaText, describeHazard, fill, localizeDigits, pick, reasonText, titleFor, whenText, zoneName,
+  ACTIONS, ADVICE, PROVIDER_LABELS, activityLabelFor, areaText, confidenceLine, describeHazard, fill, localizeDigits, pick, reasonText, titleFor, whenText, zoneName,
 } from './messages.js';
 
 // Stage 4a: turn (event, subscriber, scenario result) into the stored notification fields, in the subscriber's language.
@@ -72,6 +72,10 @@ function evidenceFor(event, result, area) {
     // An official notice is quoted in its own words and linked, never rewritten.
     official: event.official ? { signalText: event.official.signalText ?? null, issuer: event.official.issuer ?? null, issuedAt: event.official.issuedAt ?? null, documentUrl: event.official.documentUrl ?? null } : null,
     validityAssumed: Boolean(evidence.validityAssumed),
+    // Only the band and model version: the raw risk score moves every tick and would rewrite every notification.
+    forecastConfidence: evidence.forecastConfidence?.band
+      ? { band: evidence.forecastConfidence.band, modelVersion: evidence.forecastConfidence.modelVersion ?? null }
+      : null,
     matchedArea: { role: area.role, upazilaPcode: area.upazilaPcode, districtPcode: area.districtPcode, matchMethod: area.matchMethod },
     eventMatch: event.coverage.matchMethod,
     ...(result.evidence ?? {}),
@@ -89,7 +93,9 @@ export function composeNotification({
   const advice = result.advice.map((item) => fill(pick(ADVICE[item.key], lang), { ...builtIn, ...(item.params ?? {}) }));
   // Bangla attaches its suffix to the plain place name ("বাড্ডা-এ"), so it gets the short name; English reads best with the district.
   const what = describeHazard(event, { areaName: lang === 'bn' ? shortName(affectedArea, lang) : areaName, nowMs, lang });
-  const message = [what, ...advice].filter(Boolean).join(' ');
+  // Rain alerts with an ML confidence band get it as one last line; everything above it is unchanged.
+  const confidence = event.hazardType === 'HEAVY_RAIN' ? confidenceLine(event.evidence?.forecastConfidence?.band, lang) : '';
+  const message = [[what, ...advice].filter(Boolean).join(' '), confidence].filter(Boolean).join('\n');
 
   const reason = reasonText({
     occupation: subscriber.occupation,

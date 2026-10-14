@@ -37,7 +37,7 @@ function column(source, pcode, key) {
 }
 
 // 3-hourly periods { startMs, endMs, value } for one column of one source. Steps are Bangladesh-time ISO strings.
-function stepSeries(source, pcode, key) {
+export function stepSeries(source, pcode, key) {
   const values = column(source, pcode, key);
   const steps = source?.data?.steps;
   if (!values || !steps) return [];
