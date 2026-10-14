@@ -17,14 +17,24 @@ alert. If the service is off or failing, alerts go out exactly as before.
 
 ## Run it
 
+From the repository root (needs Python 3.12+; the trained models in `models/` are committed):
+
+```
+npm run ml          # only the ML service, on http://127.0.0.1:8001
+npm run dev:ml      # backend + frontend + ML service together
+```
+
+The first run creates `ml-service/.venv` and installs `requirements.txt`. Set `ML_SERVICE_URL=http://127.0.0.1:8001` in
+`server/.env` and restart the server; leave it empty to turn the feature off. `npm run demo:rain` adds a demo alert to see the line.
+
+Manual equivalent (Windows paths; use `.venv/bin/python` on macOS and Linux):
+
 ```
 cd ml-service
 python -m venv .venv
 .venv/Scripts/python -m pip install -r requirements.txt
 .venv/Scripts/python -m uvicorn app:app --host 127.0.0.1 --port 8001
 ```
-
-Then set `ML_SERVICE_URL=http://127.0.0.1:8001` in `server/.env` and restart the server. Leave it empty to turn the feature off.
 
 - `GET /health`: the loaded models and their versions
 - `POST /predict`: `{ "items": [{ "id", "target": "heavy" | "moderate", "lat", "lon", "date", "lead_day", "rain24_mm", "rain3h_max_mm", "rh_mean", "cape_max" }] }`
