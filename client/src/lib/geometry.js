@@ -19,6 +19,15 @@ export function circlePolygon(lat, lon, radiusKm, steps = 96) {
   return [ring];
 }
 
+// The point `distanceKm` from (lat, lon) along a compass bearing, as [lon, lat].
+export function destinationPoint(lat, lon, bearingDeg, distanceKm) {
+  const angular = distanceKm / EARTH_RADIUS_KM;
+  const bearing = bearingDeg * rad;
+  const lat2 = Math.asin(Math.sin(lat * rad) * Math.cos(angular) + Math.cos(lat * rad) * Math.sin(angular) * Math.cos(bearing));
+  const lon2 = lon * rad + Math.atan2(Math.sin(bearing) * Math.sin(angular) * Math.cos(lat * rad), Math.cos(angular) - Math.sin(lat * rad) * Math.sin(lat2));
+  return [lon2 / rad, lat2 / rad];
+}
+
 // MapLibre image sources want corners clockwise from the top-left, as [lon, lat].
 export function imageCoordinates({ north, west, south, east }) {
   return [[west, north], [east, north], [east, south], [west, south]];

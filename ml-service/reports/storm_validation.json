@@ -1,0 +1,2944 @@
+{
+  "summary": {
+    "day": "2026-09-22 13:00-18:00 Bangladesh time (Himawari-9 band 13 via NASA GIBS)",
+    "horizonMinutes": 60,
+    "cases": 418,
+    "trackerMedianKm": 30.5,
+    "persistenceMedianKm": 34.6,
+    "trackerMeanKm": 61.0,
+    "persistenceMeanKm": 64.0,
+    "trackerBetterShare": 0.586,
+    "movingCases": 398,
+    "movingTrackerMedianKm": 32.2,
+    "movingPersistenceMedianKm": 37.4,
+    "movingTrackerBetterShare": 0.608
+  },
+  "cases": [
+    {
+      "time": "2026-09-22T07:20:00Z",
+      "areaKm2": 19057,
+      "speedKmh": 21.6,
+      "trackerErrorKm": 8.9,
+      "persistenceErrorKm": 13.7
+    },
+    {
+      "time": "2026-09-22T07:20:00Z",
+      "areaKm2": 6903,
+      "speedKmh": 19.7,
+      "trackerErrorKm": 23.0,
+      "persistenceErrorKm": 21.4
+    },
+    {
+      "time": "2026-09-22T07:20:00Z",
+      "areaKm2": 4113,
+      "speedKmh": 22.6,
+      "trackerErrorKm": 17.1,
+      "persistenceErrorKm": 33.9
+    },
+    {
+      "time": "2026-09-22T07:20:00Z",
+      "areaKm2": 3860,
+      "speedKmh": 31.6,
+      "trackerErrorKm": 12.2,
+      "persistenceErrorKm": 41.9
+    },
+    {
+      "time": "2026-09-22T07:20:00Z",
+      "areaKm2": 2840,
+      "speedKmh": 30.9,
+      "trackerErrorKm": 40.4,
+      "persistenceErrorKm": 11.4
+    },
+    {
+      "time": "2026-09-22T07:20:00Z",
+      "areaKm2": 2504,
+      "speedKmh": 24.3,
+      "trackerErrorKm": 111.8,
+      "persistenceErrorKm": 87.5
+    },
+    {
+      "time": "2026-09-22T07:20:00Z",
+      "areaKm2": 2108,
+      "speedKmh": 3.2,
+      "trackerErrorKm": 13.0,
+      "persistenceErrorKm": 15.8
+    },
+    {
+      "time": "2026-09-22T07:20:00Z",
+      "areaKm2": 1649,
+      "speedKmh": 26.4,
+      "trackerErrorKm": 32.7,
+      "persistenceErrorKm": 32.0
+    },
+    {
+      "time": "2026-09-22T07:20:00Z",
+      "areaKm2": 1186,
+      "speedKmh": 30.1,
+      "trackerErrorKm": 6.4,
+      "persistenceErrorKm": 30.7
+    },
+    {
+      "time": "2026-09-22T07:20:00Z",
+      "areaKm2": 713,
+      "speedKmh": 16.5,
+      "trackerErrorKm": 92.2,
+      "persistenceErrorKm": 77.9
+    },
+    {
+      "time": "2026-09-22T07:20:00Z",
+      "areaKm2": 693,
+      "speedKmh": 3.1,
+      "trackerErrorKm": 36.6,
+      "persistenceErrorKm": 39.0
+    },
+    {
+      "time": "2026-09-22T07:20:00Z",
+      "areaKm2": 499,
+      "speedKmh": 29.2,
+      "trackerErrorKm": 34.3,
+      "persistenceErrorKm": 13.1
+    },
+    {
+      "time": "2026-09-22T07:20:00Z",
+      "areaKm2": 498,
+      "speedKmh": 12.7,
+      "trackerErrorKm": 76.8,
+      "persistenceErrorKm": 64.1
+    },
+    {
+      "time": "2026-09-22T07:20:00Z",
+      "areaKm2": 438,
+      "speedKmh": 56.0,
+      "trackerErrorKm": 31.6,
+      "persistenceErrorKm": 25.6
+    },
+    {
+      "time": "2026-09-22T07:20:00Z",
+      "areaKm2": 341,
+      "speedKmh": 48.5,
+      "trackerErrorKm": 34.3,
+      "persistenceErrorKm": 18.7
+    },
+    {
+      "time": "2026-09-22T07:20:00Z",
+      "areaKm2": 236,
+      "speedKmh": 30.3,
+      "trackerErrorKm": 33.7,
+      "persistenceErrorKm": 50.5
+    },
+    {
+      "time": "2026-09-22T07:20:00Z",
+      "areaKm2": 232,
+      "speedKmh": 12.9,
+      "trackerErrorKm": 8.6,
+      "persistenceErrorKm": 4.3
+    },
+    {
+      "time": "2026-09-22T07:30:00Z",
+      "areaKm2": 20442,
+      "speedKmh": 5.1,
+      "trackerErrorKm": 11.1,
+      "persistenceErrorKm": 15.0
+    },
+    {
+      "time": "2026-09-22T07:30:00Z",
+      "areaKm2": 8989,
+      "speedKmh": 10.2,
+      "trackerErrorKm": 31.0,
+      "persistenceErrorKm": 23.1
+    },
+    {
+      "time": "2026-09-22T07:30:00Z",
+      "areaKm2": 4725,
+      "speedKmh": 31.8,
+      "trackerErrorKm": 10.2,
+      "persistenceErrorKm": 40.3
+    },
+    {
+      "time": "2026-09-22T07:30:00Z",
+      "areaKm2": 3706,
+      "speedKmh": 29.2,
+      "trackerErrorKm": 18.2,
+      "persistenceErrorKm": 43.0
+    },
+    {
+      "time": "2026-09-22T07:30:00Z",
+      "areaKm2": 2887,
+      "speedKmh": 23.8,
+      "trackerErrorKm": 47.6,
+      "persistenceErrorKm": 24.0
+    },
+    {
+      "time": "2026-09-22T07:30:00Z",
+      "areaKm2": 2485,
+      "speedKmh": 6.1,
+      "trackerErrorKm": 13.7,
+      "persistenceErrorKm": 16.4
+    },
+    {
+      "time": "2026-09-22T07:30:00Z",
+      "areaKm2": 1547,
+      "speedKmh": 23.3,
+      "trackerErrorKm": 22.3,
+      "persistenceErrorKm": 28.1
+    },
+    {
+      "time": "2026-09-22T07:30:00Z",
+      "areaKm2": 1439,
+      "speedKmh": 35.0,
+      "trackerErrorKm": 11.5,
+      "persistenceErrorKm": 24.8
+    },
+    {
+      "time": "2026-09-22T07:30:00Z",
+      "areaKm2": 970,
+      "speedKmh": 9.7,
+      "trackerErrorKm": 33.9,
+      "persistenceErrorKm": 40.2
+    },
+    {
+      "time": "2026-09-22T07:30:00Z",
+      "areaKm2": 780,
+      "speedKmh": 43.5,
+      "trackerErrorKm": 27.5,
+      "persistenceErrorKm": 47.3
+    },
+    {
+      "time": "2026-09-22T07:30:00Z",
+      "areaKm2": 750,
+      "speedKmh": 15.7,
+      "trackerErrorKm": 91.3,
+      "persistenceErrorKm": 76.6
+    },
+    {
+      "time": "2026-09-22T07:30:00Z",
+      "areaKm2": 689,
+      "speedKmh": 31.8,
+      "trackerErrorKm": 37.5,
+      "persistenceErrorKm": 16.7
+    },
+    {
+      "time": "2026-09-22T07:30:00Z",
+      "areaKm2": 539,
+      "speedKmh": 32.0,
+      "trackerErrorKm": 10.7,
+      "persistenceErrorKm": 21.2
+    },
+    {
+      "time": "2026-09-22T07:30:00Z",
+      "areaKm2": 538,
+      "speedKmh": 34.0,
+      "trackerErrorKm": 56.3,
+      "persistenceErrorKm": 23.1
+    },
+    {
+      "time": "2026-09-22T07:30:00Z",
+      "areaKm2": 427,
+      "speedKmh": 11.1,
+      "trackerErrorKm": 11.3,
+      "persistenceErrorKm": 2.9
+    },
+    {
+      "time": "2026-09-22T07:30:00Z",
+      "areaKm2": 393,
+      "speedKmh": 9.6,
+      "trackerErrorKm": 56.4,
+      "persistenceErrorKm": 56.0
+    },
+    {
+      "time": "2026-09-22T07:30:00Z",
+      "areaKm2": 363,
+      "speedKmh": 33.6,
+      "trackerErrorKm": 8.2,
+      "persistenceErrorKm": 26.8
+    },
+    {
+      "time": "2026-09-22T07:30:00Z",
+      "areaKm2": 255,
+      "speedKmh": 27.4,
+      "trackerErrorKm": 11.1,
+      "persistenceErrorKm": 16.4
+    },
+    {
+      "time": "2026-09-22T07:30:00Z",
+      "areaKm2": 206,
+      "speedKmh": 38.9,
+      "trackerErrorKm": 18.0,
+      "persistenceErrorKm": 32.2
+    },
+    {
+      "time": "2026-09-22T07:40:00Z",
+      "areaKm2": 22509,
+      "speedKmh": 6.4,
+      "trackerErrorKm": 11.5,
+      "persistenceErrorKm": 17.9
+    },
+    {
+      "time": "2026-09-22T07:40:00Z",
+      "areaKm2": 7957,
+      "speedKmh": 11.2,
+      "trackerErrorKm": 31.8,
+      "persistenceErrorKm": 27.9
+    },
+    {
+      "time": "2026-09-22T07:40:00Z",
+      "areaKm2": 5231,
+      "speedKmh": 35.0,
+      "trackerErrorKm": 6.9,
+      "persistenceErrorKm": 41.2
+    },
+    {
+      "time": "2026-09-22T07:40:00Z",
+      "areaKm2": 3272,
+      "speedKmh": 30.3,
+      "trackerErrorKm": 22.1,
+      "persistenceErrorKm": 41.4
+    },
+    {
+      "time": "2026-09-22T07:40:00Z",
+      "areaKm2": 2873,
+      "speedKmh": 24.6,
+      "trackerErrorKm": 47.2,
+      "persistenceErrorKm": 22.7
+    },
+    {
+      "time": "2026-09-22T07:40:00Z",
+      "areaKm2": 1957,
+      "speedKmh": 30.9,
+      "trackerErrorKm": 12.0,
+      "persistenceErrorKm": 19.0
+    },
+    {
+      "time": "2026-09-22T07:40:00Z",
+      "areaKm2": 1260,
+      "speedKmh": 4.6,
+      "trackerErrorKm": 44.2,
+      "persistenceErrorKm": 46.9
+    },
+    {
+      "time": "2026-09-22T07:40:00Z",
+      "areaKm2": 1171,
+      "speedKmh": 28.1,
+      "trackerErrorKm": 5.8,
+      "persistenceErrorKm": 23.0
+    },
+    {
+      "time": "2026-09-22T07:40:00Z",
+      "areaKm2": 1146,
+      "speedKmh": 2.0,
+      "trackerErrorKm": 44.3,
+      "persistenceErrorKm": 46.3
+    },
+    {
+      "time": "2026-09-22T07:40:00Z",
+      "areaKm2": 1025,
+      "speedKmh": 15.9,
+      "trackerErrorKm": 88.9,
+      "persistenceErrorKm": 74.2
+    },
+    {
+      "time": "2026-09-22T07:40:00Z",
+      "areaKm2": 844,
+      "speedKmh": 9.7,
+      "trackerErrorKm": 69.1,
+      "persistenceErrorKm": 61.8
+    },
+    {
+      "time": "2026-09-22T07:40:00Z",
+      "areaKm2": 788,
+      "speedKmh": 29.8,
+      "trackerErrorKm": 18.6,
+      "persistenceErrorKm": 14.2
+    },
+    {
+      "time": "2026-09-22T07:40:00Z",
+      "areaKm2": 761,
+      "speedKmh": 30.5,
+      "trackerErrorKm": 53.6,
+      "persistenceErrorKm": 25.1
+    },
+    {
+      "time": "2026-09-22T07:40:00Z",
+      "areaKm2": 597,
+      "speedKmh": 27.8,
+      "trackerErrorKm": 36.2,
+      "persistenceErrorKm": 18.5
+    },
+    {
+      "time": "2026-09-22T07:40:00Z",
+      "areaKm2": 472,
+      "speedKmh": 28.1,
+      "trackerErrorKm": 20.8,
+      "persistenceErrorKm": 22.5
+    },
+    {
+      "time": "2026-09-22T07:40:00Z",
+      "areaKm2": 436,
+      "speedKmh": 7.2,
+      "trackerErrorKm": 167.6,
+      "persistenceErrorKm": 174.8
+    },
+    {
+      "time": "2026-09-22T07:40:00Z",
+      "areaKm2": 385,
+      "speedKmh": 25.7,
+      "trackerErrorKm": 17.4,
+      "persistenceErrorKm": 20.3
+    },
+    {
+      "time": "2026-09-22T07:40:00Z",
+      "areaKm2": 372,
+      "speedKmh": 33.4,
+      "trackerErrorKm": 48.9,
+      "persistenceErrorKm": 70.7
+    },
+    {
+      "time": "2026-09-22T07:40:00Z",
+      "areaKm2": 270,
+      "speedKmh": 39.0,
+      "trackerErrorKm": 14.2,
+      "persistenceErrorKm": 24.9
+    },
+    {
+      "time": "2026-09-22T07:50:00Z",
+      "areaKm2": 23570,
+      "speedKmh": 12.7,
+      "trackerErrorKm": 14.8,
+      "persistenceErrorKm": 26.3
+    },
+    {
+      "time": "2026-09-22T07:50:00Z",
+      "areaKm2": 8168,
+      "speedKmh": 14.3,
+      "trackerErrorKm": 39.6,
+      "persistenceErrorKm": 32.5
+    },
+    {
+      "time": "2026-09-22T07:50:00Z",
+      "areaKm2": 5530,
+      "speedKmh": 46.3,
+      "trackerErrorKm": 9.1,
+      "persistenceErrorKm": 39.6
+    },
+    {
+      "time": "2026-09-22T07:50:00Z",
+      "areaKm2": 2754,
+      "speedKmh": 28.9,
+      "trackerErrorKm": 20.9,
+      "persistenceErrorKm": 40.3
+    },
+    {
+      "time": "2026-09-22T07:50:00Z",
+      "areaKm2": 2608,
+      "speedKmh": 33.8,
+      "trackerErrorKm": 19.7,
+      "persistenceErrorKm": 15.4
+    },
+    {
+      "time": "2026-09-22T07:50:00Z",
+      "areaKm2": 1618,
+      "speedKmh": 23.8,
+      "trackerErrorKm": 31.8,
+      "persistenceErrorKm": 44.8
+    },
+    {
+      "time": "2026-09-22T07:50:00Z",
+      "areaKm2": 1569,
+      "speedKmh": 2.3,
+      "trackerErrorKm": 49.2,
+      "persistenceErrorKm": 51.0
+    },
+    {
+      "time": "2026-09-22T07:50:00Z",
+      "areaKm2": 1267,
+      "speedKmh": 23.3,
+      "trackerErrorKm": 4.8,
+      "persistenceErrorKm": 23.3
+    },
+    {
+      "time": "2026-09-22T07:50:00Z",
+      "areaKm2": 1164,
+      "speedKmh": 17.6,
+      "trackerErrorKm": 63.9,
+      "persistenceErrorKm": 56.2
+    },
+    {
+      "time": "2026-09-22T07:50:00Z",
+      "areaKm2": 1139,
+      "speedKmh": 25.8,
+      "trackerErrorKm": 18.2,
+      "persistenceErrorKm": 10.8
+    },
+    {
+      "time": "2026-09-22T07:50:00Z",
+      "areaKm2": 1121,
+      "speedKmh": 19.5,
+      "trackerErrorKm": 89.0,
+      "persistenceErrorKm": 71.7
+    },
+    {
+      "time": "2026-09-22T07:50:00Z",
+      "areaKm2": 873,
+      "speedKmh": 41.4,
+      "trackerErrorKm": 67.1,
+      "persistenceErrorKm": 29.2
+    },
+    {
+      "time": "2026-09-22T07:50:00Z",
+      "areaKm2": 729,
+      "speedKmh": 14.7,
+      "trackerErrorKm": 40.4,
+      "persistenceErrorKm": 44.7
+    },
+    {
+      "time": "2026-09-22T07:50:00Z",
+      "areaKm2": 645,
+      "speedKmh": 54.3,
+      "trackerErrorKm": 60.2,
+      "persistenceErrorKm": 7.6
+    },
+    {
+      "time": "2026-09-22T07:50:00Z",
+      "areaKm2": 636,
+      "speedKmh": 35.4,
+      "trackerErrorKm": 27.8,
+      "persistenceErrorKm": 15.5
+    },
+    {
+      "time": "2026-09-22T07:50:00Z",
+      "areaKm2": 623,
+      "speedKmh": 2.6,
+      "trackerErrorKm": 166.1,
+      "persistenceErrorKm": 168.6
+    },
+    {
+      "time": "2026-09-22T07:50:00Z",
+      "areaKm2": 615,
+      "speedKmh": 30.8,
+      "trackerErrorKm": 39.3,
+      "persistenceErrorKm": 17.7
+    },
+    {
+      "time": "2026-09-22T07:50:00Z",
+      "areaKm2": 477,
+      "speedKmh": 25.1,
+      "trackerErrorKm": 17.2,
+      "persistenceErrorKm": 27.8
+    },
+    {
+      "time": "2026-09-22T07:50:00Z",
+      "areaKm2": 446,
+      "speedKmh": 28.4,
+      "trackerErrorKm": 44.9,
+      "persistenceErrorKm": 69.1
+    },
+    {
+      "time": "2026-09-22T07:50:00Z",
+      "areaKm2": 303,
+      "speedKmh": 40.0,
+      "trackerErrorKm": 21.4,
+      "persistenceErrorKm": 21.4
+    },
+    {
+      "time": "2026-09-22T07:50:00Z",
+      "areaKm2": 240,
+      "speedKmh": 36.9,
+      "trackerErrorKm": 12.2,
+      "persistenceErrorKm": 24.9
+    },
+    {
+      "time": "2026-09-22T08:00:00Z",
+      "areaKm2": 24520,
+      "speedKmh": 9.6,
+      "trackerErrorKm": 40.5,
+      "persistenceErrorKm": 34.6
+    },
+    {
+      "time": "2026-09-22T08:00:00Z",
+      "areaKm2": 8911,
+      "speedKmh": 12.6,
+      "trackerErrorKm": 45.1,
+      "persistenceErrorKm": 36.5
+    },
+    {
+      "time": "2026-09-22T08:00:00Z",
+      "areaKm2": 5389,
+      "speedKmh": 47.3,
+      "trackerErrorKm": 8.5,
+      "persistenceErrorKm": 42.6
+    },
+    {
+      "time": "2026-09-22T08:00:00Z",
+      "areaKm2": 2661,
+      "speedKmh": 30.5,
+      "trackerErrorKm": 18.7,
+      "persistenceErrorKm": 12.5
+    },
+    {
+      "time": "2026-09-22T08:00:00Z",
+      "areaKm2": 2544,
+      "speedKmh": 27.7,
+      "trackerErrorKm": 12.3,
+      "persistenceErrorKm": 40.0
+    },
+    {
+      "time": "2026-09-22T08:00:00Z",
+      "areaKm2": 1802,
+      "speedKmh": 3.5,
+      "trackerErrorKm": 147.9,
+      "persistenceErrorKm": 149.8
+    },
+    {
+      "time": "2026-09-22T08:00:00Z",
+      "areaKm2": 1788,
+      "speedKmh": 13.1,
+      "trackerErrorKm": 40.7,
+      "persistenceErrorKm": 29.8
+    },
+    {
+      "time": "2026-09-22T08:00:00Z",
+      "areaKm2": 1758,
+      "speedKmh": 4.2,
+      "trackerErrorKm": 48.9,
+      "persistenceErrorKm": 53.1
+    },
+    {
+      "time": "2026-09-22T08:00:00Z",
+      "areaKm2": 1414,
+      "speedKmh": 17.4,
+      "trackerErrorKm": 80.2,
+      "persistenceErrorKm": 67.3
+    },
+    {
+      "time": "2026-09-22T08:00:00Z",
+      "areaKm2": 1342,
+      "speedKmh": 21.9,
+      "trackerErrorKm": 16.0,
+      "persistenceErrorKm": 13.0
+    },
+    {
+      "time": "2026-09-22T08:00:00Z",
+      "areaKm2": 1253,
+      "speedKmh": 19.8,
+      "trackerErrorKm": 47.6,
+      "persistenceErrorKm": 63.2
+    },
+    {
+      "time": "2026-09-22T08:00:00Z",
+      "areaKm2": 1164,
+      "speedKmh": 18.4,
+      "trackerErrorKm": 21.9,
+      "persistenceErrorKm": 4.6
+    },
+    {
+      "time": "2026-09-22T08:00:00Z",
+      "areaKm2": 1052,
+      "speedKmh": 27.4,
+      "trackerErrorKm": 34.9,
+      "persistenceErrorKm": 58.9
+    },
+    {
+      "time": "2026-09-22T08:00:00Z",
+      "areaKm2": 979,
+      "speedKmh": 38.6,
+      "trackerErrorKm": 27.6,
+      "persistenceErrorKm": 15.3
+    },
+    {
+      "time": "2026-09-22T08:00:00Z",
+      "areaKm2": 904,
+      "speedKmh": 48.3,
+      "trackerErrorKm": 149.1,
+      "persistenceErrorKm": 105.8
+    },
+    {
+      "time": "2026-09-22T08:00:00Z",
+      "areaKm2": 878,
+      "speedKmh": 21.8,
+      "trackerErrorKm": 24.6,
+      "persistenceErrorKm": 15.1
+    },
+    {
+      "time": "2026-09-22T08:00:00Z",
+      "areaKm2": 791,
+      "speedKmh": 30.0,
+      "trackerErrorKm": 63.5,
+      "persistenceErrorKm": 74.4
+    },
+    {
+      "time": "2026-09-22T08:00:00Z",
+      "areaKm2": 714,
+      "speedKmh": 8.3,
+      "trackerErrorKm": 152.6,
+      "persistenceErrorKm": 158.7
+    },
+    {
+      "time": "2026-09-22T08:00:00Z",
+      "areaKm2": 651,
+      "speedKmh": 11.4,
+      "trackerErrorKm": 92.8,
+      "persistenceErrorKm": 104.2
+    },
+    {
+      "time": "2026-09-22T08:00:00Z",
+      "areaKm2": 478,
+      "speedKmh": 22.7,
+      "trackerErrorKm": 48.9,
+      "persistenceErrorKm": 69.0
+    },
+    {
+      "time": "2026-09-22T08:00:00Z",
+      "areaKm2": 402,
+      "speedKmh": 31.1,
+      "trackerErrorKm": 20.1,
+      "persistenceErrorKm": 28.6
+    },
+    {
+      "time": "2026-09-22T08:00:00Z",
+      "areaKm2": 285,
+      "speedKmh": 44.0,
+      "trackerErrorKm": 46.9,
+      "persistenceErrorKm": 3.2
+    },
+    {
+      "time": "2026-09-22T08:00:00Z",
+      "areaKm2": 275,
+      "speedKmh": 32.6,
+      "trackerErrorKm": 42.7,
+      "persistenceErrorKm": 21.3
+    },
+    {
+      "time": "2026-09-22T08:10:00Z",
+      "areaKm2": 26024,
+      "speedKmh": 5.0,
+      "trackerErrorKm": 35.1,
+      "persistenceErrorKm": 32.1
+    },
+    {
+      "time": "2026-09-22T08:10:00Z",
+      "areaKm2": 12456,
+      "speedKmh": 12.4,
+      "trackerErrorKm": 28.1,
+      "persistenceErrorKm": 17.6
+    },
+    {
+      "time": "2026-09-22T08:10:00Z",
+      "areaKm2": 5666,
+      "speedKmh": 43.6,
+      "trackerErrorKm": 6.7,
+      "persistenceErrorKm": 41.6
+    },
+    {
+      "time": "2026-09-22T08:10:00Z",
+      "areaKm2": 4855,
+      "speedKmh": 8.5,
+      "trackerErrorKm": 51.4,
+      "persistenceErrorKm": 59.5
+    },
+    {
+      "time": "2026-09-22T08:10:00Z",
+      "areaKm2": 2555,
+      "speedKmh": 35.3,
+      "trackerErrorKm": 28.1,
+      "persistenceErrorKm": 13.7
+    },
+    {
+      "time": "2026-09-22T08:10:00Z",
+      "areaKm2": 2152,
+      "speedKmh": 27.9,
+      "trackerErrorKm": 10.3,
+      "persistenceErrorKm": 36.9
+    },
+    {
+      "time": "2026-09-22T08:10:00Z",
+      "areaKm2": 1929,
+      "speedKmh": 10.8,
+      "trackerErrorKm": 4.8,
+      "persistenceErrorKm": 8.7
+    },
+    {
+      "time": "2026-09-22T08:10:00Z",
+      "areaKm2": 1900,
+      "speedKmh": 5.1,
+      "trackerErrorKm": 157.9,
+      "persistenceErrorKm": 154.6
+    },
+    {
+      "time": "2026-09-22T08:10:00Z",
+      "areaKm2": 1591,
+      "speedKmh": 15.5,
+      "trackerErrorKm": 10.6,
+      "persistenceErrorKm": 17.7
+    },
+    {
+      "time": "2026-09-22T08:10:00Z",
+      "areaKm2": 1574,
+      "speedKmh": 15.7,
+      "trackerErrorKm": 126.4,
+      "persistenceErrorKm": 112.6
+    },
+    {
+      "time": "2026-09-22T08:10:00Z",
+      "areaKm2": 1382,
+      "speedKmh": 20.7,
+      "trackerErrorKm": 72.1,
+      "persistenceErrorKm": 88.5
+    },
+    {
+      "time": "2026-09-22T08:10:00Z",
+      "areaKm2": 1288,
+      "speedKmh": 29.0,
+      "trackerErrorKm": 30.0,
+      "persistenceErrorKm": 55.5
+    },
+    {
+      "time": "2026-09-22T08:10:00Z",
+      "areaKm2": 1276,
+      "speedKmh": 24.9,
+      "trackerErrorKm": 10.2,
+      "persistenceErrorKm": 18.0
+    },
+    {
+      "time": "2026-09-22T08:10:00Z",
+      "areaKm2": 869,
+      "speedKmh": 22.0,
+      "trackerErrorKm": 18.9,
+      "persistenceErrorKm": 14.6
+    },
+    {
+      "time": "2026-09-22T08:10:00Z",
+      "areaKm2": 755,
+      "speedKmh": 5.3,
+      "trackerErrorKm": 151.7,
+      "persistenceErrorKm": 157.0
+    },
+    {
+      "time": "2026-09-22T08:10:00Z",
+      "areaKm2": 578,
+      "speedKmh": 34.5,
+      "trackerErrorKm": 13.9,
+      "persistenceErrorKm": 25.2
+    },
+    {
+      "time": "2026-09-22T08:10:00Z",
+      "areaKm2": 441,
+      "speedKmh": 22.5,
+      "trackerErrorKm": 51.0,
+      "persistenceErrorKm": 69.8
+    },
+    {
+      "time": "2026-09-22T08:10:00Z",
+      "areaKm2": 210,
+      "speedKmh": 34.2,
+      "trackerErrorKm": 32.2,
+      "persistenceErrorKm": 20.6
+    },
+    {
+      "time": "2026-09-22T08:20:00Z",
+      "areaKm2": 26992,
+      "speedKmh": 5.2,
+      "trackerErrorKm": 32.9,
+      "persistenceErrorKm": 28.5
+    },
+    {
+      "time": "2026-09-22T08:20:00Z",
+      "areaKm2": 10723,
+      "speedKmh": 11.4,
+      "trackerErrorKm": 28.1,
+      "persistenceErrorKm": 24.6
+    },
+    {
+      "time": "2026-09-22T08:20:00Z",
+      "areaKm2": 6049,
+      "speedKmh": 10.5,
+      "trackerErrorKm": 58.8,
+      "persistenceErrorKm": 56.9
+    },
+    {
+      "time": "2026-09-22T08:20:00Z",
+      "areaKm2": 5592,
+      "speedKmh": 48.1,
+      "trackerErrorKm": 9.4,
+      "persistenceErrorKm": 41.7
+    },
+    {
+      "time": "2026-09-22T08:20:00Z",
+      "areaKm2": 4737,
+      "speedKmh": 4.2,
+      "trackerErrorKm": 128.8,
+      "persistenceErrorKm": 133.0
+    },
+    {
+      "time": "2026-09-22T08:20:00Z",
+      "areaKm2": 2695,
+      "speedKmh": 6.1,
+      "trackerErrorKm": 10.6,
+      "persistenceErrorKm": 12.5
+    },
+    {
+      "time": "2026-09-22T08:20:00Z",
+      "areaKm2": 2476,
+      "speedKmh": 31.3,
+      "trackerErrorKm": 22.1,
+      "persistenceErrorKm": 14.0
+    },
+    {
+      "time": "2026-09-22T08:20:00Z",
+      "areaKm2": 1814,
+      "speedKmh": 20.2,
+      "trackerErrorKm": 18.4,
+      "persistenceErrorKm": 27.3
+    },
+    {
+      "time": "2026-09-22T08:20:00Z",
+      "areaKm2": 1623,
+      "speedKmh": 17.1,
+      "trackerErrorKm": 3.9,
+      "persistenceErrorKm": 16.9
+    },
+    {
+      "time": "2026-09-22T08:20:00Z",
+      "areaKm2": 1533,
+      "speedKmh": 16.0,
+      "trackerErrorKm": 2.5,
+      "persistenceErrorKm": 18.1
+    },
+    {
+      "time": "2026-09-22T08:20:00Z",
+      "areaKm2": 1529,
+      "speedKmh": 22.5,
+      "trackerErrorKm": 58.1,
+      "persistenceErrorKm": 76.5
+    },
+    {
+      "time": "2026-09-22T08:20:00Z",
+      "areaKm2": 1529,
+      "speedKmh": 29.1,
+      "trackerErrorKm": 31.2,
+      "persistenceErrorKm": 48.9
+    },
+    {
+      "time": "2026-09-22T08:20:00Z",
+      "areaKm2": 1406,
+      "speedKmh": 28.0,
+      "trackerErrorKm": 6.8,
+      "persistenceErrorKm": 32.1
+    },
+    {
+      "time": "2026-09-22T08:20:00Z",
+      "areaKm2": 1004,
+      "speedKmh": 33.8,
+      "trackerErrorKm": 41.9,
+      "persistenceErrorKm": 22.7
+    },
+    {
+      "time": "2026-09-22T08:20:00Z",
+      "areaKm2": 887,
+      "speedKmh": 23.7,
+      "trackerErrorKm": 16.0,
+      "persistenceErrorKm": 12.3
+    },
+    {
+      "time": "2026-09-22T08:20:00Z",
+      "areaKm2": 859,
+      "speedKmh": 4.6,
+      "trackerErrorKm": 153.7,
+      "persistenceErrorKm": 158.0
+    },
+    {
+      "time": "2026-09-22T08:20:00Z",
+      "areaKm2": 698,
+      "speedKmh": 31.0,
+      "trackerErrorKm": 21.6,
+      "persistenceErrorKm": 10.5
+    },
+    {
+      "time": "2026-09-22T08:20:00Z",
+      "areaKm2": 451,
+      "speedKmh": 24.1,
+      "trackerErrorKm": 24.3,
+      "persistenceErrorKm": 17.0
+    },
+    {
+      "time": "2026-09-22T08:20:00Z",
+      "areaKm2": 383,
+      "speedKmh": 12.4,
+      "trackerErrorKm": 63.8,
+      "persistenceErrorKm": 53.0
+    },
+    {
+      "time": "2026-09-22T08:20:00Z",
+      "areaKm2": 362,
+      "speedKmh": 14.7,
+      "trackerErrorKm": 77.4,
+      "persistenceErrorKm": 75.8
+    },
+    {
+      "time": "2026-09-22T08:20:00Z",
+      "areaKm2": 294,
+      "speedKmh": 20.8,
+      "trackerErrorKm": 49.5,
+      "persistenceErrorKm": 67.8
+    },
+    {
+      "time": "2026-09-22T08:20:00Z",
+      "areaKm2": 227,
+      "speedKmh": 33.1,
+      "trackerErrorKm": 45.5,
+      "persistenceErrorKm": 18.5
+    },
+    {
+      "time": "2026-09-22T08:20:00Z",
+      "areaKm2": 203,
+      "speedKmh": 21.3,
+      "trackerErrorKm": 37.2,
+      "persistenceErrorKm": 58.3
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 28313,
+      "speedKmh": 8.0,
+      "trackerErrorKm": 25.9,
+      "persistenceErrorKm": 18.0
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 11010,
+      "speedKmh": 9.9,
+      "trackerErrorKm": 59.2,
+      "persistenceErrorKm": 55.2
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 7141,
+      "speedKmh": 20.5,
+      "trackerErrorKm": 58.0,
+      "persistenceErrorKm": 46.5
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 5598,
+      "speedKmh": 19.8,
+      "trackerErrorKm": 116.1,
+      "persistenceErrorKm": 135.6
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 5399,
+      "speedKmh": 52.9,
+      "trackerErrorKm": 19.2,
+      "persistenceErrorKm": 34.9
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 3286,
+      "speedKmh": 6.1,
+      "trackerErrorKm": 16.6,
+      "persistenceErrorKm": 15.4
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 2181,
+      "speedKmh": 23.4,
+      "trackerErrorKm": 4.5,
+      "persistenceErrorKm": 22.9
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 1665,
+      "speedKmh": 13.4,
+      "trackerErrorKm": 33.1,
+      "persistenceErrorKm": 40.4
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 1497,
+      "speedKmh": 21.8,
+      "trackerErrorKm": 71.2,
+      "persistenceErrorKm": 85.6
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 1474,
+      "speedKmh": 33.1,
+      "trackerErrorKm": 16.6,
+      "persistenceErrorKm": 28.5
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 1396,
+      "speedKmh": 12.5,
+      "trackerErrorKm": 6.4,
+      "persistenceErrorKm": 18.1
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 1325,
+      "speedKmh": 24.0,
+      "trackerErrorKm": 33.3,
+      "persistenceErrorKm": 26.9
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 955,
+      "speedKmh": 4.8,
+      "trackerErrorKm": 161.7,
+      "persistenceErrorKm": 165.8
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 878,
+      "speedKmh": 20.6,
+      "trackerErrorKm": 12.5,
+      "persistenceErrorKm": 8.0
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 849,
+      "speedKmh": 15.9,
+      "trackerErrorKm": 42.5,
+      "persistenceErrorKm": 57.7
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 785,
+      "speedKmh": 31.7,
+      "trackerErrorKm": 26.3,
+      "persistenceErrorKm": 23.3
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 553,
+      "speedKmh": 26.1,
+      "trackerErrorKm": 98.6,
+      "persistenceErrorKm": 93.5
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 338,
+      "speedKmh": 25.3,
+      "trackerErrorKm": 12.8,
+      "persistenceErrorKm": 37.9
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 334,
+      "speedKmh": 28.7,
+      "trackerErrorKm": 50.2,
+      "persistenceErrorKm": 55.0
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 299,
+      "speedKmh": 23.3,
+      "trackerErrorKm": 22.4,
+      "persistenceErrorKm": 16.8
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 297,
+      "speedKmh": 25.8,
+      "trackerErrorKm": 32.7,
+      "persistenceErrorKm": 55.5
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 276,
+      "speedKmh": 47.8,
+      "trackerErrorKm": 28.1,
+      "persistenceErrorKm": 75.6
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 242,
+      "speedKmh": 50.6,
+      "trackerErrorKm": 64.1,
+      "persistenceErrorKm": 24.1
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 241,
+      "speedKmh": 39.2,
+      "trackerErrorKm": 55.5,
+      "persistenceErrorKm": 17.8
+    },
+    {
+      "time": "2026-09-22T08:30:00Z",
+      "areaKm2": 239,
+      "speedKmh": 24.0,
+      "trackerErrorKm": 51.3,
+      "persistenceErrorKm": 70.0
+    },
+    {
+      "time": "2026-09-22T08:40:00Z",
+      "areaKm2": 31520,
+      "speedKmh": 3.0,
+      "trackerErrorKm": 11.3,
+      "persistenceErrorKm": 8.2
+    },
+    {
+      "time": "2026-09-22T08:40:00Z",
+      "areaKm2": 10863,
+      "speedKmh": 12.4,
+      "trackerErrorKm": 66.8,
+      "persistenceErrorKm": 63.8
+    },
+    {
+      "time": "2026-09-22T08:40:00Z",
+      "areaKm2": 8376,
+      "speedKmh": 32.2,
+      "trackerErrorKm": 69.7,
+      "persistenceErrorKm": 43.5
+    },
+    {
+      "time": "2026-09-22T08:40:00Z",
+      "areaKm2": 6021,
+      "speedKmh": 26.1,
+      "trackerErrorKm": 109.0,
+      "persistenceErrorKm": 134.6
+    },
+    {
+      "time": "2026-09-22T08:40:00Z",
+      "areaKm2": 4632,
+      "speedKmh": 57.2,
+      "trackerErrorKm": 24.7,
+      "persistenceErrorKm": 34.6
+    },
+    {
+      "time": "2026-09-22T08:40:00Z",
+      "areaKm2": 4454,
+      "speedKmh": 6.2,
+      "trackerErrorKm": 12.6,
+      "persistenceErrorKm": 14.8
+    },
+    {
+      "time": "2026-09-22T08:40:00Z",
+      "areaKm2": 2865,
+      "speedKmh": 32.9,
+      "trackerErrorKm": 13.3,
+      "persistenceErrorKm": 31.1
+    },
+    {
+      "time": "2026-09-22T08:40:00Z",
+      "areaKm2": 2674,
+      "speedKmh": 31.5,
+      "trackerErrorKm": 4.5,
+      "persistenceErrorKm": 27.1
+    },
+    {
+      "time": "2026-09-22T08:40:00Z",
+      "areaKm2": 1801,
+      "speedKmh": 28.5,
+      "trackerErrorKm": 25.8,
+      "persistenceErrorKm": 28.3
+    },
+    {
+      "time": "2026-09-22T08:40:00Z",
+      "areaKm2": 1506,
+      "speedKmh": 14.4,
+      "trackerErrorKm": 3.3,
+      "persistenceErrorKm": 17.3
+    },
+    {
+      "time": "2026-09-22T08:40:00Z",
+      "areaKm2": 1451,
+      "speedKmh": 17.9,
+      "trackerErrorKm": 77.4,
+      "persistenceErrorKm": 86.8
+    },
+    {
+      "time": "2026-09-22T08:40:00Z",
+      "areaKm2": 1448,
+      "speedKmh": 22.4,
+      "trackerErrorKm": 20.3,
+      "persistenceErrorKm": 42.7
+    },
+    {
+      "time": "2026-09-22T08:40:00Z",
+      "areaKm2": 1191,
+      "speedKmh": 23.1,
+      "trackerErrorKm": 34.2,
+      "persistenceErrorKm": 45.2
+    },
+    {
+      "time": "2026-09-22T08:40:00Z",
+      "areaKm2": 928,
+      "speedKmh": 17.9,
+      "trackerErrorKm": 10.9,
+      "persistenceErrorKm": 6.9
+    },
+    {
+      "time": "2026-09-22T08:40:00Z",
+      "areaKm2": 898,
+      "speedKmh": 30.7,
+      "trackerErrorKm": 26.3,
+      "persistenceErrorKm": 56.6
+    },
+    {
+      "time": "2026-09-22T08:40:00Z",
+      "areaKm2": 808,
+      "speedKmh": 25.4,
+      "trackerErrorKm": 27.1,
+      "persistenceErrorKm": 26.9
+    },
+    {
+      "time": "2026-09-22T08:40:00Z",
+      "areaKm2": 714,
+      "speedKmh": 16.1,
+      "trackerErrorKm": 9.8,
+      "persistenceErrorKm": 7.4
+    },
+    {
+      "time": "2026-09-22T08:40:00Z",
+      "areaKm2": 609,
+      "speedKmh": 36.7,
+      "trackerErrorKm": 107.0,
+      "persistenceErrorKm": 94.0
+    },
+    {
+      "time": "2026-09-22T08:40:00Z",
+      "areaKm2": 599,
+      "speedKmh": 16.0,
+      "trackerErrorKm": 37.5,
+      "persistenceErrorKm": 53.4
+    },
+    {
+      "time": "2026-09-22T08:40:00Z",
+      "areaKm2": 373,
+      "speedKmh": 26.8,
+      "trackerErrorKm": 30.0,
+      "persistenceErrorKm": 20.9
+    },
+    {
+      "time": "2026-09-22T08:40:00Z",
+      "areaKm2": 233,
+      "speedKmh": 32.9,
+      "trackerErrorKm": 29.6,
+      "persistenceErrorKm": 29.8
+    },
+    {
+      "time": "2026-09-22T08:50:00Z",
+      "areaKm2": 32085,
+      "speedKmh": 10.1,
+      "trackerErrorKm": 18.1,
+      "persistenceErrorKm": 25.2
+    },
+    {
+      "time": "2026-09-22T08:50:00Z",
+      "areaKm2": 10778,
+      "speedKmh": 8.5,
+      "trackerErrorKm": 188.5,
+      "persistenceErrorKm": 183.8
+    },
+    {
+      "time": "2026-09-22T08:50:00Z",
+      "areaKm2": 9177,
+      "speedKmh": 27.5,
+      "trackerErrorKm": 60.6,
+      "persistenceErrorKm": 39.4
+    },
+    {
+      "time": "2026-09-22T08:50:00Z",
+      "areaKm2": 7055,
+      "speedKmh": 25.2,
+      "trackerErrorKm": 109.9,
+      "persistenceErrorKm": 134.3
+    },
+    {
+      "time": "2026-09-22T08:50:00Z",
+      "areaKm2": 5134,
+      "speedKmh": 9.0,
+      "trackerErrorKm": 14.5,
+      "persistenceErrorKm": 16.5
+    },
+    {
+      "time": "2026-09-22T08:50:00Z",
+      "areaKm2": 4950,
+      "speedKmh": 24.6,
+      "trackerErrorKm": 4.3,
+      "persistenceErrorKm": 22.0
+    },
+    {
+      "time": "2026-09-22T08:50:00Z",
+      "areaKm2": 4221,
+      "speedKmh": 56.9,
+      "trackerErrorKm": 24.2,
+      "persistenceErrorKm": 35.2
+    },
+    {
+      "time": "2026-09-22T08:50:00Z",
+      "areaKm2": 2808,
+      "speedKmh": 21.8,
+      "trackerErrorKm": 6.6,
+      "persistenceErrorKm": 28.3
+    },
+    {
+      "time": "2026-09-22T08:50:00Z",
+      "areaKm2": 1788,
+      "speedKmh": 34.9,
+      "trackerErrorKm": 3.5,
+      "persistenceErrorKm": 32.3
+    },
+    {
+      "time": "2026-09-22T08:50:00Z",
+      "areaKm2": 1474,
+      "speedKmh": 13.5,
+      "trackerErrorKm": 5.6,
+      "persistenceErrorKm": 16.8
+    },
+    {
+      "time": "2026-09-22T08:50:00Z",
+      "areaKm2": 1379,
+      "speedKmh": 33.0,
+      "trackerErrorKm": 19.3,
+      "persistenceErrorKm": 51.8
+    },
+    {
+      "time": "2026-09-22T08:50:00Z",
+      "areaKm2": 1254,
+      "speedKmh": 17.4,
+      "trackerErrorKm": 82.2,
+      "persistenceErrorKm": 91.3
+    },
+    {
+      "time": "2026-09-22T08:50:00Z",
+      "areaKm2": 1185,
+      "speedKmh": 41.3,
+      "trackerErrorKm": 18.5,
+      "persistenceErrorKm": 59.6
+    },
+    {
+      "time": "2026-09-22T08:50:00Z",
+      "areaKm2": 1121,
+      "speedKmh": 16.3,
+      "trackerErrorKm": 17.2,
+      "persistenceErrorKm": 11.7
+    },
+    {
+      "time": "2026-09-22T08:50:00Z",
+      "areaKm2": 1079,
+      "speedKmh": 26.8,
+      "trackerErrorKm": 26.6,
+      "persistenceErrorKm": 29.8
+    },
+    {
+      "time": "2026-09-22T08:50:00Z",
+      "areaKm2": 822,
+      "speedKmh": 11.5,
+      "trackerErrorKm": 5.7,
+      "persistenceErrorKm": 7.9
+    },
+    {
+      "time": "2026-09-22T08:50:00Z",
+      "areaKm2": 750,
+      "speedKmh": 8.8,
+      "trackerErrorKm": 45.3,
+      "persistenceErrorKm": 54.1
+    },
+    {
+      "time": "2026-09-22T08:50:00Z",
+      "areaKm2": 627,
+      "speedKmh": 36.0,
+      "trackerErrorKm": 113.0,
+      "persistenceErrorKm": 95.8
+    },
+    {
+      "time": "2026-09-22T08:50:00Z",
+      "areaKm2": 428,
+      "speedKmh": 15.4,
+      "trackerErrorKm": 17.6,
+      "persistenceErrorKm": 20.2
+    },
+    {
+      "time": "2026-09-22T08:50:00Z",
+      "areaKm2": 397,
+      "speedKmh": 27.9,
+      "trackerErrorKm": 25.6,
+      "persistenceErrorKm": 31.4
+    },
+    {
+      "time": "2026-09-22T08:50:00Z",
+      "areaKm2": 238,
+      "speedKmh": 20.1,
+      "trackerErrorKm": 28.9,
+      "persistenceErrorKm": 41.5
+    },
+    {
+      "time": "2026-09-22T09:00:00Z",
+      "areaKm2": 31274,
+      "speedKmh": 12.0,
+      "trackerErrorKm": 47.4,
+      "persistenceErrorKm": 52.2
+    },
+    {
+      "time": "2026-09-22T09:00:00Z",
+      "areaKm2": 18770,
+      "speedKmh": 31.6,
+      "trackerErrorKm": 10.3,
+      "persistenceErrorKm": 38.5
+    },
+    {
+      "time": "2026-09-22T09:00:00Z",
+      "areaKm2": 10367,
+      "speedKmh": 7.7,
+      "trackerErrorKm": 232.5,
+      "persistenceErrorKm": 226.8
+    },
+    {
+      "time": "2026-09-22T09:00:00Z",
+      "areaKm2": 6701,
+      "speedKmh": 24.5,
+      "trackerErrorKm": 15.2,
+      "persistenceErrorKm": 23.6
+    },
+    {
+      "time": "2026-09-22T09:00:00Z",
+      "areaKm2": 6240,
+      "speedKmh": 23.7,
+      "trackerErrorKm": 126.4,
+      "persistenceErrorKm": 117.8
+    },
+    {
+      "time": "2026-09-22T09:00:00Z",
+      "areaKm2": 3969,
+      "speedKmh": 57.7,
+      "trackerErrorKm": 25.4,
+      "persistenceErrorKm": 35.1
+    },
+    {
+      "time": "2026-09-22T09:00:00Z",
+      "areaKm2": 3029,
+      "speedKmh": 22.2,
+      "trackerErrorKm": 34.3,
+      "persistenceErrorKm": 47.2
+    },
+    {
+      "time": "2026-09-22T09:00:00Z",
+      "areaKm2": 2697,
+      "speedKmh": 14.7,
+      "trackerErrorKm": 21.7,
+      "persistenceErrorKm": 36.3
+    },
+    {
+      "time": "2026-09-22T09:00:00Z",
+      "areaKm2": 1723,
+      "speedKmh": 50.8,
+      "trackerErrorKm": 20.1,
+      "persistenceErrorKm": 34.0
+    },
+    {
+      "time": "2026-09-22T09:00:00Z",
+      "areaKm2": 1620,
+      "speedKmh": 18.2,
+      "trackerErrorKm": 7.9,
+      "persistenceErrorKm": 13.7
+    },
+    {
+      "time": "2026-09-22T09:00:00Z",
+      "areaKm2": 1412,
+      "speedKmh": 34.4,
+      "trackerErrorKm": 21.4,
+      "persistenceErrorKm": 55.6
+    },
+    {
+      "time": "2026-09-22T09:00:00Z",
+      "areaKm2": 1397,
+      "speedKmh": 10.7,
+      "trackerErrorKm": 3.8,
+      "persistenceErrorKm": 13.5
+    },
+    {
+      "time": "2026-09-22T09:00:00Z",
+      "areaKm2": 1052,
+      "speedKmh": 7.5,
+      "trackerErrorKm": 38.7,
+      "persistenceErrorKm": 45.8
+    },
+    {
+      "time": "2026-09-22T09:00:00Z",
+      "areaKm2": 928,
+      "speedKmh": 11.1,
+      "trackerErrorKm": 40.1,
+      "persistenceErrorKm": 32.9
+    },
+    {
+      "time": "2026-09-22T09:00:00Z",
+      "areaKm2": 557,
+      "speedKmh": 36.5,
+      "trackerErrorKm": 187.6,
+      "persistenceErrorKm": 174.1
+    },
+    {
+      "time": "2026-09-22T09:00:00Z",
+      "areaKm2": 360,
+      "speedKmh": 29.0,
+      "trackerErrorKm": 5.5,
+      "persistenceErrorKm": 25.8
+    },
+    {
+      "time": "2026-09-22T09:00:00Z",
+      "areaKm2": 202,
+      "speedKmh": 19.4,
+      "trackerErrorKm": 4.4,
+      "persistenceErrorKm": 20.4
+    },
+    {
+      "time": "2026-09-22T09:10:00Z",
+      "areaKm2": 32246,
+      "speedKmh": 9.9,
+      "trackerErrorKm": 54.5,
+      "persistenceErrorKm": 58.9
+    },
+    {
+      "time": "2026-09-22T09:10:00Z",
+      "areaKm2": 20198,
+      "speedKmh": 24.8,
+      "trackerErrorKm": 16.5,
+      "persistenceErrorKm": 34.8
+    },
+    {
+      "time": "2026-09-22T09:10:00Z",
+      "areaKm2": 10323,
+      "speedKmh": 11.6,
+      "trackerErrorKm": 234.1,
+      "persistenceErrorKm": 227.9
+    },
+    {
+      "time": "2026-09-22T09:10:00Z",
+      "areaKm2": 8272,
+      "speedKmh": 22.6,
+      "trackerErrorKm": 124.2,
+      "persistenceErrorKm": 118.0
+    },
+    {
+      "time": "2026-09-22T09:10:00Z",
+      "areaKm2": 7632,
+      "speedKmh": 21.6,
+      "trackerErrorKm": 10.6,
+      "persistenceErrorKm": 22.5
+    },
+    {
+      "time": "2026-09-22T09:10:00Z",
+      "areaKm2": 3593,
+      "speedKmh": 50.5,
+      "trackerErrorKm": 14.2,
+      "persistenceErrorKm": 39.5
+    },
+    {
+      "time": "2026-09-22T09:10:00Z",
+      "areaKm2": 2610,
+      "speedKmh": 18.5,
+      "trackerErrorKm": 16.1,
+      "persistenceErrorKm": 34.4
+    },
+    {
+      "time": "2026-09-22T09:10:00Z",
+      "areaKm2": 2468,
+      "speedKmh": 32.6,
+      "trackerErrorKm": 32.9,
+      "persistenceErrorKm": 24.7
+    },
+    {
+      "time": "2026-09-22T09:10:00Z",
+      "areaKm2": 2028,
+      "speedKmh": 14.5,
+      "trackerErrorKm": 7.5,
+      "persistenceErrorKm": 19.6
+    },
+    {
+      "time": "2026-09-22T09:10:00Z",
+      "areaKm2": 1406,
+      "speedKmh": 13.5,
+      "trackerErrorKm": 4.1,
+      "persistenceErrorKm": 9.6
+    },
+    {
+      "time": "2026-09-22T09:10:00Z",
+      "areaKm2": 1207,
+      "speedKmh": 15.7,
+      "trackerErrorKm": 30.0,
+      "persistenceErrorKm": 39.1
+    },
+    {
+      "time": "2026-09-22T09:10:00Z",
+      "areaKm2": 868,
+      "speedKmh": 18.2,
+      "trackerErrorKm": 73.1,
+      "persistenceErrorKm": 79.9
+    },
+    {
+      "time": "2026-09-22T09:10:00Z",
+      "areaKm2": 827,
+      "speedKmh": 16.3,
+      "trackerErrorKm": 45.0,
+      "persistenceErrorKm": 30.1
+    },
+    {
+      "time": "2026-09-22T09:10:00Z",
+      "areaKm2": 416,
+      "speedKmh": 30.9,
+      "trackerErrorKm": 5.7,
+      "persistenceErrorKm": 25.5
+    },
+    {
+      "time": "2026-09-22T09:10:00Z",
+      "areaKm2": 402,
+      "speedKmh": 46.0,
+      "trackerErrorKm": 60.0,
+      "persistenceErrorKm": 21.1
+    },
+    {
+      "time": "2026-09-22T09:10:00Z",
+      "areaKm2": 369,
+      "speedKmh": 4.3,
+      "trackerErrorKm": 177.5,
+      "persistenceErrorKm": 173.2
+    },
+    {
+      "time": "2026-09-22T09:10:00Z",
+      "areaKm2": 300,
+      "speedKmh": 15.9,
+      "trackerErrorKm": 18.9,
+      "persistenceErrorKm": 27.8
+    },
+    {
+      "time": "2026-09-22T09:10:00Z",
+      "areaKm2": 296,
+      "speedKmh": 22.5,
+      "trackerErrorKm": 63.8,
+      "persistenceErrorKm": 56.5
+    },
+    {
+      "time": "2026-09-22T09:10:00Z",
+      "areaKm2": 207,
+      "speedKmh": 17.4,
+      "trackerErrorKm": 2.7,
+      "persistenceErrorKm": 17.3
+    },
+    {
+      "time": "2026-09-22T09:20:00Z",
+      "areaKm2": 32155,
+      "speedKmh": 6.9,
+      "trackerErrorKm": 67.0,
+      "persistenceErrorKm": 70.5
+    },
+    {
+      "time": "2026-09-22T09:20:00Z",
+      "areaKm2": 21987,
+      "speedKmh": 23.9,
+      "trackerErrorKm": 3.7,
+      "persistenceErrorKm": 27.6
+    },
+    {
+      "time": "2026-09-22T09:20:00Z",
+      "areaKm2": 10077,
+      "speedKmh": 20.7,
+      "trackerErrorKm": 114.4,
+      "persistenceErrorKm": 105.4
+    },
+    {
+      "time": "2026-09-22T09:20:00Z",
+      "areaKm2": 9584,
+      "speedKmh": 8.8,
+      "trackerErrorKm": 244.8,
+      "persistenceErrorKm": 241.6
+    },
+    {
+      "time": "2026-09-22T09:20:00Z",
+      "areaKm2": 8299,
+      "speedKmh": 28.0,
+      "trackerErrorKm": 3.5,
+      "persistenceErrorKm": 24.9
+    },
+    {
+      "time": "2026-09-22T09:20:00Z",
+      "areaKm2": 3414,
+      "speedKmh": 22.1,
+      "trackerErrorKm": 29.1,
+      "persistenceErrorKm": 33.7
+    },
+    {
+      "time": "2026-09-22T09:20:00Z",
+      "areaKm2": 3076,
+      "speedKmh": 6.6,
+      "trackerErrorKm": 20.8,
+      "persistenceErrorKm": 27.4
+    },
+    {
+      "time": "2026-09-22T09:20:00Z",
+      "areaKm2": 2707,
+      "speedKmh": 21.4,
+      "trackerErrorKm": 14.0,
+      "persistenceErrorKm": 34.7
+    },
+    {
+      "time": "2026-09-22T09:20:00Z",
+      "areaKm2": 1477,
+      "speedKmh": 12.1,
+      "trackerErrorKm": 32.7,
+      "persistenceErrorKm": 41.8
+    },
+    {
+      "time": "2026-09-22T09:20:00Z",
+      "areaKm2": 1126,
+      "speedKmh": 35.1,
+      "trackerErrorKm": 47.5,
+      "persistenceErrorKm": 17.2
+    },
+    {
+      "time": "2026-09-22T09:20:00Z",
+      "areaKm2": 757,
+      "speedKmh": 20.0,
+      "trackerErrorKm": 46.1,
+      "persistenceErrorKm": 27.3
+    },
+    {
+      "time": "2026-09-22T09:20:00Z",
+      "areaKm2": 647,
+      "speedKmh": 14.0,
+      "trackerErrorKm": 191.0,
+      "persistenceErrorKm": 190.1
+    },
+    {
+      "time": "2026-09-22T09:20:00Z",
+      "areaKm2": 502,
+      "speedKmh": 10.5,
+      "trackerErrorKm": 23.7,
+      "persistenceErrorKm": 28.8
+    },
+    {
+      "time": "2026-09-22T09:20:00Z",
+      "areaKm2": 492,
+      "speedKmh": 32.0,
+      "trackerErrorKm": 90.4,
+      "persistenceErrorKm": 63.9
+    },
+    {
+      "time": "2026-09-22T09:20:00Z",
+      "areaKm2": 329,
+      "speedKmh": 12.8,
+      "trackerErrorKm": 91.6,
+      "persistenceErrorKm": 80.2
+    },
+    {
+      "time": "2026-09-22T09:20:00Z",
+      "areaKm2": 310,
+      "speedKmh": 25.3,
+      "trackerErrorKm": 67.7,
+      "persistenceErrorKm": 53.7
+    },
+    {
+      "time": "2026-09-22T09:20:00Z",
+      "areaKm2": 289,
+      "speedKmh": 44.3,
+      "trackerErrorKm": 24.1,
+      "persistenceErrorKm": 63.2
+    },
+    {
+      "time": "2026-09-22T09:20:00Z",
+      "areaKm2": 248,
+      "speedKmh": 20.6,
+      "trackerErrorKm": 4.9,
+      "persistenceErrorKm": 16.9
+    },
+    {
+      "time": "2026-09-22T09:20:00Z",
+      "areaKm2": 237,
+      "speedKmh": 36.3,
+      "trackerErrorKm": 51.9,
+      "persistenceErrorKm": 88.1
+    },
+    {
+      "time": "2026-09-22T09:30:00Z",
+      "areaKm2": 31644,
+      "speedKmh": 12.0,
+      "trackerErrorKm": 54.6,
+      "persistenceErrorKm": 61.8
+    },
+    {
+      "time": "2026-09-22T09:30:00Z",
+      "areaKm2": 22528,
+      "speedKmh": 32.0,
+      "trackerErrorKm": 8.1,
+      "persistenceErrorKm": 24.4
+    },
+    {
+      "time": "2026-09-22T09:30:00Z",
+      "areaKm2": 11417,
+      "speedKmh": 19.1,
+      "trackerErrorKm": 116.3,
+      "persistenceErrorKm": 111.4
+    },
+    {
+      "time": "2026-09-22T09:30:00Z",
+      "areaKm2": 7965,
+      "speedKmh": 27.5,
+      "trackerErrorKm": 25.7,
+      "persistenceErrorKm": 42.5
+    },
+    {
+      "time": "2026-09-22T09:30:00Z",
+      "areaKm2": 6318,
+      "speedKmh": 14.4,
+      "trackerErrorKm": 15.5,
+      "persistenceErrorKm": 18.0
+    },
+    {
+      "time": "2026-09-22T09:30:00Z",
+      "areaKm2": 6275,
+      "speedKmh": 5.4,
+      "trackerErrorKm": 207.9,
+      "persistenceErrorKm": 202.8
+    },
+    {
+      "time": "2026-09-22T09:30:00Z",
+      "areaKm2": 4347,
+      "speedKmh": 15.7,
+      "trackerErrorKm": 22.9,
+      "persistenceErrorKm": 38.6
+    },
+    {
+      "time": "2026-09-22T09:30:00Z",
+      "areaKm2": 2763,
+      "speedKmh": 19.8,
+      "trackerErrorKm": 13.8,
+      "persistenceErrorKm": 32.8
+    },
+    {
+      "time": "2026-09-22T09:30:00Z",
+      "areaKm2": 1786,
+      "speedKmh": 12.6,
+      "trackerErrorKm": 12.5,
+      "persistenceErrorKm": 13.4
+    },
+    {
+      "time": "2026-09-22T09:30:00Z",
+      "areaKm2": 1732,
+      "speedKmh": 32.2,
+      "trackerErrorKm": 32.4,
+      "persistenceErrorKm": 13.8
+    },
+    {
+      "time": "2026-09-22T09:30:00Z",
+      "areaKm2": 1039,
+      "speedKmh": 17.5,
+      "trackerErrorKm": 44.0,
+      "persistenceErrorKm": 29.2
+    },
+    {
+      "time": "2026-09-22T09:30:00Z",
+      "areaKm2": 910,
+      "speedKmh": 6.1,
+      "trackerErrorKm": 58.2,
+      "persistenceErrorKm": 64.2
+    },
+    {
+      "time": "2026-09-22T09:30:00Z",
+      "areaKm2": 710,
+      "speedKmh": 20.3,
+      "trackerErrorKm": 12.7,
+      "persistenceErrorKm": 27.2
+    },
+    {
+      "time": "2026-09-22T09:30:00Z",
+      "areaKm2": 227,
+      "speedKmh": 22.3,
+      "trackerErrorKm": 17.4,
+      "persistenceErrorKm": 5.0
+    },
+    {
+      "time": "2026-09-22T09:30:00Z",
+      "areaKm2": 225,
+      "speedKmh": 15.9,
+      "trackerErrorKm": 2.1,
+      "persistenceErrorKm": 13.9
+    },
+    {
+      "time": "2026-09-22T09:40:00Z",
+      "areaKm2": 31596,
+      "speedKmh": 14.5,
+      "trackerErrorKm": 52.1,
+      "persistenceErrorKm": 59.3
+    },
+    {
+      "time": "2026-09-22T09:40:00Z",
+      "areaKm2": 23676,
+      "speedKmh": 36.4,
+      "trackerErrorKm": 13.9,
+      "persistenceErrorKm": 22.5
+    },
+    {
+      "time": "2026-09-22T09:40:00Z",
+      "areaKm2": 13455,
+      "speedKmh": 16.1,
+      "trackerErrorKm": 111.2,
+      "persistenceErrorKm": 111.5
+    },
+    {
+      "time": "2026-09-22T09:40:00Z",
+      "areaKm2": 8481,
+      "speedKmh": 42.1,
+      "trackerErrorKm": 119.2,
+      "persistenceErrorKm": 81.2
+    },
+    {
+      "time": "2026-09-22T09:40:00Z",
+      "areaKm2": 7406,
+      "speedKmh": 5.2,
+      "trackerErrorKm": 202.5,
+      "persistenceErrorKm": 197.3
+    },
+    {
+      "time": "2026-09-22T09:40:00Z",
+      "areaKm2": 6678,
+      "speedKmh": 16.8,
+      "trackerErrorKm": 15.1,
+      "persistenceErrorKm": 14.5
+    },
+    {
+      "time": "2026-09-22T09:40:00Z",
+      "areaKm2": 5267,
+      "speedKmh": 15.1,
+      "trackerErrorKm": 104.9,
+      "persistenceErrorKm": 119.2
+    },
+    {
+      "time": "2026-09-22T09:40:00Z",
+      "areaKm2": 2952,
+      "speedKmh": 22.2,
+      "trackerErrorKm": 10.9,
+      "persistenceErrorKm": 32.5
+    },
+    {
+      "time": "2026-09-22T09:40:00Z",
+      "areaKm2": 2791,
+      "speedKmh": 27.8,
+      "trackerErrorKm": 14.6,
+      "persistenceErrorKm": 13.6
+    },
+    {
+      "time": "2026-09-22T09:40:00Z",
+      "areaKm2": 2018,
+      "speedKmh": 13.1,
+      "trackerErrorKm": 13.8,
+      "persistenceErrorKm": 12.7
+    },
+    {
+      "time": "2026-09-22T09:40:00Z",
+      "areaKm2": 1030,
+      "speedKmh": 12.9,
+      "trackerErrorKm": 38.2,
+      "persistenceErrorKm": 25.9
+    },
+    {
+      "time": "2026-09-22T09:40:00Z",
+      "areaKm2": 962,
+      "speedKmh": 17.7,
+      "trackerErrorKm": 178.3,
+      "persistenceErrorKm": 168.0
+    },
+    {
+      "time": "2026-09-22T09:40:00Z",
+      "areaKm2": 719,
+      "speedKmh": 18.6,
+      "trackerErrorKm": 8.1,
+      "persistenceErrorKm": 26.4
+    },
+    {
+      "time": "2026-09-22T09:40:00Z",
+      "areaKm2": 360,
+      "speedKmh": 12.0,
+      "trackerErrorKm": 6.4,
+      "persistenceErrorKm": 16.5
+    },
+    {
+      "time": "2026-09-22T09:40:00Z",
+      "areaKm2": 294,
+      "speedKmh": 18.5,
+      "trackerErrorKm": 32.1,
+      "persistenceErrorKm": 45.3
+    },
+    {
+      "time": "2026-09-22T09:40:00Z",
+      "areaKm2": 260,
+      "speedKmh": 26.3,
+      "trackerErrorKm": 24.6,
+      "persistenceErrorKm": 5.6
+    },
+    {
+      "time": "2026-09-22T09:40:00Z",
+      "areaKm2": 230,
+      "speedKmh": 7.6,
+      "trackerErrorKm": 84.4,
+      "persistenceErrorKm": 78.4
+    },
+    {
+      "time": "2026-09-22T09:40:00Z",
+      "areaKm2": 223,
+      "speedKmh": 24.1,
+      "trackerErrorKm": 20.3,
+      "persistenceErrorKm": 33.6
+    },
+    {
+      "time": "2026-09-22T09:50:00Z",
+      "areaKm2": 40494,
+      "speedKmh": 17.7,
+      "trackerErrorKm": 175.2,
+      "persistenceErrorKm": 184.3
+    },
+    {
+      "time": "2026-09-22T09:50:00Z",
+      "areaKm2": 25186,
+      "speedKmh": 20.2,
+      "trackerErrorKm": 237.5,
+      "persistenceErrorKm": 227.0
+    },
+    {
+      "time": "2026-09-22T09:50:00Z",
+      "areaKm2": 15035,
+      "speedKmh": 27.7,
+      "trackerErrorKm": 71.4,
+      "persistenceErrorKm": 94.5
+    },
+    {
+      "time": "2026-09-22T09:50:00Z",
+      "areaKm2": 8525,
+      "speedKmh": 32.7,
+      "trackerErrorKm": 116.2,
+      "persistenceErrorKm": 89.8
+    },
+    {
+      "time": "2026-09-22T09:50:00Z",
+      "areaKm2": 6997,
+      "speedKmh": 15.4,
+      "trackerErrorKm": 13.5,
+      "persistenceErrorKm": 9.0
+    },
+    {
+      "time": "2026-09-22T09:50:00Z",
+      "areaKm2": 6800,
+      "speedKmh": 20.9,
+      "trackerErrorKm": 84.4,
+      "persistenceErrorKm": 104.3
+    },
+    {
+      "time": "2026-09-22T09:50:00Z",
+      "areaKm2": 3525,
+      "speedKmh": 30.8,
+      "trackerErrorKm": 20.5,
+      "persistenceErrorKm": 16.8
+    },
+    {
+      "time": "2026-09-22T09:50:00Z",
+      "areaKm2": 2824,
+      "speedKmh": 20.2,
+      "trackerErrorKm": 8.5,
+      "persistenceErrorKm": 28.7
+    },
+    {
+      "time": "2026-09-22T09:50:00Z",
+      "areaKm2": 2281,
+      "speedKmh": 10.9,
+      "trackerErrorKm": 5.5,
+      "persistenceErrorKm": 11.0
+    },
+    {
+      "time": "2026-09-22T09:50:00Z",
+      "areaKm2": 1111,
+      "speedKmh": 18.5,
+      "trackerErrorKm": 186.2,
+      "persistenceErrorKm": 175.9
+    },
+    {
+      "time": "2026-09-22T09:50:00Z",
+      "areaKm2": 863,
+      "speedKmh": 11.8,
+      "trackerErrorKm": 34.5,
+      "persistenceErrorKm": 22.9
+    },
+    {
+      "time": "2026-09-22T09:50:00Z",
+      "areaKm2": 691,
+      "speedKmh": 27.1,
+      "trackerErrorKm": 2.0,
+      "persistenceErrorKm": 27.8
+    },
+    {
+      "time": "2026-09-22T09:50:00Z",
+      "areaKm2": 536,
+      "speedKmh": 26.3,
+      "trackerErrorKm": 123.7,
+      "persistenceErrorKm": 107.7
+    },
+    {
+      "time": "2026-09-22T09:50:00Z",
+      "areaKm2": 458,
+      "speedKmh": 37.5,
+      "trackerErrorKm": 24.1,
+      "persistenceErrorKm": 19.7
+    },
+    {
+      "time": "2026-09-22T09:50:00Z",
+      "areaKm2": 361,
+      "speedKmh": 67.3,
+      "trackerErrorKm": 29.6,
+      "persistenceErrorKm": 55.1
+    },
+    {
+      "time": "2026-09-22T09:50:00Z",
+      "areaKm2": 320,
+      "speedKmh": 20.0,
+      "trackerErrorKm": 18.7,
+      "persistenceErrorKm": 29.9
+    },
+    {
+      "time": "2026-09-22T09:50:00Z",
+      "areaKm2": 316,
+      "speedKmh": 21.1,
+      "trackerErrorKm": 23.6,
+      "persistenceErrorKm": 8.5
+    },
+    {
+      "time": "2026-09-22T09:50:00Z",
+      "areaKm2": 229,
+      "speedKmh": 6.1,
+      "trackerErrorKm": 77.9,
+      "persistenceErrorKm": 80.3
+    },
+    {
+      "time": "2026-09-22T10:00:00Z",
+      "areaKm2": 57149,
+      "speedKmh": 17.3,
+      "trackerErrorKm": 128.2,
+      "persistenceErrorKm": 137.9
+    },
+    {
+      "time": "2026-09-22T10:00:00Z",
+      "areaKm2": 25604,
+      "speedKmh": 17.9,
+      "trackerErrorKm": 238.8,
+      "persistenceErrorKm": 229.3
+    },
+    {
+      "time": "2026-09-22T10:00:00Z",
+      "areaKm2": 8375,
+      "speedKmh": 26.7,
+      "trackerErrorKm": 4.5,
+      "persistenceErrorKm": 22.1
+    },
+    {
+      "time": "2026-09-22T10:00:00Z",
+      "areaKm2": 7764,
+      "speedKmh": 32.6,
+      "trackerErrorKm": 198.9,
+      "persistenceErrorKm": 170.4
+    },
+    {
+      "time": "2026-09-22T10:00:00Z",
+      "areaKm2": 5704,
+      "speedKmh": 11.2,
+      "trackerErrorKm": 4.8,
+      "persistenceErrorKm": 12.9
+    },
+    {
+      "time": "2026-09-22T10:00:00Z",
+      "areaKm2": 4246,
+      "speedKmh": 40.9,
+      "trackerErrorKm": 34.8,
+      "persistenceErrorKm": 11.1
+    },
+    {
+      "time": "2026-09-22T10:00:00Z",
+      "areaKm2": 3821,
+      "speedKmh": 19.1,
+      "trackerErrorKm": 5.6,
+      "persistenceErrorKm": 18.3
+    },
+    {
+      "time": "2026-09-22T10:00:00Z",
+      "areaKm2": 2509,
+      "speedKmh": 11.4,
+      "trackerErrorKm": 327.3,
+      "persistenceErrorKm": 338.3
+    },
+    {
+      "time": "2026-09-22T10:00:00Z",
+      "areaKm2": 1060,
+      "speedKmh": 9.7,
+      "trackerErrorKm": 249.3,
+      "persistenceErrorKm": 250.0
+    },
+    {
+      "time": "2026-09-22T10:00:00Z",
+      "areaKm2": 706,
+      "speedKmh": 26.4,
+      "trackerErrorKm": 21.3,
+      "persistenceErrorKm": 20.8
+    },
+    {
+      "time": "2026-09-22T10:00:00Z",
+      "areaKm2": 648,
+      "speedKmh": 13.3,
+      "trackerErrorKm": 95.0,
+      "persistenceErrorKm": 103.9
+    },
+    {
+      "time": "2026-09-22T10:00:00Z",
+      "areaKm2": 630,
+      "speedKmh": 44.8,
+      "trackerErrorKm": 27.4,
+      "persistenceErrorKm": 62.7
+    },
+    {
+      "time": "2026-09-22T10:00:00Z",
+      "areaKm2": 585,
+      "speedKmh": 25.6,
+      "trackerErrorKm": 9.1,
+      "persistenceErrorKm": 27.6
+    },
+    {
+      "time": "2026-09-22T10:00:00Z",
+      "areaKm2": 386,
+      "speedKmh": 13.9,
+      "trackerErrorKm": 90.9,
+      "persistenceErrorKm": 80.8
+    },
+    {
+      "time": "2026-09-22T10:00:00Z",
+      "areaKm2": 353,
+      "speedKmh": 18.1,
+      "trackerErrorKm": 23.3,
+      "persistenceErrorKm": 9.3
+    },
+    {
+      "time": "2026-09-22T10:00:00Z",
+      "areaKm2": 348,
+      "speedKmh": 19.1,
+      "trackerErrorKm": 26.4,
+      "persistenceErrorKm": 31.1
+    },
+    {
+      "time": "2026-09-22T10:00:00Z",
+      "areaKm2": 329,
+      "speedKmh": 17.7,
+      "trackerErrorKm": 58.4,
+      "persistenceErrorKm": 41.4
+    },
+    {
+      "time": "2026-09-22T10:00:00Z",
+      "areaKm2": 221,
+      "speedKmh": 22.1,
+      "trackerErrorKm": 103.1,
+      "persistenceErrorKm": 95.2
+    },
+    {
+      "time": "2026-09-22T10:10:00Z",
+      "areaKm2": 58382,
+      "speedKmh": 20.1,
+      "trackerErrorKm": 120.4,
+      "persistenceErrorKm": 134.2
+    },
+    {
+      "time": "2026-09-22T10:10:00Z",
+      "areaKm2": 26889,
+      "speedKmh": 33.1,
+      "trackerErrorKm": 254.4,
+      "persistenceErrorKm": 229.2
+    },
+    {
+      "time": "2026-09-22T10:10:00Z",
+      "areaKm2": 9212,
+      "speedKmh": 18.9,
+      "trackerErrorKm": 91.1,
+      "persistenceErrorKm": 72.3
+    },
+    {
+      "time": "2026-09-22T10:10:00Z",
+      "areaKm2": 8508,
+      "speedKmh": 29.6,
+      "trackerErrorKm": 298.4,
+      "persistenceErrorKm": 271.1
+    },
+    {
+      "time": "2026-09-22T10:10:00Z",
+      "areaKm2": 6846,
+      "speedKmh": 26.0,
+      "trackerErrorKm": 105.4,
+      "persistenceErrorKm": 131.1
+    },
+    {
+      "time": "2026-09-22T10:10:00Z",
+      "areaKm2": 5676,
+      "speedKmh": 3.0,
+      "trackerErrorKm": 10.5,
+      "persistenceErrorKm": 13.4
+    },
+    {
+      "time": "2026-09-22T10:10:00Z",
+      "areaKm2": 3581,
+      "speedKmh": 16.7,
+      "trackerErrorKm": 6.8,
+      "persistenceErrorKm": 19.9
+    },
+    {
+      "time": "2026-09-22T10:10:00Z",
+      "areaKm2": 2826,
+      "speedKmh": 13.4,
+      "trackerErrorKm": 327.4,
+      "persistenceErrorKm": 338.0
+    },
+    {
+      "time": "2026-09-22T10:10:00Z",
+      "areaKm2": 860,
+      "speedKmh": 34.0,
+      "trackerErrorKm": 28.8,
+      "persistenceErrorKm": 20.2
+    },
+    {
+      "time": "2026-09-22T10:10:00Z",
+      "areaKm2": 845,
+      "speedKmh": 48.8,
+      "trackerErrorKm": 22.0,
+      "persistenceErrorKm": 66.7
+    },
+    {
+      "time": "2026-09-22T10:10:00Z",
+      "areaKm2": 562,
+      "speedKmh": 22.7,
+      "trackerErrorKm": 7.6,
+      "persistenceErrorKm": 24.8
+    },
+    {
+      "time": "2026-09-22T10:10:00Z",
+      "areaKm2": 547,
+      "speedKmh": 28.1,
+      "trackerErrorKm": 160.1,
+      "persistenceErrorKm": 133.3
+    },
+    {
+      "time": "2026-09-22T10:10:00Z",
+      "areaKm2": 357,
+      "speedKmh": 18.5,
+      "trackerErrorKm": 24.5,
+      "persistenceErrorKm": 9.2
+    },
+    {
+      "time": "2026-09-22T10:10:00Z",
+      "areaKm2": 357,
+      "speedKmh": 16.2,
+      "trackerErrorKm": 31.6,
+      "persistenceErrorKm": 29.1
+    },
+    {
+      "time": "2026-09-22T10:10:00Z",
+      "areaKm2": 220,
+      "speedKmh": 14.0,
+      "trackerErrorKm": 64.7,
+      "persistenceErrorKm": 51.7
+    },
+    {
+      "time": "2026-09-22T10:20:00Z",
+      "areaKm2": 53410,
+      "speedKmh": 23.6,
+      "trackerErrorKm": 196.0,
+      "persistenceErrorKm": 210.7
+    },
+    {
+      "time": "2026-09-22T10:20:00Z",
+      "areaKm2": 29005,
+      "speedKmh": 30.0,
+      "trackerErrorKm": 175.7,
+      "persistenceErrorKm": 150.3
+    },
+    {
+      "time": "2026-09-22T10:20:00Z",
+      "areaKm2": 10659,
+      "speedKmh": 41.2,
+      "trackerErrorKm": 112.7,
+      "persistenceErrorKm": 72.1
+    },
+    {
+      "time": "2026-09-22T10:20:00Z",
+      "areaKm2": 8891,
+      "speedKmh": 21.2,
+      "trackerErrorKm": 114.8,
+      "persistenceErrorKm": 136.0
+    },
+    {
+      "time": "2026-09-22T10:20:00Z",
+      "areaKm2": 8630,
+      "speedKmh": 37.1,
+      "trackerErrorKm": 301.1,
+      "persistenceErrorKm": 267.7
+    },
+    {
+      "time": "2026-09-22T10:20:00Z",
+      "areaKm2": 5685,
+      "speedKmh": 9.8,
+      "trackerErrorKm": 6.9,
+      "persistenceErrorKm": 11.4
+    },
+    {
+      "time": "2026-09-22T10:20:00Z",
+      "areaKm2": 3466,
+      "speedKmh": 16.2,
+      "trackerErrorKm": 5.9,
+      "persistenceErrorKm": 21.1
+    },
+    {
+      "time": "2026-09-22T10:20:00Z",
+      "areaKm2": 2695,
+      "speedKmh": 11.6,
+      "trackerErrorKm": 414.8,
+      "persistenceErrorKm": 423.3
+    },
+    {
+      "time": "2026-09-22T10:20:00Z",
+      "areaKm2": 1295,
+      "speedKmh": 12.5,
+      "trackerErrorKm": 12.0,
+      "persistenceErrorKm": 15.2
+    },
+    {
+      "time": "2026-09-22T10:20:00Z",
+      "areaKm2": 972,
+      "speedKmh": 27.7,
+      "trackerErrorKm": 13.7,
+      "persistenceErrorKm": 19.9
+    },
+    {
+      "time": "2026-09-22T10:20:00Z",
+      "areaKm2": 846,
+      "speedKmh": 49.0,
+      "trackerErrorKm": 16.2,
+      "persistenceErrorKm": 65.0
+    },
+    {
+      "time": "2026-09-22T10:20:00Z",
+      "areaKm2": 530,
+      "speedKmh": 24.3,
+      "trackerErrorKm": 0.5,
+      "persistenceErrorKm": 24.0
+    },
+    {
+      "time": "2026-09-22T10:20:00Z",
+      "areaKm2": 464,
+      "speedKmh": 38.4,
+      "trackerErrorKm": 304.0,
+      "persistenceErrorKm": 281.0
+    },
+    {
+      "time": "2026-09-22T10:20:00Z",
+      "areaKm2": 320,
+      "speedKmh": 12.9,
+      "trackerErrorKm": 24.8,
+      "persistenceErrorKm": 36.4
+    },
+    {
+      "time": "2026-09-22T10:20:00Z",
+      "areaKm2": 283,
+      "speedKmh": 11.5,
+      "trackerErrorKm": 328.5,
+      "persistenceErrorKm": 326.2
+    },
+    {
+      "time": "2026-09-22T10:20:00Z",
+      "areaKm2": 274,
+      "speedKmh": 27.4,
+      "trackerErrorKm": 31.6,
+      "persistenceErrorKm": 29.7
+    },
+    {
+      "time": "2026-09-22T10:20:00Z",
+      "areaKm2": 209,
+      "speedKmh": 44.0,
+      "trackerErrorKm": 48.8,
+      "persistenceErrorKm": 63.2
+    },
+    {
+      "time": "2026-09-22T10:30:00Z",
+      "areaKm2": 55360,
+      "speedKmh": 18.5,
+      "trackerErrorKm": 110.7,
+      "persistenceErrorKm": 124.6
+    },
+    {
+      "time": "2026-09-22T10:30:00Z",
+      "areaKm2": 29032,
+      "speedKmh": 21.4,
+      "trackerErrorKm": 246.2,
+      "persistenceErrorKm": 235.5
+    },
+    {
+      "time": "2026-09-22T10:30:00Z",
+      "areaKm2": 11320,
+      "speedKmh": 22.1,
+      "trackerErrorKm": 106.2,
+      "persistenceErrorKm": 84.4
+    },
+    {
+      "time": "2026-09-22T10:30:00Z",
+      "areaKm2": 9852,
+      "speedKmh": 10.7,
+      "trackerErrorKm": 108.8,
+      "persistenceErrorKm": 119.3
+    },
+    {
+      "time": "2026-09-22T10:30:00Z",
+      "areaKm2": 8546,
+      "speedKmh": 36.9,
+      "trackerErrorKm": 318.2,
+      "persistenceErrorKm": 283.9
+    },
+    {
+      "time": "2026-09-22T10:30:00Z",
+      "areaKm2": 5657,
+      "speedKmh": 13.6,
+      "trackerErrorKm": 5.5,
+      "persistenceErrorKm": 13.3
+    },
+    {
+      "time": "2026-09-22T10:30:00Z",
+      "areaKm2": 3203,
+      "speedKmh": 11.0,
+      "trackerErrorKm": 14.7,
+      "persistenceErrorKm": 25.7
+    },
+    {
+      "time": "2026-09-22T10:30:00Z",
+      "areaKm2": 2084,
+      "speedKmh": 14.3,
+      "trackerErrorKm": 317.3,
+      "persistenceErrorKm": 327.5
+    },
+    {
+      "time": "2026-09-22T10:30:00Z",
+      "areaKm2": 1876,
+      "speedKmh": 14.3,
+      "trackerErrorKm": 10.0,
+      "persistenceErrorKm": 6.6
+    },
+    {
+      "time": "2026-09-22T10:30:00Z",
+      "areaKm2": 963,
+      "speedKmh": 25.4,
+      "trackerErrorKm": 12.6,
+      "persistenceErrorKm": 21.8
+    },
+    {
+      "time": "2026-09-22T10:30:00Z",
+      "areaKm2": 837,
+      "speedKmh": 73.5,
+      "trackerErrorKm": 6.2,
+      "persistenceErrorKm": 67.6
+    },
+    {
+      "time": "2026-09-22T10:30:00Z",
+      "areaKm2": 530,
+      "speedKmh": 22.7,
+      "trackerErrorKm": 5.1,
+      "persistenceErrorKm": 27.8
+    },
+    {
+      "time": "2026-09-22T10:30:00Z",
+      "areaKm2": 442,
+      "speedKmh": 21.0,
+      "trackerErrorKm": 256.1,
+      "persistenceErrorKm": 276.9
+    },
+    {
+      "time": "2026-09-22T10:30:00Z",
+      "areaKm2": 428,
+      "speedKmh": 14.4,
+      "trackerErrorKm": 4.8,
+      "persistenceErrorKm": 19.2
+    },
+    {
+      "time": "2026-09-22T10:40:00Z",
+      "areaKm2": 55618,
+      "speedKmh": 22.3,
+      "trackerErrorKm": 109.7,
+      "persistenceErrorKm": 127.4
+    },
+    {
+      "time": "2026-09-22T10:40:00Z",
+      "areaKm2": 28937,
+      "speedKmh": 34.4,
+      "trackerErrorKm": 260.5,
+      "persistenceErrorKm": 234.6
+    },
+    {
+      "time": "2026-09-22T10:40:00Z",
+      "areaKm2": 21187,
+      "speedKmh": 28.9,
+      "trackerErrorKm": 197.1,
+      "persistenceErrorKm": 168.8
+    },
+    {
+      "time": "2026-09-22T10:40:00Z",
+      "areaKm2": 9966,
+      "speedKmh": 31.6,
+      "trackerErrorKm": 76.0,
+      "persistenceErrorKm": 107.4
+    },
+    {
+      "time": "2026-09-22T10:40:00Z",
+      "areaKm2": 5799,
+      "speedKmh": 7.3,
+      "trackerErrorKm": 8.9,
+      "persistenceErrorKm": 13.1
+    },
+    {
+      "time": "2026-09-22T10:40:00Z",
+      "areaKm2": 3130,
+      "speedKmh": 17.1,
+      "trackerErrorKm": 13.0,
+      "persistenceErrorKm": 26.5
+    },
+    {
+      "time": "2026-09-22T10:40:00Z",
+      "areaKm2": 2150,
+      "speedKmh": 14.7,
+      "trackerErrorKm": 20.6,
+      "persistenceErrorKm": 14.1
+    },
+    {
+      "time": "2026-09-22T10:40:00Z",
+      "areaKm2": 2007,
+      "speedKmh": 9.3,
+      "trackerErrorKm": 320.6,
+      "persistenceErrorKm": 329.9
+    },
+    {
+      "time": "2026-09-22T10:40:00Z",
+      "areaKm2": 587,
+      "speedKmh": 32.1,
+      "trackerErrorKm": 180.6,
+      "persistenceErrorKm": 173.2
+    },
+    {
+      "time": "2026-09-22T10:40:00Z",
+      "areaKm2": 550,
+      "speedKmh": 22.5,
+      "trackerErrorKm": 253.3,
+      "persistenceErrorKm": 275.1
+    },
+    {
+      "time": "2026-09-22T10:40:00Z",
+      "areaKm2": 512,
+      "speedKmh": 21.5,
+      "trackerErrorKm": 8.9,
+      "persistenceErrorKm": 30.0
+    },
+    {
+      "time": "2026-09-22T10:40:00Z",
+      "areaKm2": 424,
+      "speedKmh": 14.4,
+      "trackerErrorKm": 8.0,
+      "persistenceErrorKm": 19.0
+    },
+    {
+      "time": "2026-09-22T10:40:00Z",
+      "areaKm2": 244,
+      "speedKmh": 27.1,
+      "trackerErrorKm": 8.3,
+      "persistenceErrorKm": 31.3
+    },
+    {
+      "time": "2026-09-22T10:50:00Z",
+      "areaKm2": 84245,
+      "speedKmh": 22.9,
+      "trackerErrorKm": 120.5,
+      "persistenceErrorKm": 97.7
+    },
+    {
+      "time": "2026-09-22T10:50:00Z",
+      "areaKm2": 21743,
+      "speedKmh": 32.9,
+      "trackerErrorKm": 198.1,
+      "persistenceErrorKm": 165.4
+    },
+    {
+      "time": "2026-09-22T10:50:00Z",
+      "areaKm2": 11233,
+      "speedKmh": 24.4,
+      "trackerErrorKm": 76.7,
+      "persistenceErrorKm": 100.8
+    },
+    {
+      "time": "2026-09-22T10:50:00Z",
+      "areaKm2": 5950,
+      "speedKmh": 10.7,
+      "trackerErrorKm": 5.5,
+      "persistenceErrorKm": 13.5
+    },
+    {
+      "time": "2026-09-22T10:50:00Z",
+      "areaKm2": 2913,
+      "speedKmh": 20.1,
+      "trackerErrorKm": 11.9,
+      "persistenceErrorKm": 8.6
+    },
+    {
+      "time": "2026-09-22T10:50:00Z",
+      "areaKm2": 2308,
+      "speedKmh": 18.4,
+      "trackerErrorKm": 28.2,
+      "persistenceErrorKm": 15.7
+    },
+    {
+      "time": "2026-09-22T10:50:00Z",
+      "areaKm2": 1195,
+      "speedKmh": 15.2,
+      "trackerErrorKm": 279.9,
+      "persistenceErrorKm": 285.8
+    },
+    {
+      "time": "2026-09-22T10:50:00Z",
+      "areaKm2": 867,
+      "speedKmh": 9.2,
+      "trackerErrorKm": 222.6,
+      "persistenceErrorKm": 215.4
+    },
+    {
+      "time": "2026-09-22T10:50:00Z",
+      "areaKm2": 770,
+      "speedKmh": 20.6,
+      "trackerErrorKm": 11.3,
+      "persistenceErrorKm": 19.6
+    },
+    {
+      "time": "2026-09-22T10:50:00Z",
+      "areaKm2": 590,
+      "speedKmh": 19.8,
+      "trackerErrorKm": 186.5,
+      "persistenceErrorKm": 201.6
+    },
+    {
+      "time": "2026-09-22T10:50:00Z",
+      "areaKm2": 428,
+      "speedKmh": 12.6,
+      "trackerErrorKm": 191.6,
+      "persistenceErrorKm": 190.2
+    },
+    {
+      "time": "2026-09-22T10:50:00Z",
+      "areaKm2": 427,
+      "speedKmh": 6.9,
+      "trackerErrorKm": 16.0,
+      "persistenceErrorKm": 13.6
+    },
+    {
+      "time": "2026-09-22T10:50:00Z",
+      "areaKm2": 427,
+      "speedKmh": 20.1,
+      "trackerErrorKm": 237.3,
+      "persistenceErrorKm": 217.7
+    },
+    {
+      "time": "2026-09-22T10:50:00Z",
+      "areaKm2": 414,
+      "speedKmh": 22.4,
+      "trackerErrorKm": 8.0,
+      "persistenceErrorKm": 30.3
+    },
+    {
+      "time": "2026-09-22T11:00:00Z",
+      "areaKm2": 83570,
+      "speedKmh": 24.4,
+      "trackerErrorKm": 134.8,
+      "persistenceErrorKm": 111.1
+    },
+    {
+      "time": "2026-09-22T11:00:00Z",
+      "areaKm2": 14704,
+      "speedKmh": 37.6,
+      "trackerErrorKm": 134.6,
+      "persistenceErrorKm": 96.9
+    },
+    {
+      "time": "2026-09-22T11:00:00Z",
+      "areaKm2": 12110,
+      "speedKmh": 13.8,
+      "trackerErrorKm": 86.6,
+      "persistenceErrorKm": 99.0
+    },
+    {
+      "time": "2026-09-22T11:00:00Z",
+      "areaKm2": 5758,
+      "speedKmh": 17.3,
+      "trackerErrorKm": 12.1,
+      "persistenceErrorKm": 14.4
+    },
+    {
+      "time": "2026-09-22T11:00:00Z",
+      "areaKm2": 2549,
+      "speedKmh": 18.8,
+      "trackerErrorKm": 29.5,
+      "persistenceErrorKm": 12.2
+    },
+    {
+      "time": "2026-09-22T11:00:00Z",
+      "areaKm2": 2313,
+      "speedKmh": 15.9,
+      "trackerErrorKm": 23.8,
+      "persistenceErrorKm": 15.3
+    },
+    {
+      "time": "2026-09-22T11:00:00Z",
+      "areaKm2": 1812,
+      "speedKmh": 42.9,
+      "trackerErrorKm": 20.9,
+      "persistenceErrorKm": 42.1
+    },
+    {
+      "time": "2026-09-22T11:00:00Z",
+      "areaKm2": 1108,
+      "speedKmh": 6.6,
+      "trackerErrorKm": 227.3,
+      "persistenceErrorKm": 225.0
+    },
+    {
+      "time": "2026-09-22T11:00:00Z",
+      "areaKm2": 770,
+      "speedKmh": 18.1,
+      "trackerErrorKm": 16.9,
+      "persistenceErrorKm": 20.4
+    },
+    {
+      "time": "2026-09-22T11:00:00Z",
+      "areaKm2": 613,
+      "speedKmh": 22.9,
+      "trackerErrorKm": 170.1,
+      "persistenceErrorKm": 187.6
+    },
+    {
+      "time": "2026-09-22T11:00:00Z",
+      "areaKm2": 566,
+      "speedKmh": 15.0,
+      "trackerErrorKm": 16.0,
+      "persistenceErrorKm": 30.4
+    },
+    {
+      "time": "2026-09-22T11:00:00Z",
+      "areaKm2": 386,
+      "speedKmh": 9.4,
+      "trackerErrorKm": 23.1,
+      "persistenceErrorKm": 19.5
+    },
+    {
+      "time": "2026-09-22T11:00:00Z",
+      "areaKm2": 361,
+      "speedKmh": 35.2,
+      "trackerErrorKm": 130.2,
+      "persistenceErrorKm": 153.2
+    },
+    {
+      "time": "2026-09-22T11:00:00Z",
+      "areaKm2": 270,
+      "speedKmh": 24.7,
+      "trackerErrorKm": 141.7,
+      "persistenceErrorKm": 152.4
+    }
+  ]
+}

@@ -4,3 +4,4 @@ numpy==2.5.4
 joblib==1.6.0
 fastapi==0.143.0
 uvicorn==0.54.0
+opencv-python-headless==5.0.0.93
