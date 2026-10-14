@@ -29,13 +29,16 @@ const LONG_PATH_HINT = WINDOWS
     + ' or enable Windows long paths, then delete ml-service/.venv and run this again.'
   : '';
 
-// The first Python 3.12+ on this machine (numpy and scipy, which the model needs, require 3.12).
+// The first stable Python 3.12+ on this machine (numpy and scipy, which the model needs, require 3.12). Pre-releases are skipped:
+// the Windows launcher's plain "py -3" picks the newest install even when it is a beta, and the service crashes on one.
 function findPython() {
-  const candidates = WINDOWS ? [['py', ['-3']], ['python', []], ['python3', []]] : [['python3', []], ['python', []]];
+  const candidates = WINDOWS
+    ? [['python', []], ...['3.14', '3.13', '3.12'].map((version) => ['py', [`-${version}`]]), ['py', ['-3']], ['python3', []]]
+    : [['python3', []], ['python', []]];
   for (const [command, prefix] of candidates) {
-    const probe = spawnSync(command, [...prefix, '-c', 'import sys; print(sys.version_info[0], sys.version_info[1])'], { encoding: 'utf8' });
-    const [major, minor] = (probe.stdout ?? '').trim().split(' ').map(Number);
-    if (probe.status === 0 && (major > 3 || (major === 3 && minor >= 12))) return [command, prefix];
+    const probe = spawnSync(command, [...prefix, '-c', 'import sys; v = sys.version_info; print(v.major, v.minor, v.releaselevel)'], { encoding: 'utf8' });
+    const [major, minor, level] = (probe.stdout ?? '').trim().split(' ');
+    if (probe.status === 0 && level === 'final' && (Number(major) > 3 || (Number(major) === 3 && Number(minor) >= 12))) return [command, prefix];
   }
   return null;
 }
@@ -45,7 +48,7 @@ if (!models.length) fail('No model files in ml-service/models/. Pull them from g
 
 if (!existsSync(venvPython)) {
   const python = findPython();
-  if (!python) fail('Python 3.12 or newer is required. Install it from https://www.python.org/downloads/ and run this again.');
+  if (!python) fail('A stable Python 3.12 or newer is required (not a beta). Install it from https://www.python.org/downloads/ and run this again.');
   console.log('[ml] Creating ml-service/.venv (first run only)...');
   run(python[0], [...python[1], '-m', 'venv', VENV]);
 }
