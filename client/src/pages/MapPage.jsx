@@ -173,7 +173,9 @@ export default function MapPage() {
       const frame = stormFrames[Math.min(stormIndex, Math.max(stormFrames.length - 1, 0))] ?? null;
       return { visible: true, snapshot: frame, image: frame?.image ? { url: frame.image, bounds: stormDemoState.data.bounds } : null };
     }
-    return { visible: true, snapshot: stormsState.data?.live ?? null, image: null };
+    // Live: the picture ml-service draws from the analysed frame (NOAA, about 15 minutes old), so it lines up with the outlines.
+    const live = stormsState.data?.live ?? null;
+    return { visible: true, snapshot: live, image: live?.image?.url ? { url: live.image.url, bounds: live.image.bounds } : null };
   }, [overlays.storms, stormMode, stormFrames, stormIndex, stormDemoState.data, stormsState.data]);
 
   // ---------- data status ----------

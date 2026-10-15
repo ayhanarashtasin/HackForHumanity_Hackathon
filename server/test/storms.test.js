@@ -144,6 +144,33 @@ test('GET /api/storms answers even before the first analysis', async () => {
   assert.equal(data.live, null);
 });
 
+test('GET /api/storms gives the live picture through this API and the places a storm warning applies to, counted from now', async () => {
+  env.alerts.mlServiceUrl = ML_URL;
+  const frame = new Date(Math.floor(Date.now() / 600_000) * 600_000 - 10 * 60_000).toISOString().replace('.000Z', 'Z');
+  const name = `${frame.replaceAll(':', '').slice(0, -1)}Z.png`; // 2026-10-15T18:20:00Z -> 2026-10-15T182000Z.png
+  const snapshot = {
+    source: 'live', observedAt: frame, frames: [frame], motionMinutes: 20,
+    image: { name, bounds: { north: 28, south: 19, west: 86, east: 95 } },
+    cells: [{ id: 'c1', intensity: 6, trend: 'growing', motion: { speedKmh: 25, towards: 'S' }, reaches: [{ pcode: '302604', etaMin: 40 }] }],
+  };
+  const fetchImpl = async (url) => (url.includes(`time=${encodeURIComponent(frame)}`)
+    ? { ok: true, status: 200, json: async () => snapshot }
+    : { ok: false, status: 404, json: async () => ({}) });
+  await refreshStorms({ fetchImpl, frameTime: frame });
+
+  const { data } = await (await fetch(`${baseUrl}/storms`)).json();
+  assert.deepEqual(data.live.image, { url: `/api/storms/image/${name}`, bounds: snapshot.image.bounds });
+  assert.deepEqual(data.live.arrivals.map((arrival) => arrival.pcode), ['302604']);
+  assert.ok(data.live.arrivals[0].minutesFromNow > 0 && data.live.arrivals[0].minutesFromNow <= 40);
+  assert.ok(Date.parse(data.live.arrivalsAt) <= Date.now());
+});
+
+test('the live picture route rejects names that are not frame names', async () => {
+  for (const bad of ['..%2F..%2Fapp.py', 'latest.png', '2026-10-15T182000Z.jpg']) {
+    assert.equal((await fetch(`${baseUrl}/storms/image/${bad}`)).status, 404, bad);
+  }
+});
+
 test('the replay image route rejects names that are not demo frames', async () => {
   const response = await fetch(`${baseUrl}/storms/demo/image/..%2F..%2Fapp.py`);
   assert.equal(response.status, 404);

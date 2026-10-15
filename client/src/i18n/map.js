@@ -322,12 +322,15 @@ export const MAP = {
   'Waiting for the first satellite analysis…': 'প্রথম স্যাটেলাইট বিশ্লেষণের অপেক্ষায়…',
   'Satellite image': 'স্যাটেলাইটের ছবি', '; positions are where the storms were then': '; অবস্থান দেখানো হয়েছে ছবির সময়ের',
   '{place} is under a storm cell on this image.': 'এই ছবিতে {place} একটি ঝড়ের মেঘের নিচে আছে।',
-  'A storm cell may reach {place} in about {n} minutes.': 'একটি ঝড়ের মেঘ আনুমানিক {n} মিনিটে {place} পৌঁছাতে পারে।',
-  'No tracked storm cell is heading for {place} in the next 90 minutes.': 'আগামী ৯০ মিনিটে {place}-এর দিকে কোনো শনাক্ত ঝড়ের মেঘ আসছে না।',
+  'Storm warning: a storm may reach {place} around {time} (in about {n} minutes).': 'ঝড়ের সতর্কতা: {time} নাগাদ (প্রায় {n} মিনিটে) {place}-এ ঝড় পৌঁছাতে পারে।',
+  'Storm warning: a storm may be reaching {place} now.': 'ঝড়ের সতর্কতা: হয়তো এখনই {place}-এ ঝড় পৌঁছাচ্ছে।',
+  'No warning-strength storm is heading for {place} in the next hour.': 'আগামী এক ঘণ্টায় {place}-এর দিকে সতর্কতার মতো প্রবল কোনো ঝড় আসছে না।',
+  'Within 30 min': '৩০ মিনিটের মধ্যে', 'Within 60 min': '৬০ মিনিটের মধ্যে',
+  'Shaded: the {n} upazilas a storm warning applies to, counted from {time}.': 'রঙ করা: যে {n}টি উপজেলায় ঝড়ের সতর্কতা প্রযোজ্য, সময় গণনা {time} থেকে।',
   '{n} storm cells': '{n}টি ঝড়ের মেঘ', 'No strong storm cells on this satellite image.': 'এই স্যাটেলাইট ছবিতে কোনো শক্তিশালী ঝড়ের মেঘ নেই।',
   'Strong': 'শক্তিশালী', 'Severe': 'তীব্র', 'Extreme': 'অতি তীব্র', 'km²': 'বর্গকিমি',
   'Growing': 'বাড়ছে', 'Steady': 'স্থির', 'Weakening': 'দুর্বল হচ্ছে',
   'Moving {dir} at {speed} km/h': '{dir} দিকে {speed} কিমি/ঘণ্টা বেগে সরছে', 'Movement not measured yet': 'গতি এখনো মাপা যায়নি',
-  'Cold cloud tops, shifted about {km} km to the ground below them for the satellite’s viewing angle. Arrows show 60 minutes of straight-line movement. This is not a lightning observation; a strong storm heading for a saved area sends a prototype storm warning.':
-    'ঠান্ডা মেঘচূড়া, স্যাটেলাইটের দেখার কোণের কারণে প্রায় {km} কিমি সরিয়ে নিচের মাটির অবস্থানে দেখানো। তীর ৬০ মিনিট সোজা পথে চললে কোথায় যাবে তা দেখায়। এটি বজ্রপাতের পর্যবেক্ষণ নয়; সংরক্ষিত এলাকার দিকে প্রবল ঝড় এগোলে পরীক্ষামূলক ঝড়ের সতর্কবার্তা পাঠানো হয়।',
+  'Cold cloud tops, shifted about {km} km to the ground below them for the satellite’s viewing angle. Dashed circles show where each storm may be after 30, 60 and 90 minutes of straight-line movement, with the time. This is not a lightning observation; a strong storm heading for a saved area sends a prototype storm warning.':
+    'ঠান্ডা মেঘচূড়া, স্যাটেলাইটের দেখার কোণের কারণে প্রায় {km} কিমি সরিয়ে নিচের মাটির অবস্থানে দেখানো। ড্যাশ দেওয়া বৃত্ত দেখায় সোজা পথে চললে ৩০, ৬০ ও ৯০ মিনিট পরে প্রতিটি ঝড় কোথায় থাকতে পারে, সময়সহ। এটি বজ্রপাতের পর্যবেক্ষণ নয়; সংরক্ষিত এলাকার দিকে প্রবল ঝড় এগোলে পরীক্ষামূলক ঝড়ের সতর্কবার্তা পাঠানো হয়।',
 };

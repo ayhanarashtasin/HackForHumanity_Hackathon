@@ -90,10 +90,17 @@ async function keep(snapshot, now) {
   }
 }
 
+// The live snapshot's picture (ml-service draws it from the frame) is served through this API, like the replay's.
+function withImageUrl(snapshot) {
+  if (!snapshot) return null;
+  const { image, ...rest } = snapshot;
+  return { ...rest, image: DEMO_IMAGE.test(image?.name ?? '') ? { url: `/api/storms/image/${image.name}`, bounds: image.bounds } : null };
+}
+
 export function getStorms() {
   return {
     enabled: Boolean(serviceUrl()),
-    live: state.live,
+    live: withImageUrl(state.live),
     checkedAt: state.checkedAt ? state.checkedAt.toISOString() : null,
     error: state.error,
   };
@@ -114,6 +121,13 @@ export async function getStormDemo({ fetchImpl = fetch } = {}) {
     })),
   };
   return demo;
+}
+
+// The picture of an analysed live frame (only frames the ML service has cached; names carry the frame time).
+export async function getStormImage(name, { fetchImpl = fetch } = {}) {
+  if (!DEMO_IMAGE.test(name) || !serviceUrl()) return null;
+  const response = await fetchImpl(`${serviceUrl()}/storms/image/${name}`, { signal: AbortSignal.timeout(30_000) });
+  return response.ok ? Buffer.from(await response.arrayBuffer()) : null;
 }
 
 export async function getStormDemoImage(name, { fetchImpl = fetch } = {}) {

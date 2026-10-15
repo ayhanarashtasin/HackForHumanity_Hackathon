@@ -9,14 +9,13 @@ const INTENSITY = { 4: 'Strong', 5: 'Severe', 6: 'Extreme' };
 const TREND = { growing: 'Growing', steady: 'Steady', weakening: 'Weakening' };
 const SHOWN_CELLS = 4;
 
-// What the snapshot means for the selected upazila: inside a cell now, reached within 90 minutes, or nothing heading there.
+// What the snapshot means for the selected upazila: a storm warning applies (the API's arrivals, counted from now), it was under a
+// cell on the image, or no warning-strength storm is heading there.
 function forArea(snapshot, pcode) {
-  let best = null;
-  for (const cell of snapshot?.cells ?? []) {
-    const hit = cell.reaches?.find((place) => place.pcode === pcode);
-    if (hit && (!best || hit.etaMin < best.etaMin)) best = { ...hit, cell };
-  }
-  return best;
+  const warned = snapshot?.arrivals?.find((arrival) => arrival.pcode === pcode);
+  if (warned) return { kind: 'warned', arrivalMs: toMs(warned.arrivalAt), minutes: warned.minutesFromNow };
+  const under = (snapshot?.cells ?? []).some((cell) => cell.reaches?.some((place) => place.pcode === pcode && place.etaMin === 0));
+  return under ? { kind: 'under' } : null;
 }
 
 function CellRow({ cell }) {
@@ -89,13 +88,27 @@ export function StormPanel({ mode, onMode, live, liveError, demo, demoError, dem
             </span>
           </p>
 
+          {snapshot.arrivals && (
+            <div className="storm-legend">
+              <p>
+                <span><i className="storm-tier is-soon" aria-hidden="true" />{tr('Within 30 min')}</span>
+                <span><i className="storm-tier" aria-hidden="true" />{tr('Within 60 min')}</span>
+              </p>
+              <small>
+                {tr('Shaded: the {n} upazilas a storm warning applies to, counted from {time}.', {
+                  n: number(snapshot.arrivals.length), time: formatClock(toMs(snapshot.arrivalsAt)),
+                })}
+              </small>
+            </div>
+          )}
+
           {selectedPcode && (
             <p className={`storm-area${area ? ' is-hit' : ''}`} role="status">
-              {area
-                ? (area.etaMin === 0
-                  ? tr('{place} is under a storm cell on this image.', { place: selectedName })
-                  : tr('A storm cell may reach {place} in about {n} minutes.', { place: selectedName, n: number(area.etaMin) }))
-                : tr('No tracked storm cell is heading for {place} in the next 90 minutes.', { place: selectedName })}
+              {area?.kind === 'warned' && (area.minutes > 0
+                ? tr('Storm warning: a storm may reach {place} around {time} (in about {n} minutes).', { place: selectedName, time: formatClock(area.arrivalMs), n: number(area.minutes) })
+                : tr('Storm warning: a storm may be reaching {place} now.', { place: selectedName }))}
+              {area?.kind === 'under' && tr('{place} is under a storm cell on this image.', { place: selectedName })}
+              {!area && tr('No warning-strength storm is heading for {place} in the next hour.', { place: selectedName })}
             </p>
           )}
 
@@ -109,7 +122,7 @@ export function StormPanel({ mode, onMode, live, liveError, demo, demoError, dem
       )}
 
       <p className="storm-disclaimer">
-        {tr('Cold cloud tops, shifted about {km} km to the ground below them for the satellite’s viewing angle. Arrows show 60 minutes of straight-line movement. This is not a lightning observation; a strong storm heading for a saved area sends a prototype storm warning.', { km: number(Math.round(demo?.imageShiftKm ?? 22)) })}
+        {tr('Cold cloud tops, shifted about {km} km to the ground below them for the satellite’s viewing angle. Dashed circles show where each storm may be after 30, 60 and 90 minutes of straight-line movement, with the time. This is not a lightning observation; a strong storm heading for a saved area sends a prototype storm warning.', { km: number(Math.round(demo?.imageShiftKm ?? 22)) })}
       </p>
     </section>
   );

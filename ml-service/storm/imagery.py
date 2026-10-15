@@ -116,6 +116,25 @@ def _cache(name, data):
             old.unlink(missing_ok=True)
 
 
+# The live picture under the storm outlines (BGRA). Each tracker class has the colour GIBS gives it (cyan, blue, green, yellow, red,
+# dark red, colder and colder), so live and replay read alike; cloud between 0 C and the first class is grey and fades out toward
+# 0 C, and anything warmer (clear ground, low cloud) is transparent so the map shows through.
+CLASS_COLORS = [(230, 190, 0), (220, 90, 30), (60, 185, 50), (40, 210, 245), (35, 50, 225), (20, 10, 125)]
+
+
+def render_kelvin(kelvin, edges_c):
+    """PNG bytes (BGRA) of a brightness-temperature grid, classed with `edges_c` (degrees C, class 1 first)."""
+    celsius = kelvin - 273.15
+    out = np.zeros(kelvin.shape + (4,), np.uint8)
+    cold = np.clip(celsius / edges_c[0], 0, 1)  # 0 at 0 C, 1 at the first class edge
+    grey = (celsius < 0) & (celsius > edges_c[0])
+    out[grey, :3] = (150 + 80 * cold[grey])[:, None].astype(np.uint8)
+    out[grey, 3] = (30 + 150 * cold[grey]).astype(np.uint8)
+    for level, edge in enumerate(edges_c):
+        out[celsius <= edge] = (*CLASS_COLORS[level], 225)
+    return cv2.imencode('.png', out)[1].tobytes()
+
+
 def frames_before(when, count=3, step_minutes=10, fetch=True, source=None):
     """[(time, frame)] for `when` and the frames 10 and 20 minutes earlier, oldest first; missing frames are left out."""
     when = parse_time(when) if isinstance(when, str) else when

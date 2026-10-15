@@ -130,7 +130,9 @@ Not done: the site has no dark theme; nothing was tested on a physical phone or 
 
 **Verification.** Server suite with MongoDB-backed tests against a local throwaway MongoDB: 408 passed (new: `stormAlerts.test.js`, `alertStorm.test.js`, storm cases in the bot, message, scenario and delivery tests); client 105 passed; ml-service 15 passed; build passes. One unrelated morning-digest test failed once in a full run and passed in two further full runs and on its own (timing). Not run against a live Telegram chat or during a live storm.
 
-**Not done.** WhatsApp and SMS for storm warnings (a config change); storms that form overhead get no advance warning (no growth/cooling detection yet); the map panel still counts arrival from the image time; the map's satellite picture is still GIBS, so outlines sit ahead of it; Bangla needs a fluent reader.
+**Map.** The Storm movement layer now shades, in the WARNING amber, the upazilas a storm warning applies to (`GET /api/storms` adds `arrivals`, computed with the alert rule at request time; the replay counts each frame 15 minutes after it was taken), labels each with its name and expected time, draws every moving cell's 30, 60 and 90-minute circles with the clock time on each, and in live mode shows the picture ml-service draws from the NOAA frame (`GET /api/storms/image/:name`, warm ground transparent), so it lines up with the outlines. The panel shows a legend and, for a selected place, the warning and its time counted from now. Features are built in `client/src/lib/stormMap.js` (tested without a map).
+
+**Not done.** WhatsApp and SMS for storm warnings (a config change); storms that form overhead get no advance warning (no growth/cooling detection yet); the separate Satellite map layer is still GIBS (about 45 minutes older than the storm outlines); Bangla needs a fluent reader.
 
 ## Known gaps (not fixed, so nobody mistakes them for done)
 

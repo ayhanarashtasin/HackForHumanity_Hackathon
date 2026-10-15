@@ -8,7 +8,7 @@ import { evaluateSubscriber } from '../src/services/alerts/scenarios/index.js';
 import { stormEpisodeState } from '../src/services/alerts/stormEpisodes.js';
 import { hazardAllowsChannel, skipsQuietHours } from '../src/services/delivery/policy.js';
 import {
-  approaching, stormDataStatus, stormNear, stormReach, warnableCell,
+  approaching, stormArrivals, stormDataStatus, stormNear, stormReach, warnableCell, withArrivals,
 } from '../src/services/stormOutlook.js';
 import {
   BADDA, DHAKA, HOUR, NOW, SAVAR, makeSubscriber, stormEvent,
@@ -33,6 +33,22 @@ test('outlook: arrival times are counted from now, not from the image, and the s
   assert.equal(hits.get(SAVAR).over, true);
   assert.equal(hits.has('999999'), false);
   assert.equal(stormReach(null, [BADDA], NOW).size, 0);
+});
+
+test('outlook: the map\'s arrivals are exactly the places the rule would warn, soonest first, with the reference time', () => {
+  const snap = snapshot([
+    cell([{ pcode: BADDA, etaMin: 40 }, { pcode: SAVAR, etaMin: 70 }, { pcode: '302650', etaMin: 0 }]),
+    cell([{ pcode: '100409', etaMin: 30 }], { id: 'c2', trend: 'weakening' }),
+  ]);
+  const arrivals = stormArrivals(snap, NOW);
+  assert.deepEqual(arrivals.map((arrival) => [arrival.pcode, arrival.minutesFromNow, arrival.soon]), [[BADDA, 25, true], [SAVAR, 55, false]]);
+  assert.equal(arrivals[0].arrivalAt, new Date(NOW + 25 * MINUTE).toISOString());
+  assert.deepEqual(stormArrivals(snapshot([cell([{ pcode: BADDA, etaMin: 40 }])], 70), NOW), [], 'a stale image shades nothing');
+
+  const sent = withArrivals({ observedAt: new Date(snap.observedAtMs).toISOString(), cells: snap.cells }, NOW);
+  assert.equal(sent.arrivalsAt, new Date(NOW).toISOString());
+  assert.equal(sent.arrivals.length, 2);
+  assert.equal(withArrivals(null, NOW), null);
 });
 
 test('outlook: an image is usable for an hour, then STALE; no image is UNAVAILABLE', () => {

@@ -28,6 +28,9 @@ Defined once in `client/src/lib/scales.js` and mirrored here.
 | Wind | km/h | 0 `#CFE0C0` · 10 `#A9BE87` · 20 `#D8D36A` · 30 `#F0A63C` · 45 `#D9582B` · 60 `#9B2335` |
 | Thunderstorm potential | level 1–3 | 1 `#F5D547` · 2 `#F2A900` · 3 `#D9480F` |
 | Lightning summary | state | reported `#FFB800` (solid ring) · none in window `#A9BE87` (dashed) · stale `#8C9A80` · unavailable / not checked `#6B7568` (dotted) |
+| Storm cells (satellite tracker) | intensity class | 4 (−58 °C) `#E9B949` · 5 (−66 °C) `#E0703A` · 6 (−72 °C) `#B8322A`; dashed circles at 30 / 60 / 90 minutes in the cell's colour, track and arrow in Soft White |
+| Storm warning area | arrival | the WARNING amber `#F2A03D` of the alert ramp, because these are exactly the upazilas a storm warning applies to: within 30 min fill 42 %, within 60 min fill 20 %; arrival times in amber text |
+| Live satellite picture (NOAA) | cloud-top °C | warmer than 0 transparent · 0 to −27 grey, fading out toward 0 · −27 cyan · −36 blue · −47 green · −58 yellow · −66 red · −72 dark red (the tracker's class edges, in the colours GIBS gives the same classes) |
 
 ### Data status
 

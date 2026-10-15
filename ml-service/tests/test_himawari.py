@@ -7,6 +7,7 @@ import struct
 import unittest
 from datetime import datetime, timedelta, timezone
 
+import cv2
 import numpy as np
 
 from storm import himawari, imagery, tracker
@@ -108,6 +109,20 @@ class HimawariReaderTest(unittest.TestCase):
         when = datetime(2026, 9, 22, 8, 0, tzinfo=timezone.utc)
         self.assertEqual(himawari.segment_url(when, 3), 'https://noaa-himawari9.s3.amazonaws.com/AHI-L1b-FLDK/2026/09/22/0800/'
                                                        'HS_H09_20260922_0800_B13_FLDK_R20_S0310.DAT.bz2')
+
+
+class LivePictureTest(unittest.TestCase):
+    def test_clear_ground_is_transparent_and_storm_tops_take_their_class_colour(self):
+        kelvin = np.array([[300.0, 263.15, 240.0, 213.15, 198.15, np.nan]], np.float32)
+        png = imagery.render_kelvin(kelvin, tracker.CLASS_EDGES_C)
+        picture = cv2.imdecode(np.frombuffer(png, np.uint8), cv2.IMREAD_UNCHANGED)
+        self.assertEqual(picture.shape, (1, 6, 4), 'BGRA')
+        self.assertEqual(int(picture[0, 0, 3]), 0, '27 C ground: transparent')
+        self.assertTrue(0 < picture[0, 1, 3] < 225, '-10 C cloud: faint grey')
+        self.assertEqual(int(picture[0, 1, 0]), int(picture[0, 1, 2]), 'grey')
+        self.assertEqual(tuple(int(v) for v in picture[0, 3]), (*imagery.CLASS_COLORS[3], 225), '-60 C: class 4 (yellow)')
+        self.assertEqual(tuple(int(v) for v in picture[0, 4]), (*imagery.CLASS_COLORS[5], 225), '-75 C: class 6 (dark red)')
+        self.assertEqual(int(picture[0, 5, 3]), 0, 'no measurement: transparent')
 
 
 class KelvinFramesTest(unittest.TestCase):

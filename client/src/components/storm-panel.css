@@ -24,3 +24,10 @@
 .storm-note { font-size: .74rem; line-height: 1.6; color: var(--map-muted); }
 .storm-disclaimer { font-size: .6875rem; line-height: 1.6; color: var(--map-muted); padding-top: 10px; border-top: 1px solid var(--map-rule); }
 .menu-tag { display: inline-block; margin-left: 4px; padding: 0 5px; border: 1px solid var(--map-rule); border-radius: 4px; font-size: .62rem; font-weight: 600; vertical-align: 1px; }
+/* Arrival shading legend: the WARNING amber (lib/stormMap.js STORM_WARNING_COLOR), stronger for "within 30 minutes" as on the map. */
+.storm-legend { display: grid; gap: 4px; font-size: .72rem; line-height: 1.5; }
+.storm-legend p { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.storm-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.storm-legend small { color: var(--map-muted); font-size: .6875rem; }
+.storm-tier { width: 14px; height: 10px; border-radius: 3px; border: 1.5px solid rgba(242, 160, 61, .75); background: rgba(242, 160, 61, .22); }
+.storm-tier.is-soon { border-color: #F2A03D; background: rgba(242, 160, 61, .5); }

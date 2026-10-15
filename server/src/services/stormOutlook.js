@@ -59,6 +59,26 @@ export function approaching(hit, rules = hazardRules.STORM_APPROACH) {
   return Boolean(hit) && !hit.over && hit.minutesFromNow >= -rules.lateMinutes && hit.minutesFromNow <= rules.horizonMinutes;
 }
 
+// The places the storm-approach rule would warn at `nowMs`, for the map's arrival shading: [{ pcode, arrivalAt, minutesFromNow, soon }],
+// soonest first. The same cells, window and "counted from now" as the alert stage, so the map shades exactly who would be warned.
+export function stormArrivals(snapshot, nowMs, rules = hazardRules.STORM_APPROACH) {
+  if (stormDataStatus(snapshot, nowMs) !== 'FRESH') return [];
+  const pcodes = new Set((snapshot.cells ?? []).flatMap((cell) => (cell.reaches ?? []).map((place) => place.pcode)));
+  return [...stormReach(snapshot, pcodes, nowMs, warnableCell)]
+    .filter(([, hit]) => approaching(hit, rules))
+    .map(([pcode, hit]) => ({
+      pcode, arrivalAt: new Date(hit.arrivalMs).toISOString(), minutesFromNow: hit.minutesFromNow, soon: hit.minutesFromNow <= rules.soonMinutes,
+    }))
+    .sort((a, b) => a.minutesFromNow - b.minutesFromNow);
+}
+
+// A snapshot as the API sends it ({ observedAt: ISO, cells }) with its arrivals at `nowMs` and that reference time.
+export function withArrivals(snapshot, nowMs) {
+  if (!snapshot?.observedAt) return snapshot;
+  const arrivals = stormArrivals({ observedAtMs: Date.parse(snapshot.observedAt), cells: snapshot.cells }, nowMs);
+  return { ...snapshot, arrivalsAt: new Date(nowMs).toISOString(), arrivals };
+}
+
 // Any tracked cell over the place or heading there within the horizon: enough to look for real lightning (the lightning gate).
 export function stormNear(hit, rules = hazardRules.STORM_APPROACH) {
   return Boolean(hit) && (hit.over || hit.minutesFromNow <= rules.horizonMinutes);

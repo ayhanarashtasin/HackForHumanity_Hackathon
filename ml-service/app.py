@@ -7,8 +7,8 @@ the alert is about? Two models, chosen per item by `target`:
 Each returns a risk score (a ranking, not a calibrated probability) and a High / Medium / Low band. The engine only uses the band
 to add one line to rain alerts; it never changes, adds or cancels an alert.
 
-It also tracks thunderstorm cells on Himawari-9 infrared images (/storms/*, see storm/tracker.py): experimental, shown on the
-map only, never used for alerts.
+It also tracks thunderstorm cells on Himawari-9 infrared images (/storms/*, see storm/tracker.py): experimental. The map shows them,
+and the Node server turns a strong cell heading for a subscriber's area into a prototype storm warning.
 
 Run (from ml-service/):  .venv/Scripts/python -m uvicorn app:app --host 127.0.0.1 --port 8001
 The model files come from scripts/train.py (--target heavy and --target moderate).
@@ -20,10 +20,11 @@ from datetime import date
 from pathlib import Path
 from typing import Literal
 
+import cv2
 import joblib
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
 from storm import imagery, tracker
@@ -104,6 +105,17 @@ def predict(request: PredictRequest):
 _storm_cache = {}
 _demo = None
 _demo_lock = threading.Lock()
+_IMAGE_NAME = re.compile(r'\d{4}-\d{2}-\d{2}T\d{6}Z\.png')
+
+
+def _image_bounds():
+    """The storm box moved by the box-centre parallax shift, as the outlines are, so a frame's picture lines up with them on the map."""
+    lat0, lon0 = (imagery.NORTH + imagery.SOUTH) / 2, (imagery.WEST + imagery.EAST) / 2
+    shift_km, shift_bearing = tracker.parallax_shift(lat0, lon0)
+    lat1, lon1 = tracker.destination(lat0, lon0, shift_bearing, shift_km)
+    dlat, dlon = lat1 - lat0, lon1 - lon0
+    bounds = {'north': imagery.NORTH + dlat, 'south': imagery.SOUTH + dlat, 'west': imagery.WEST + dlon, 'east': imagery.EAST + dlon}
+    return bounds, shift_km
 
 
 @app.get('/storms/snapshot')
@@ -119,7 +131,9 @@ def storm_snapshot(time: str = Query(pattern=r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d
             raise HTTPException(502, f'satellite frames unavailable: {error}') from error
         if not published:
             raise HTTPException(404, 'frame not published yet')
-        _storm_cache[time] = tracker.snapshot(frames, 'live')
+        # The frame's picture (GET /storms/image/<name>) goes with it, placed like the outlines.
+        image = {'name': imagery.file_name(imagery.parse_time(time)), 'bounds': _image_bounds()[0]}
+        _storm_cache[time] = {**tracker.snapshot(frames, 'live'), 'image': image}
         for old in sorted(_storm_cache)[:-12]:
             del _storm_cache[old]
     return _storm_cache[time]
@@ -134,13 +148,10 @@ def storm_demo():
             times = imagery.demo_times()
             # The cell outlines are moved to the ground under the cloud tops; the image is moved by the same (box-centre) parallax
             # shift so both line up on the map.
-            shift_km, shift_bearing = tracker.parallax_shift((imagery.NORTH + imagery.SOUTH) / 2, (imagery.WEST + imagery.EAST) / 2)
-            lat0, lon0 = (imagery.NORTH + imagery.SOUTH) / 2, (imagery.WEST + imagery.EAST) / 2
-            lat1, lon1 = tracker.destination(lat0, lon0, shift_bearing, shift_km)
-            dlat, dlon = lat1 - lat0, lon1 - lon0
+            bounds, shift_km = _image_bounds()
             _demo = {
                 'day': '2026-09-22',
-                'bounds': {'north': imagery.NORTH + dlat, 'south': imagery.SOUTH + dlat, 'west': imagery.WEST + dlon, 'east': imagery.EAST + dlon},
+                'bounds': bounds,
                 'imageShiftKm': round(shift_km, 1),
                 'snapshots': [
                     {**tracker.snapshot(imagery.frames_before(time, fetch=False, source='gibs'), 'demo'),
@@ -153,6 +164,16 @@ def storm_demo():
 
 # Building the replay takes about 20 seconds, so it starts in the background as soon as the service does.
 threading.Thread(target=storm_demo, daemon=True).start()
+
+
+@app.get('/storms/image/{name}')
+def storm_image(name: str):
+    """The picture of an analysed live frame: a NOAA frame drawn from its temperatures (imagery.render_kelvin), or the GIBS image."""
+    frame = imagery.load_frame(name[:-4], fetch=False) if _IMAGE_NAME.fullmatch(name) else None
+    if frame is None:
+        raise HTTPException(404, 'no such frame')
+    data = imagery.render_kelvin(frame, tracker.CLASS_EDGES_C) if frame.ndim == 2 else cv2.imencode('.png', frame)[1].tobytes()
+    return Response(data, media_type='image/png', headers={'Cache-Control': 'public, max-age=86400'})
 
 
 @app.get('/storms/demo/{name}')
