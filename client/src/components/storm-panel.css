@@ -1,0 +1,26 @@
+/* Storm movement (experimental): sits under the layer menu, in the explorer's paper / olive palette. */
+.weather-app .right-stack.with-storms { width: min(286px, calc(100% - 32px)); }
+.weather-app .storm-panel { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; border-radius: 18px; overflow-y: auto; min-height: 0; scrollbar-width: thin; }
+.storm-header { display: flex; align-items: center; gap: 10px; }
+.storm-heading-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; color: var(--cream); background: var(--olive); flex: none; }
+.weather-app .storm-header h2 { font-size: .9rem; font-weight: 650; line-height: 1.3; letter-spacing: -.02em; }
+.storm-header p { font-size: .6875rem; color: var(--map-muted); margin-top: 2px; }
+.storm-mode { display: flex; flex-wrap: wrap; gap: 6px; }
+.storm-player { display: flex; align-items: center; gap: 6px; font-size: .75rem; font-variant-numeric: tabular-nums; }
+.storm-player .icon-button { min-width: 40px; min-height: 40px; }
+.storm-player .icon-button:nth-child(2) svg { transform: scaleX(-1); }
+.storm-player > span { margin-left: auto; color: var(--map-muted); }
+.storm-time { display: flex; gap: 7px; font-size: .75rem; line-height: 1.55; }
+.storm-time > svg { flex: none; margin-top: 3px; }
+.storm-time small { display: block; color: var(--map-muted); font-size: .6875rem; }
+.storm-area { padding: 9px 11px; border-radius: 10px; border: 1px solid var(--map-rule); font-size: .75rem; line-height: 1.55; }
+.storm-area.is-hit { border-color: #E0703A; background: rgba(224, 112, 58, .12); font-weight: 600; }
+.storm-panel h3 { font-size: .75rem; font-weight: 650; }
+.storm-cells { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.storm-cell-row { display: flex; gap: 9px; align-items: flex-start; }
+.storm-swatch { width: 10px; height: 10px; border-radius: 3px; margin-top: 4px; flex: none; }
+.storm-cell-row strong { display: block; font-size: .73rem; font-weight: 650; line-height: 1.45; }
+.storm-cell-row span { display: block; font-size: .7rem; color: var(--map-muted); line-height: 1.5; }
+.storm-note { font-size: .74rem; line-height: 1.6; color: var(--map-muted); }
+.storm-disclaimer { font-size: .6875rem; line-height: 1.6; color: var(--map-muted); padding-top: 10px; border-top: 1px solid var(--map-rule); }
+.menu-tag { display: inline-block; margin-left: 4px; padding: 0 5px; border: 1px solid var(--map-rule); border-radius: 4px; font-size: .62rem; font-weight: 600; vertical-align: 1px; }

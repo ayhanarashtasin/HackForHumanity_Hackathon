@@ -75,6 +75,10 @@ export function LayerMenu({
               <input type="checkbox" checked={overlays.lightning} onChange={() => onToggleOverlay('lightning')} />
               <span className="menu-label">{tr('Lightning summaries')}</span>
             </label>
+            <label className={`menu-item${overlays.storms ? ' active' : ''}`}>
+              <input type="checkbox" checked={Boolean(overlays.storms)} onChange={() => onToggleOverlay('storms')} />
+              <span className="menu-label">{tr('Storm movement')} <small className="menu-tag">{tr('Experimental')}</small></span>
+            </label>
           </div>
         </div>
       )}

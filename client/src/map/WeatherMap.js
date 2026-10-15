@@ -1,5 +1,5 @@
 import { AttributionControl, LngLat, LngLatBounds, MapLibreMap, NavigationControl, setWorkerUrl } from 'maplibre-gl';
-import { circlePolygon, clampToBounds, imageCoordinates, outsideMask } from '../lib/geometry.js';
+import { circlePolygon, clampToBounds, destinationPoint, imageCoordinates, outsideMask } from '../lib/geometry.js';
 import { registerIcons } from '../lib/icons.js';
 import { neighbourhoodById } from '../lib/neighbourhoods.js';
 import { LABELS_ANCHOR, buildBaseStyle } from '../lib/mapStyle.js';
@@ -44,6 +44,10 @@ export const LIGHTNING_COLORS = {
   'not-checked': STATUS_COLORS.unavailable,
 };
 
+// Storm cells by cloud-top intensity class from the tracker (4 yellow, 5 red, 6 dark red on the satellite palette).
+export const STORM_COLORS = { 4: '#E9B949', 5: '#E0703A', 6: '#B8322A' };
+const STORM_LABEL_CELLS = 8;
+
 const mean = (values) => {
   const present = values.filter((value) => value !== null && value !== undefined && Number.isFinite(value));
   return present.length ? present.reduce((sum, value) => sum + value, 0) / present.length : null;
@@ -65,6 +69,7 @@ export class WeatherMap {
     this.signState = null;
     this.radarUrls = new Map();
     this.satellite = { current: 'a', pending: false, requested: null, shown: null };
+    this.stormImageUrl = null;
 
     this.locationByPcode = new Map(catalogue.locations.map((location) => [location.pcode, location]));
     this.districtByCode = new Map(catalogue.districts.map((district) => [district.pcode, district]));
@@ -255,6 +260,7 @@ export class WeatherMap {
 
     this.limitZoomOut();
     this.addLightningLayers();
+    this.addStormLayers();
     // MapLibre places symbols from the top layer down, so the weather signs (added last) claim space before the names.
     this.addNameLayer('names-district', 'district', 6.2, UPAZILA_ZOOM);
     this.addNameLayer('names-upazila', 'upazila', UPAZILA_ZOOM + 1, 24);
@@ -422,6 +428,70 @@ export class WeatherMap {
       },
       paint: { 'text-color': colorByState, 'text-halo-color': BASEMAP.halo, 'text-halo-width': 2 },
     });
+  }
+
+  // Experimental storm movement (ml-service storm tracker): cell outlines, the 60-minute projected circle, the track and an arrow.
+  // Drawn above the outside mask: a storm still over Meghalaya or the Bay is exactly the one worth seeing coming.
+  addStormLayers() {
+    const { map } = this;
+    map.addSource('storms', { type: 'geojson', data: EMPTY });
+    const color = ['match', ['get', 'intensity'], 6, STORM_COLORS[6], 5, STORM_COLORS[5], STORM_COLORS[4]];
+    const kind = (name) => ['==', ['get', 'kind'], name];
+    const add = (layer) => map.addLayer({ ...layer, source: 'storms', layout: { visibility: 'none', ...layer.layout } });
+
+    add({ id: 'storm-cone', type: 'fill', filter: kind('cone'), paint: { 'fill-color': color, 'fill-opacity': 0.07 } });
+    add({ id: 'storm-cone-line', type: 'line', filter: kind('cone'), paint: { 'line-color': color, 'line-width': 1.4, 'line-dasharray': [2, 2], 'line-opacity': 0.85 } });
+    add({ id: 'storm-cell', type: 'fill', filter: kind('cell'), paint: { 'fill-color': color, 'fill-opacity': 0.32 } });
+    add({ id: 'storm-cell-line', type: 'line', filter: kind('cell'), paint: { 'line-color': color, 'line-width': 1.6 } });
+    add({ id: 'storm-track', type: 'line', filter: kind('track'), layout: { 'line-cap': 'round' }, paint: { 'line-color': PALETTE.cream, 'line-width': 2.4 } });
+    add({ id: 'storm-arrow', type: 'fill', filter: kind('arrow'), paint: { 'fill-color': PALETTE.cream } });
+    add({
+      id: 'storm-label', type: 'symbol', filter: kind('label'),
+      layout: { 'text-field': ['get', 'label'], 'text-font': ['Noto Sans Bold'], 'text-size': 11, 'text-offset': [0, 1.3], 'text-optional': true },
+      paint: { 'text-color': PALETTE.cream, 'text-halo-color': BASEMAP.halo, 'text-halo-width': 1.6 },
+    });
+  }
+
+  // { visible, snapshot, image: { url, bounds } | null }. The image is the demo day's satellite frame (live mode uses the satellite overlay).
+  setStorms({ visible, snapshot, image }) {
+    if (!this.ready) return;
+    const { map } = this;
+    const features = [];
+    const feature = (geometry, properties) => features.push({ type: 'Feature', geometry, properties });
+
+    for (const [index, cell] of (visible ? snapshot?.cells ?? [] : []).entries()) {
+      const props = { id: cell.id, intensity: cell.intensity };
+      if (cell.polygon?.length > 3) feature({ type: 'Polygon', coordinates: [cell.polygon] }, { ...props, kind: 'cell' });
+      const sixty = cell.forecast?.find((step) => step.minutes === 60);
+      if (cell.motion && sixty) {
+        const path = [[cell.center.lon, cell.center.lat], ...cell.forecast.map((step) => [step.lon, step.lat])];
+        const { bearingDeg } = cell.motion;
+        feature({ type: 'Polygon', coordinates: circlePolygon(sixty.lat, sixty.lon, sixty.radiusKm) }, { ...props, kind: 'cone' });
+        feature({ type: 'LineString', coordinates: path.slice(0, 3) }, { ...props, kind: 'track' });
+        const head = [destinationPoint(sixty.lat, sixty.lon, bearingDeg, 7), destinationPoint(sixty.lat, sixty.lon, bearingDeg + 140, 6), destinationPoint(sixty.lat, sixty.lon, bearingDeg - 140, 6)];
+        feature({ type: 'Polygon', coordinates: [[...head, head[0]]] }, { ...props, kind: 'arrow' });
+      }
+      // Speed labels only on the biggest cells; canvas text stays in English like every other map label.
+      if (index < STORM_LABEL_CELLS && cell.motion) {
+        feature({ type: 'Point', coordinates: [cell.center.lon, cell.center.lat] }, { ...props, kind: 'label', label: `${Math.round(cell.motion.speedKmh)} km/h ${cell.motion.towards}` });
+      }
+    }
+
+    map.getSource('storms').setData({ type: 'FeatureCollection', features });
+    for (const id of ['storm-cone', 'storm-cone-line', 'storm-cell', 'storm-cell-line', 'storm-track', 'storm-arrow', 'storm-label']) {
+      map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');
+    }
+
+    // The replay's satellite frame sits with the other raster layers, under the outside mask.
+    const url = visible && image ? image.url : null;
+    if (url && !map.getSource('storm-image')) {
+      map.addSource('storm-image', { type: 'image', url, coordinates: imageCoordinates(image.bounds) });
+      map.addLayer({ id: 'storm-image', type: 'raster', source: 'storm-image', paint: { 'raster-opacity': 0.85, 'raster-fade-duration': 0 } }, 'district-fill');
+    } else if (url && this.stormImageUrl !== url) {
+      map.getSource('storm-image').updateImage({ url, coordinates: imageCoordinates(image.bounds) });
+    }
+    if (map.getLayer('storm-image')) map.setLayoutProperty('storm-image', 'visibility', url ? 'visible' : 'none');
+    this.stormImageUrl = url;
   }
 
   // ---------- weather signs ----------

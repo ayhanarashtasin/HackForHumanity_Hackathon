@@ -3,6 +3,7 @@ import { fetchForecast, probeUpdatedAt } from '../services/bmdForecast.js';
 import { refreshRadar } from '../services/bmdRadar.js';
 import { fetchOpenMeteo } from '../services/openMeteo.js';
 import { refreshSatellite } from '../services/satellite.js';
+import { refreshStorms } from '../services/stormTracking.js';
 import { recordRun } from '../services/weatherHistory.js';
 import {
   getSourceData, recordAttempt, recordCheck, recordFailure, restoreSnapshots, setSnapshot,
@@ -67,6 +68,8 @@ export async function startJobs() {
       every('open-meteo', env.weather.openMeteoMinutes, refreshOpenMeteo),
       every('radar', env.weather.radarMinutes, () => refreshRadar()),
       every('satellite', env.weather.satelliteMinutes, () => refreshSatellite()),
+      // Experimental storm movement from the newest satellite frame (needs the ML service; a no-op without it).
+      every('storms', 10, () => refreshStorms()),
     );
   }
 

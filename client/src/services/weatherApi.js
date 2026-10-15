@@ -15,6 +15,8 @@ export const weatherApi = {
     body: JSON.stringify({ start, end }),
     signal,
   }),
+  storms: (signal) => request('/storms', { signal }),
+  stormDemo: (signal) => request('/storms/demo', { signal }),
 };
 
 export async function loadCatalogue(signal) {

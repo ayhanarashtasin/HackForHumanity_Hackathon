@@ -136,6 +136,10 @@ To see the line without waiting for real rain: create a profile at <http://local
 
 How the models were built and tested: [`ml-service/README.md`](ml-service/README.md).
 
+The same service powers the experimental **Storm movement** map layer: thunderstorm cells tracked on Himawari-9 satellite images, with
+their direction, speed and the upazilas they may reach in the next 90 minutes. It is map information only and never changes an alert.
+To present it without live storms, open <http://localhost:5173/map#o=storms&storm=replay> (a replay of 22 September 2026).
+
 ## Configuration
 
 Server configuration is loaded from `server/.env`. The complete template is [`server/.env.example`](server/.env.example); validation and additional tuning options are defined in [`server/src/config/env.js`](server/src/config/env.js). Restart the backend after changing environment variables.

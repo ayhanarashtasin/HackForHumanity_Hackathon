@@ -10,6 +10,7 @@ import { LogoMark } from '../components/Logo.jsx';
 import { MapView } from '../components/MapView.jsx';
 import { SearchBox } from '../components/SearchBox.jsx';
 import { StatusPanel } from '../components/StatusPanel.jsx';
+import { StormPanel } from '../components/StormPanel.jsx';
 import { TimeBar } from '../components/TimeBar.jsx';
 import { Tooltip } from '../components/Tooltip.jsx';
 import { useUnreadBadge } from '../alert/useUnreadBadge.js';
@@ -64,7 +65,7 @@ export default function MapPage() {
   const lightningSummariesState = usePolled(weatherApi.lightningSummaries, 5 * MINUTE);
 
   const [signLayer, setSignLayer] = useState(initial.layer ?? 'temp');
-  const [overlays, setOverlays] = useState(initial.overlays ?? { radar: false, satellite: false, lightning: false });
+  const [overlays, setOverlays] = useState(initial.overlays ?? { radar: false, satellite: false, lightning: false, storms: false });
   const [satelliteLayer, setSatelliteLayer] = useState('ir');
   const [mode, setMode] = useState(initial.overlays?.radar || initial.overlays?.satellite ? 'live' : 'forecast');
   const [selectedTime, setSelectedTime] = useState(null);
@@ -78,6 +79,11 @@ export default function MapPage() {
   const [lightningSelected, setLightningSelected] = useState(null);
   const [lightningInfo, setLightningInfo] = useState(null);
   const [mobileView, setMobileView] = useState('weather');
+  const [stormMode, setStormMode] = useState(initial.stormReplay ? 'demo' : 'live');
+  const [stormIndex, setStormIndex] = useState(0);
+  const [stormPlaying, setStormPlaying] = useState(false);
+  const stormsState = usePolled(weatherApi.storms, 2 * MINUTE, { enabled: Boolean(overlays.storms) });
+  const stormDemoState = usePolled(weatherApi.stormDemo, 0, { enabled: Boolean(overlays.storms) && stormMode === 'demo' });
   const viewRef = useRef(initial.view);
   const locationIntentRef = useRef(true);
   const sidebarRef = useRef(null);
@@ -153,6 +159,23 @@ export default function MapPage() {
     [overlays.lightning, lightningSummariesState.data],
   );
 
+  // Storm movement: the newest live analysis, or one frame of the saved storm day.
+  const stormFrames = stormDemoState.data?.snapshots ?? [];
+  useEffect(() => {
+    if (!stormPlaying || stormFrames.length < 2) return undefined;
+    const timer = setInterval(() => setStormIndex((index) => (index + 1) % stormFrames.length), 900);
+    return () => clearInterval(timer);
+  }, [stormPlaying, stormFrames.length]);
+
+  const storms = useMemo(() => {
+    if (!overlays.storms) return { visible: false, snapshot: null, image: null };
+    if (stormMode === 'demo') {
+      const frame = stormFrames[Math.min(stormIndex, Math.max(stormFrames.length - 1, 0))] ?? null;
+      return { visible: true, snapshot: frame, image: frame?.image ? { url: frame.image, bounds: stormDemoState.data.bounds } : null };
+    }
+    return { visible: true, snapshot: stormsState.data?.live ?? null, image: null };
+  }, [overlays.storms, stormMode, stormFrames, stormIndex, stormDemoState.data, stormsState.data]);
+
   // ---------- data status ----------
   const statuses = useMemo(() => {
     const fromSnapshot = snapshot?.sources;
@@ -216,7 +239,8 @@ export default function MapPage() {
     const next = { ...overlays, [key]: !overlays[key] };
     setOverlays(next);
     setSelectedTime(null);
-    if (key !== 'lightning') {
+    if (key === 'storms' && !next.storms) setStormPlaying(false);
+    if (key !== 'lightning' && key !== 'storms') {
       if (next[key]) setMode('live');
       else if (!next.radar && !next.satellite) setMode('forecast');
     }
@@ -340,6 +364,7 @@ export default function MapPage() {
               radarItems={radarItems}
               satelliteSpec={satelliteSpec}
               lightning={lightning}
+              storms={storms}
               selection={selection}
               flyRequest={flyRequest}
               userPosition={location.match ? location.position : null}
@@ -356,7 +381,7 @@ export default function MapPage() {
           </div>
 
           {bannerText && <p className="banner" role="status">{tr(bannerText)}</p>}
-          <div className={`right-stack${showLightningPanel ? ' with-lightning' : ''}`}>
+          <div className={`right-stack${showLightningPanel ? ' with-lightning' : ''}${overlays.storms && !showLightningPanel ? ' with-storms' : ''}`}>
             <LayerMenu
               open={menuOpen}
               onToggleOpen={() => setMenuOpen((open) => !open)}
@@ -381,6 +406,22 @@ export default function MapPage() {
                   setLightningPanelOpen(false);
                   requestAnimationFrame(() => document.getElementById('lightning-summary-toggle')?.focus());
                 }}
+              />
+            )}
+            {overlays.storms && !showLightningPanel && (
+              <StormPanel
+                mode={stormMode}
+                onMode={(next) => { setStormMode(next); setStormPlaying(false); setStormIndex(0); }}
+                live={stormsState.data}
+                liveError={stormsState.error}
+                demo={stormDemoState.data}
+                demoError={stormDemoState.error}
+                demoIndex={Math.min(stormIndex, Math.max(stormFrames.length - 1, 0))}
+                onDemoIndex={(index) => { setStormIndex(index); setStormPlaying(false); }}
+                playing={stormPlaying}
+                onPlay={() => setStormPlaying((value) => !value)}
+                selectedPcode={resolved?.dailyPcode ?? null}
+                selectedName={resolved?.name ?? ''}
               />
             )}
             {overlays.lightning && !lightningPanelOpen && (

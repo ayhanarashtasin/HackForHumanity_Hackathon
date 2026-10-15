@@ -2,11 +2,11 @@ import { SIGN_ORDER } from './scales.js';
 
 // Shareable view in the URL hash, like Zoom Earth: #view=23.64,90.51,8z&layer=temp&o=radar,lightning
 export const DEFAULT_VIEW = { lat: 23.7, lon: 90.35, zoom: null };
-const OVERLAY_KEYS = ['radar', 'satellite', 'lightning'];
+const OVERLAY_KEYS = ['radar', 'satellite', 'lightning', 'storms'];
 
 export function readHash(hash = window.location.hash) {
   const params = new URLSearchParams(hash.replace(/^#/, ''));
-  const result = { view: null, layer: null, overlays: null };
+  const result = { view: null, layer: null, overlays: null, stormReplay: false };
 
   const view = /^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?),(\d+(?:\.\d+)?)z$/.exec(params.get('view') ?? '');
   if (view) {
@@ -16,6 +16,9 @@ export function readHash(hash = window.location.hash) {
 
   const layer = params.get('layer');
   if (SIGN_ORDER.includes(layer)) result.layer = layer;
+
+  // A presentation link: #o=storms&storm=replay opens the storm movement replay directly.
+  result.stormReplay = params.get('storm') === 'replay';
 
   if (params.has('o')) {
     result.overlays = Object.fromEntries(OVERLAY_KEYS.map((key) => [key, params.get('o').split(',').includes(key)]));

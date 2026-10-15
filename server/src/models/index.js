@@ -8,6 +8,7 @@ import { JobState } from './JobState.js';
 import { MorningDigest } from './MorningDigest.js';
 import { Notification } from './Notification.js';
 import { RuleSetting } from './RuleSetting.js';
+import { StormSnapshot } from './StormSnapshot.js';
 import { Subscriber } from './Subscriber.js';
 import { WeatherRun } from './WeatherRun.js';
 import { WeatherSnapshot } from './WeatherSnapshot.js';
@@ -24,5 +25,5 @@ export async function initAlertModels() {
 
 // Forecast history (compact per-run summaries): the TTL and the one-row-per-run index exist before the first collector writes.
 export async function initDataModels() {
-  await WeatherRun.init();
+  await Promise.all([WeatherRun.init(), StormSnapshot.init()]);
 }

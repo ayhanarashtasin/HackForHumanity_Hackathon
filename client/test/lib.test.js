@@ -77,7 +77,10 @@ test('the URL hash parses a shareable view and ignores invalid values', () => {
   const full = readHash('#view=23.64059,90.51415,8z&layer=rain&o=radar,lightning');
   assert.deepEqual(full.view, { lat: 23.64059, lon: 90.51415, zoom: 8 });
   assert.equal(full.layer, 'rain');
-  assert.deepEqual(full.overlays, { radar: true, satellite: false, lightning: true });
+  assert.deepEqual(full.overlays, { radar: true, satellite: false, lightning: true, storms: false });
+  assert.equal(readHash('#o=storms').overlays.storms, true, 'the storm movement overlay survives a shared link');
+  assert.equal(readHash('#o=storms&storm=replay').stormReplay, true, 'a presentation link opens the replay');
+  assert.equal(full.stormReplay, false);
 
   const bad = readHash('#view=0,0,8z&layer=banana');
   assert.equal(bad.view, null, 'a view outside Bangladesh is ignored');

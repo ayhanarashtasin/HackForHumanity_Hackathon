@@ -311,4 +311,23 @@ export const MAP = {
   'Thunderstorm, heavy hail': 'বজ্রঝড় ও প্রবল শিলাবৃষ্টি',
   'N': 'উত্তর', 'NE': 'উত্তর-পূর্ব', 'E': 'পূর্ব', 'SE': 'দক্ষিণ-পূর্ব',
   'S': 'দক্ষিণ', 'SW': 'দক্ষিণ-পশ্চিম', 'W': 'পশ্চিম', 'NW': 'উত্তর-পশ্চিম',
+  // Storm movement (experimental)
+  'Storm movement': 'ঝড়ের গতিপথ', 'Experimental': 'পরীক্ষামূলক', 'Experimental · Himawari-9 satellite': 'পরীক্ষামূলক · হিমাওয়ারি-৯ স্যাটেলাইট',
+  'Storm data': 'ঝড়ের তথ্য', 'Replay: 22 Sep 2026': 'রিপ্লে: ২২ সেপ্টেম্বর ২০২৬',
+  'The replay could not be loaded.': 'রিপ্লে লোড করা যায়নি।', 'Preparing the replay…': 'রিপ্লে প্রস্তুত হচ্ছে…',
+  'Play': 'চালান', 'Pause': 'থামান', 'Previous frame': 'আগের ছবি', 'Next frame': 'পরের ছবি',
+  'Storm tracking could not be loaded.': 'ঝড়ের গতিপথের তথ্য লোড করা যায়নি।',
+  'Storm tracking is off: the ML service is not running.': 'ঝড়ের গতিপথ বন্ধ আছে: ML সার্ভিস চালু নেই।',
+  'The satellite analysis failed; trying again in 10 minutes.': 'স্যাটেলাইট বিশ্লেষণ ব্যর্থ হয়েছে; ১০ মিনিট পরে আবার চেষ্টা করা হবে।',
+  'Waiting for the first satellite analysis…': 'প্রথম স্যাটেলাইট বিশ্লেষণের অপেক্ষায়…',
+  'Satellite image': 'স্যাটেলাইটের ছবি', '; positions are where the storms were then': '; অবস্থান দেখানো হয়েছে ছবির সময়ের',
+  '{place} is under a storm cell on this image.': 'এই ছবিতে {place} একটি ঝড়ের মেঘের নিচে আছে।',
+  'A storm cell may reach {place} in about {n} minutes.': 'একটি ঝড়ের মেঘ আনুমানিক {n} মিনিটে {place} পৌঁছাতে পারে।',
+  'No tracked storm cell is heading for {place} in the next 90 minutes.': 'আগামী ৯০ মিনিটে {place}-এর দিকে কোনো শনাক্ত ঝড়ের মেঘ আসছে না।',
+  '{n} storm cells': '{n}টি ঝড়ের মেঘ', 'No strong storm cells on this satellite image.': 'এই স্যাটেলাইট ছবিতে কোনো শক্তিশালী ঝড়ের মেঘ নেই।',
+  'Strong': 'শক্তিশালী', 'Severe': 'তীব্র', 'Extreme': 'অতি তীব্র', 'km²': 'বর্গকিমি',
+  'Growing': 'বাড়ছে', 'Steady': 'স্থির', 'Weakening': 'দুর্বল হচ্ছে',
+  'Moving {dir} at {speed} km/h': '{dir} দিকে {speed} কিমি/ঘণ্টা বেগে সরছে', 'Movement not measured yet': 'গতি এখনো মাপা যায়নি',
+  'Cold cloud tops, shifted about {km} km to the ground below them for the satellite’s viewing angle. Arrows show 60 minutes of straight-line movement. This is not a lightning observation and does not change any alert.':
+    'ঠান্ডা মেঘচূড়া, স্যাটেলাইটের দেখার কোণের কারণে প্রায় {km} কিমি সরিয়ে নিচের মাটির অবস্থানে দেখানো। তীর ৬০ মিনিট সোজা পথে চললে কোথায় যাবে তা দেখায়। এটি বজ্রপাতের পর্যবেক্ষণ নয় এবং কোনো সতর্কবার্তা বদলায় না।',
 };

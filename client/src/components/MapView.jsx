@@ -9,7 +9,7 @@ const NO_ALTERNATIVES = [];
 
 // Thin React wrapper: owns the WeatherMap instance and pushes state into it. All map logic lives in map/WeatherMap.js.
 export function MapView({
-  catalogue, initialView, signLayer, snapshot, stepIndex, baseStatus, radarItems, satelliteSpec, lightning, route, routeAlternatives = NO_ALTERNATIVES, routeDetails = null, selection, flyRequest, userPosition, handlers, maxZoom,
+  catalogue, initialView, signLayer, snapshot, stepIndex, baseStatus, radarItems, satelliteSpec, lightning, storms, route, routeAlternatives = NO_ALTERNATIVES, routeDetails = null, selection, flyRequest, userPosition, handlers, maxZoom,
 }) {
   const { tr, lang } = useLanguage(MAP);
   const containerRef = useRef(null);
@@ -77,6 +77,10 @@ export function MapView({
   useEffect(() => {
     if (ready) mapRef.current.setRouteDetails(routeDetails);
   }, [ready, routeDetails]);
+
+  useEffect(() => {
+    if (ready) mapRef.current.setStorms(storms);
+  }, [ready, storms]);
 
   useEffect(() => {
     if (ready) mapRef.current.setSelection(selection);
