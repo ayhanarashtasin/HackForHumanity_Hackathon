@@ -195,18 +195,19 @@ export const RULE_SUMMARIES = {
   'PUBLIC-01': text('Rain during your usual travel time', 'আপনার নিয়মিত যাতায়াতের সময় বৃষ্টি'),
   'PUBLIC-02': text('Lightning while you play or exercise outdoors', 'বাইরে খেলাধুলা বা ব্যায়ামের সময় বজ্রপাত'),
   'PUBLIC-03': text('Extra heat guidance if you chose it', 'আপনি চাইলে গরম সম্পর্কে বাড়তি নির্দেশনা'),
+  'PUBLIC-06': text('A thunderstorm cloud on the satellite image heading for your area within the hour', 'স্যাটেলাইট ছবিতে এক ঘণ্টার মধ্যে আপনার এলাকার দিকে আসা বজ্রঝড়ের মেঘ'),
   'WORK-01': text('Heat building toward midday during your shift', 'আপনার শিফটে দুপুরের দিকে বাড়তে থাকা গরম'),
   'WORK-03': text('Lightning while you work on the road', 'রাস্তায় কাজের সময় বজ্রপাত'),
   'WORK-04': text('Rain during your working hours', 'আপনার কাজের সময়ে বৃষ্টি'),
 };
 
 export const OCCUPATION_RULES = {
-  farmer: ['FARM-01', 'FARM-02', 'FARM-03', 'FARM-04', 'FARM-05'],
-  fisherman: ['FISH-02', 'FISH-04', 'PUBLIC-03'],
-  construction: ['CONS-01', 'CONS-02', 'CONS-03', 'CONS-04'],
-  vendor: ['VEND-01', 'VEND-02', 'VEND-03'],
-  student_public: ['PUBLIC-01', 'PUBLIC-02', 'PUBLIC-03'],
-  rickshaw_labourer: ['WORK-01', 'WORK-03', 'WORK-04'],
+  farmer: ['FARM-01', 'FARM-02', 'FARM-03', 'FARM-04', 'FARM-05', 'PUBLIC-06'],
+  fisherman: ['FISH-02', 'FISH-04', 'PUBLIC-03', 'PUBLIC-06'],
+  construction: ['CONS-01', 'CONS-02', 'CONS-03', 'CONS-04', 'PUBLIC-06'],
+  vendor: ['VEND-01', 'VEND-02', 'VEND-03', 'PUBLIC-06'],
+  student_public: ['PUBLIC-01', 'PUBLIC-02', 'PUBLIC-03', 'PUBLIC-06'],
+  rickshaw_labourer: ['WORK-01', 'WORK-03', 'WORK-04', 'PUBLIC-06'],
 };
 
 // ---------- what the client receives ----------

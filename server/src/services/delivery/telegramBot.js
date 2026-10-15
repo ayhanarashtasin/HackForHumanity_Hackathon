@@ -9,7 +9,7 @@ import { placeById, placeForPoint } from './botReports/places.js';
 import {
   commandMenu, esc, renderBusy, renderError, renderHelp, toPlain,
 } from './botReports/text.js';
-import { consumeTelegramLink, telegramLanguage, unlinkTelegramChat } from './linking.js';
+import { consumeTelegramLink, unlinkTelegramChat } from './linking.js';
 
 // The bot's side of the conversation. /start <code> connects this chat to an alert profile, /stop disconnects it, /help lists the commands,
 // and the weather commands (/update, /heat, /rain, /wind, /thunderstorm, /lightning, /forecast, /route, /alerts, /status) answer from the stored
@@ -47,9 +47,28 @@ function seen(updateId) {
 // One chat may send only so many weather requests in ten minutes (TELEGRAM_COMMAND_LIMIT); /start, /stop and /help are never limited.
 const limiter = createRateLimiter();
 
+// The question the bot just asked a chat ("Which place?" after /thunderstorm), kept in memory for a few minutes so a plain place name or
+// a shared location answers that command. Only the command name is kept, nothing about the person.
+const ASKED_FOR_MS = 5 * 60_000;
+const ASKING = new Set(['ask-place', 'ambiguous', 'not-found']);
+const asked = new Map();
+
+function rememberQuestion(chatId, command, nowMs) {
+  asked.delete(chatId);
+  asked.set(chatId, { command, at: nowMs });
+  if (asked.size > 5000) asked.delete(asked.keys().next().value);
+}
+
+function takeQuestion(chatId, nowMs) {
+  const entry = asked.get(chatId);
+  asked.delete(chatId);
+  return entry && nowMs - entry.at <= ASKED_FOR_MS ? entry.command : null;
+}
+
 export function resetBotForTests() {
   recent.clear();
   limiter.reset();
+  asked.clear();
 }
 
 // A reply with formatting. If Telegram refuses the markup (it should not), the same words go out as plain text instead of nothing.
@@ -86,6 +105,8 @@ async function runWeatherCommand(channels, chatId, request, { now, deps }) {
     const result = await answerCommand({
       ...request, chatId, nowMs: now.getTime(), deps,
     });
+    if (ASKING.has(result.action)) rememberQuestion(chatId, request.command, now.getTime());
+    else asked.delete(chatId);
     for (const message of result.messages) await sendReport(channels, chatId, message);
     return { handled: true, action: result.action };
   } catch (error) {
@@ -168,7 +189,9 @@ export async function handleTelegramUpdate(update, { channels = sharedChannels()
         await reply(subscriber.language === 'bn' ? 'ওয়েব পাতায় অবস্থান অনুসরণ চলছে। Telegram-এ অনুসরণ শুরুর আগে সেখানে থামান।' : 'The web page is following your location. Stop it there before following in Telegram.');
       }
     }
-    return runWeatherCommand(channels, chatId, { command: 'update', placeId: place.id, sharedPlace: live ? 'live' : 'once', languageCode: message.from?.language_code }, { now, deps });
+    // A location sent in answer to "Which place?" answers that command (/thunderstorm, /rain...); otherwise it gets the general report.
+    const command = takeQuestion(chatId, now.getTime()) ?? 'update';
+    return runWeatherCommand(channels, chatId, { command, placeId: place.id, sharedPlace: live ? 'live' : 'once', languageCode: message.from?.language_code }, { now, deps });
   }
   if (update.edited_message) return { handled: true, action: 'ignored' };
 
@@ -220,7 +243,11 @@ export async function handleTelegramUpdate(update, { channels = sharedChannels()
   const name = canonicalCommand(command);
   if (name) return runWeatherCommand(channels, chatId, { command: name, rest, languageCode: message.from?.language_code }, { now, deps });
 
-  await reply(renderHelp(await telegramLanguage(chatId)));
+  // A plain message right after the bot asked "Which place?" is the place.
+  const question = first.startsWith('/') ? null : takeQuestion(chatId, now.getTime());
+  if (question) return runWeatherCommand(channels, chatId, { command: question, rest: [first, ...rest], languageCode: message.from?.language_code }, { now, deps });
+
+  await reply(renderHelp(await deps.telegramLanguage(chatId)));
   return { handled: true, action: 'help' };
 }
 

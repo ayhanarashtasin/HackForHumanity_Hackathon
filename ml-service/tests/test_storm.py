@@ -31,6 +31,12 @@ class TrackerTest(unittest.TestCase):
         self.assertEqual(int(grid[200, 200 + 12]), 4, 'yellow ring is class 4')
         self.assertEqual(int(grid[10, 10]), 0, 'grey is not a storm')
 
+    def test_gibs_frames_have_no_temperatures(self):
+        start = datetime(2026, 9, 22, 9, 0, tzinfo=timezone.utc)
+        snap = tracker.snapshot([(start, frame((200, 200))), (start + timedelta(minutes=10), frame((202, 200)))], 'test')
+        self.assertIsNone(snap['cells'][0]['minTempC'])
+        self.assertEqual(snap['assumptions']['imagery'], 'gibs')
+
     def test_detects_one_cell(self):
         cells = tracker.detect_cells(tracker.intensity(frame((200, 200))))
         self.assertEqual(len(cells), 1)

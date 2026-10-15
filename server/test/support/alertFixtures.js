@@ -76,6 +76,20 @@ export const lightningEvent = (type = 'OBSERVED_LIGHTNING', level = 2, opts = {}
   hazardType: type, level, from: -0.1, until: 0.5, metrics: { count: 3, nearestKm: 8, lastStrikeAtMs: NOW - 5 * 60_000 }, ...opts,
 });
 
+// A storm-approach episode (stormEpisodes.js): a growing satellite cell, image 15 minutes old, expected over the area 40 minutes from now.
+export const stormEvent = (level = 2, opts = {}) => ({
+  ...makeEvent({
+    hazardType: 'STORM_APPROACH',
+    level,
+    from: 0,
+    until: 1.7,
+    metrics: { arrivalAtMs: NOW + 40 * 60_000, minTempC: -78.2 },
+    evidence: { storm: { observedAtMs: NOW - 15 * 60_000, intensity: 6, trend: 'growing', areaKm2: 8062, speedKmh: 24.9, towards: 'S' } },
+    ...opts,
+  }),
+  source: { provider: 'himawari', product: 'storm-tracker', referenceId: '2026-10-11T03:45:00Z' },
+});
+
 export const officialEvent = (kind = 'warning', opts = {}) => ({
   ...makeEvent({ hazardType: 'OFFICIAL_NOTICE', level: kind === 'warning' ? 2 : 1, from: 0, scope: 'marine-zone', upazilas: [], marineZone: 'north_bay', evidence: { kind, greatDanger: false }, ...opts }),
   source: { provider: 'bmd', product: 'fishermen-forecast', referenceId: 'synthetic-123' },

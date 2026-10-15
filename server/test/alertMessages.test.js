@@ -6,7 +6,7 @@ import {
 } from '../src/services/alerts/messages.js';
 import { evaluateSubscriber, scenarioIds } from '../src/services/alerts/scenarios/index.js';
 import {
-  AMTALI, BADDA, DHAKA, HOUR, NOW, SAVAR, heatEvent, lightningEvent, makeEvent, makeSubscriber, officialEvent, rainEvent, windEvent,
+  AMTALI, BADDA, DHAKA, HOUR, NOW, SAVAR, heatEvent, lightningEvent, makeEvent, makeSubscriber, officialEvent, rainEvent, stormEvent, windEvent,
 } from './support/alertFixtures.js';
 
 // Style rules from the plan (section 11): no claim that anything is safe, no "all clear", no flooding claims, no certainty.
@@ -55,6 +55,10 @@ function cases() {
     ['WORK-01', makeSubscriber('rickshaw_labourer', { workload: 'heavy' }), heatEvent(27)],
     ['WORK-03', makeSubscriber('rickshaw_labourer'), lightningEvent()],
     ['WORK-04', makeSubscriber('rickshaw_labourer', { shiftStart: '09:00', shiftEnd: '18:00' }), rainEvent(1)],
+    ['PUBLIC-06', farmer('growing'), stormEvent(2)],
+    ['PUBLIC-06', makeSubscriber('fisherman', { waterBody: 'river' }, { activity: { key: 'on_water', since: NOW - HOUR, expiresAt: NOW + HOUR } }), stormEvent(3)],
+    ['PUBLIC-06', makeSubscriber('vendor'), stormEvent(2, { metrics: { arrivalAtMs: NOW - 5 * 60_000, minTempC: null } })],
+    ['PUBLIC-06', makeSubscriber('student_public'), stormEvent(3)],
   ];
 }
 

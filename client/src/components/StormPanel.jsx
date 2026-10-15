@@ -50,7 +50,7 @@ export function StormPanel({ mode, onMode, live, liveError, demo, demoError, dem
   if (mode === 'live') {
     if (liveError) liveNote = 'Storm tracking could not be loaded.';
     else if (live && !live.enabled) liveNote = 'Storm tracking is off: the ML service is not running.';
-    else if (live && !live.live) liveNote = live.error ? 'The satellite analysis failed; trying again in 10 minutes.' : 'Waiting for the first satellite analysis…';
+    else if (live && !live.live) liveNote = live.error ? 'The satellite analysis failed; trying again in a few minutes.' : 'Waiting for the first satellite analysis…';
   }
 
   return (
@@ -109,7 +109,7 @@ export function StormPanel({ mode, onMode, live, liveError, demo, demoError, dem
       )}
 
       <p className="storm-disclaimer">
-        {tr('Cold cloud tops, shifted about {km} km to the ground below them for the satellite’s viewing angle. Arrows show 60 minutes of straight-line movement. This is not a lightning observation and does not change any alert.', { km: number(Math.round(demo?.imageShiftKm ?? 22)) })}
+        {tr('Cold cloud tops, shifted about {km} km to the ground below them for the satellite’s viewing angle. Arrows show 60 minutes of straight-line movement. This is not a lightning observation; a strong storm heading for a saved area sends a prototype storm warning.', { km: number(Math.round(demo?.imageShiftKm ?? 22)) })}
       </p>
     </section>
   );

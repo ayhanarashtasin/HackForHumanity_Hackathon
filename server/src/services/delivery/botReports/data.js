@@ -5,9 +5,10 @@ import { listInbox } from '../../alerts/inbox.js';
 import { circlesCovering } from '../../alerts/lightningGate.js';
 import { effectiveLightningStatus, loadSnapshots } from '../../alerts/snapshots.js';
 import { buildUpazilaSummaries, loadGeoData } from '../../lightningCampaign.js';
-import { subscriberForChat } from '../linking.js';
+import { subscriberForChat, telegramLanguage } from '../linking.js';
 import { beginTelegramFollow, refreshTelegramFollow, requestTelegramFollow, stopTelegramFollow } from '../telegramLocation.js';
 import { buildRouteWeather } from '../../routeWeather.js';
+import { latestStormSnapshot, stormDataStatus, stormReach } from '../../stormOutlook.js';
 import { representativePcode } from './places.js';
 import { chooseLightning, loadForecast } from './readings.js';
 
@@ -68,6 +69,19 @@ export async function lightningFor(place, { nowMs = Date.now() } = {}) {
   return { pick: chooseLightning(candidates), error: attempts > 0 && failures === attempts };
 }
 
+// What the storm tracker's newest satellite image says about a place: the strong cell that reaches any of its upazilas soonest, counted
+// from now (stormOutlook.js). -> { status: FRESH | STALE | UNAVAILABLE, observedAtMs, hit | null }.
+export async function stormFor(place, { nowMs = Date.now() } = {}) {
+  const snapshot = await latestStormSnapshot();
+  const status = stormDataStatus(snapshot, nowMs);
+  if (status !== 'FRESH') return { status, observedAtMs: snapshot?.observedAtMs ?? null, hit: null };
+  let hit = null;
+  for (const candidate of stormReach(snapshot, place.members ?? [], nowMs).values()) {
+    if (!hit || candidate.arrivalMs < hit.arrivalMs) hit = candidate;
+  }
+  return { status, observedAtMs: snapshot.observedAtMs, hit };
+}
+
 export async function alertsFor(subscriber, nowMs = Date.now()) {
   if (!dbReady()) throw new Error('database not ready');
   return listInbox(subscriber._id, { view: 'active', now: new Date(nowMs) });
@@ -87,11 +101,13 @@ export const defaultDeps = {
   loadForecast,
   routeWeather: buildRouteWeather,
   subscriberForChat,
+  telegramLanguage,
   beginTelegramFollow,
   refreshTelegramFollow,
   requestTelegramFollow,
   stopTelegramFollow,
   lightningFor,
+  stormFor,
   alertsFor,
   engineStatus,
 };

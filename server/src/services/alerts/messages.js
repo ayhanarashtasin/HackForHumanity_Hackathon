@@ -58,6 +58,7 @@ export const PROVIDER_LABELS = {
   bmd: { en: 'BMD forecast', bn: 'বিএমডি (আবহাওয়া অধিদপ্তর) পূর্বাভাস' },
   'open-meteo': { en: 'Open-Meteo forecast', bn: 'Open-Meteo পূর্বাভাস' },
   xweather: { en: 'Xweather', bn: 'Xweather' },
+  himawari: { en: 'Himawari-9 satellite (JMA)', bn: 'হিমাওয়ারি-৯ স্যাটেলাইট (JMA)' },
   admin: { en: 'Administrator', bn: 'প্রশাসক' },
 };
 
@@ -83,6 +84,7 @@ export const HAZARD_LABELS = {
   STRONG_WIND: { en: 'strong wind', bn: 'প্রবল বাতাস' },
   OBSERVED_LIGHTNING: { en: 'lightning', bn: 'বজ্রপাত' },
   LIGHTNING_THREAT: { en: 'lightning', bn: 'বজ্রপাত' },
+  STORM_APPROACH: { en: 'an approaching storm', bn: 'এগিয়ে আসা ঝড়' },
   MARINE_WEATHER: { en: 'rough marine weather', bn: 'উত্তাল সমুদ্র' },
   DRY_SPELL: { en: 'a dry spell', bn: 'দীর্ঘ শুষ্ক আবহাওয়া' },
   OFFICIAL_NOTICE: { en: 'an official notice', bn: 'একটি সরকারি বিজ্ঞপ্তি' },
@@ -149,6 +151,11 @@ export function titleFor(event, areaName, lang) {
       ? (lang === 'bn' ? '{area}-এর কাছে শিগগিরই বজ্রপাতের আশঙ্কা' : 'Lightning expected near {area} soon')
       : (lang === 'bn' ? '{area}-এর কাছে এক ঘণ্টার মধ্যে বজ্রপাতের সম্ভাবনা' : 'Lightning possible near {area} within the hour'), { area: areaName });
   }
+  if (event.hazardType === 'STORM_APPROACH') {
+    return fill(event.level >= 3
+      ? (lang === 'bn' ? '{area}-এ ৩০ মিনিটের মধ্যে ঝড় পৌঁছাতে পারে' : 'Storm may reach {area} within 30 minutes')
+      : (lang === 'bn' ? '{area}-এ এক ঘণ্টার মধ্যে ঝড় পৌঁছাতে পারে' : 'Storm may reach {area} within the hour'), { area: areaName });
+  }
   if (event.hazardType === 'OFFICIAL_NOTICE') {
     return fill(event.evidence?.kind === 'withdrawal'
       ? (lang === 'bn' ? 'বিএমডির সতর্কতা প্রত্যাহার: {area}, তবু সতর্ক থাকুন' : 'BMD warning withdrawn for {area}: stay cautious')
@@ -166,6 +173,41 @@ const INDICATOR_TEXT = {
 };
 
 const ZONE_NAMES = { north_bay: { en: 'the North Bay', bn: 'উত্তর বঙ্গোপসাগর' } };
+
+// Where a storm cell is heading (the tracker's eight compass points).
+export const COMPASS_WORDS = {
+  N: { en: 'north', bn: 'উত্তর' },
+  NE: { en: 'north-east', bn: 'উত্তর-পূর্ব' },
+  E: { en: 'east', bn: 'পূর্ব' },
+  SE: { en: 'south-east', bn: 'দক্ষিণ-পূর্ব' },
+  S: { en: 'south', bn: 'দক্ষিণ' },
+  SW: { en: 'south-west', bn: 'দক্ষিণ-পশ্চিম' },
+  W: { en: 'west', bn: 'পশ্চিম' },
+  NW: { en: 'north-west', bn: 'উত্তর-পশ্চিম' },
+};
+
+// The storm-approach sentence: the satellite image time, the cell's movement and expected arrival, and what the estimate is not.
+function describeStorm(event, { areaName, nowMs, lang }) {
+  const m = event.evidence?.metrics ?? {};
+  const storm = event.evidence?.storm ?? {};
+  const image = storm.observedAtMs ? whenText(storm.observedAtMs, nowMs, lang) : '';
+  const arrival = m.arrivalAtMs ? whenText(m.arrivalAtMs, nowMs, lang) : '';
+  const dir = pick(COMPASS_WORDS[storm.towards], lang);
+  const speed = Number.isFinite(storm.speedKmh) ? Math.round(storm.speedKmh) : null;
+  const already = m.arrivalAtMs && m.arrivalAtMs <= nowMs;
+  const top = Number.isFinite(m.minTempC) ? Math.round(m.minTempC) : null;
+
+  if (lang === 'bn') {
+    const moving = dir && speed !== null ? `প্রায় ${withUnit(speed, 'kph', lang)} বেগে ${dir} দিকে যাচ্ছে এবং ` : '';
+    const reach = already ? `হয়তো এখনই ${areaName}-এ পৌঁছাচ্ছে (আনুমানিক ${arrival})` : `${arrival} নাগাদ ${areaName}-এ পৌঁছাতে পারে`;
+    const cold = top === null ? '' : ` মেঘের চূড়া প্রায় ${withUnit(top, 'c', lang)}, যা উঁচু বজ্রঝড়ের মেঘের লক্ষণ।`;
+    return `${image}-এর স্যাটেলাইট ছবিতে একটি বজ্রঝড়ের মেঘ ${moving}${reach}।${cold} এটি স্যাটেলাইটভিত্তিক অনুমান, প্রায় ৩০ কিমি এদিক-ওদিক হতে পারে; বজ্রপাতের পর্যবেক্ষণ নয়।`;
+  }
+  const moving = dir && speed !== null ? `is moving ${dir} at about ${withUnit(speed, 'kph', lang)} and ` : '';
+  const reach = already ? `may already be reaching ${areaName} (expected ${arrival})` : `may reach ${areaName} around ${arrival}`;
+  const cold = top === null ? '' : ` Its cloud top is about ${withUnit(top, 'c', lang)}, a sign of a tall thunderstorm cloud.`;
+  return `A thunderstorm cloud on the satellite image of ${image} ${moving}${reach}.${cold} This is a satellite estimate that can be about 30 km off, not a lightning observation.`;
+}
 
 // The factual sentence about the hazard (not the advice). `nowMs` anchors "today" and "tomorrow".
 export function describeHazard(event, { areaName, nowMs, lang }) {
@@ -228,6 +270,8 @@ export function describeHazard(event, { areaName, nowMs, lang }) {
         : (lang === 'bn'
           ? `${areaName}-এর কাছে আগামী এক ঘণ্টার মধ্যে বজ্রপাতের সম্ভাবনা আছে (স্বল্পমেয়াদি পূর্বাভাস, নির্দিষ্ট জায়গার নিশ্চিত পূর্বাভাস নয়)।`
           : `A lightning threat area may cover ${areaName} within the next hour (a short-range nowcast, not a prediction for one exact place).`);
+    case 'STORM_APPROACH':
+      return describeStorm(event, { areaName, nowMs, lang });
     case 'OFFICIAL_NOTICE': {
       if (event.evidence?.kind === 'withdrawal') {
         return lang === 'bn'
@@ -384,6 +428,34 @@ export const ADVICE = {
   lightning_play: {
     en: 'If you are outdoors, leave the field and go into a building now. As general guidance, wait at least 30 minutes after the last thunder before going back outside.',
     bn: 'আপনি বাইরে থাকলে এখনই মাঠ ছেড়ে ভবনের ভেতরে যান। সাধারণ নির্দেশনা হিসেবে, শেষ বজ্রধ্বনির পর অন্তত ৩০ মিনিট অপেক্ষা করে তারপর বাইরে যান।',
+  },
+  storm_field: {
+    en: 'If you are working in the field, finish now and get into a substantial building or an enclosed vehicle before the storm arrives. Open fields and isolated trees are not shelter.',
+    bn: 'মাঠে কাজ করলে ঝড় আসার আগেই এখন কাজ শেষ করে পাকা ভবন বা বন্ধ গাড়িতে আশ্রয় নিন। খোলা মাঠ ও একা দাঁড়ানো গাছ আশ্রয় নয়।',
+  },
+  storm_water: {
+    en: 'You said you are on the water. Head for shore now, before the storm arrives, and take cover as soon as you reach land. Do not rely on this message to judge your route.',
+    bn: 'আপনি জানিয়েছেন আপনি পানিতে আছেন। ঝড় আসার আগেই এখন তীরের দিকে ফিরুন এবং ডাঙায় পৌঁছেই আশ্রয় নিন। পথ ঠিক করতে এই বার্তার ওপর নির্ভর করবেন না।',
+  },
+  storm_departure: {
+    en: 'If you are about to go out on the water, wait until the storm has passed. If you are already out, head for shore now.',
+    bn: 'পানিতে যাওয়ার প্রস্তুতি থাকলে ঝড় না কাটা পর্যন্ত অপেক্ষা করুন। ইতিমধ্যে পানিতে থাকলে এখনই তীরের দিকে ফিরুন।',
+  },
+  storm_site: {
+    en: 'If you are working on a roof, scaffolding or at height, come down and go into a proper building before the storm arrives. Strong gusts and lightning can come with it.',
+    bn: 'ছাদে, ভারায় বা উঁচুতে কাজ করলে ঝড় আসার আগেই নেমে পাকা ভবনের ভেতরে যান। ঝড়ের সঙ্গে প্রবল দমকা হাওয়া ও বজ্রপাত আসতে পারে।',
+  },
+  storm_stall: {
+    en: 'Secure your goods only if it takes a few minutes, then go inside a building before the storm arrives. Awnings, stalls and trees are not shelter.',
+    bn: 'কয়েক মিনিটে সম্ভব হলে তবেই মালপত্র গুছিয়ে নিন, তারপর ঝড় আসার আগেই কোনো ভবনের ভেতরে যান। ছাউনি, দোকানের চালা ও গাছ আশ্রয় নয়।',
+  },
+  storm_road: {
+    en: 'Plan to stop before the storm arrives and go inside a shop or building. Do not shelter under trees.',
+    bn: 'ঝড় আসার আগেই থামার পরিকল্পনা করুন এবং দোকান বা ভবনের ভেতরে যান। গাছের নিচে আশ্রয় নেবেন না।',
+  },
+  storm_public: {
+    en: 'If you are outdoors, go into a building before the storm arrives and stop outdoor play or sport. As general guidance, wait at least 30 minutes after the last thunder before going back outside.',
+    bn: 'বাইরে থাকলে ঝড় আসার আগেই কোনো ভবনের ভেতরে যান এবং বাইরের খেলাধুলা বন্ধ করুন। সাধারণ নির্দেশনা হিসেবে, শেষ বজ্রধ্বনির পর অন্তত ৩০ মিনিট অপেক্ষা করে তারপর বাইরে যান।',
   },
   official_river: {
     en: 'An official notice covering river waters was updated. Read the original notice for what applies to your area and follow its instructions.',

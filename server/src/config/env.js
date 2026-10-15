@@ -20,6 +20,15 @@ function severityFromEnv(name, fallback) {
   return value;
 }
 
+// A comma-separated list of delivery channels ("telegram,whatsapp"); an unknown name stops start-up.
+function channelsFromEnv(name, fallback) {
+  const raw = process.env[name] === undefined ? fallback : process.env[name];
+  const list = raw.split(',').map((item) => item.trim().toLowerCase()).filter(Boolean);
+  const unknown = list.filter((item) => !['telegram', 'whatsapp', 'sms'].includes(item));
+  if (unknown.length) throw new Error(`${name} may only list telegram, whatsapp and sms.`);
+  return list;
+}
+
 function timeFromEnv(name, fallback) {
   const value = (process.env[name] || fallback).trim();
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) throw new Error(`${name} must be a time like 06:00 (24 hours, Bangladesh time).`);
@@ -63,6 +72,8 @@ export const env = {
     openMeteoMinutes: numberFromEnv('OPEN_METEO_MINUTES', 180, { min: 30, integer: true }),
     radarMinutes: numberFromEnv('RADAR_MINUTES', 10, { min: 2, integer: true }),
     satelliteMinutes: numberFromEnv('SATELLITE_MINUTES', 30, { min: 5, integer: true }),
+    // How often the storm job looks for a newly published frame (a check for a frame that is not there yet costs about 1 KB).
+    stormMinutes: numberFromEnv('STORM_MINUTES', 2, { min: 1, integer: true }),
     // A source with no successful refresh for this long is reported as STALE.
     staleAfterHours: numberFromEnv('FORECAST_STALE_HOURS', 36, { min: 1 }),
     // Days of per-district run summaries kept in MongoDB for trends and back-testing (0 turns the history off).
@@ -140,6 +151,9 @@ export const env = {
       whatsapp: severityFromEnv('DELIVERY_MIN_SEVERITY_WHATSAPP', 'WARNING'),
       sms: severityFromEnv('DELIVERY_MIN_SEVERITY_SMS', 'WARNING'),
     },
+    // Channels that carry satellite storm-approach warnings (STORM_APPROACH). Telegram only for now: WhatsApp and SMS cost money per
+    // message, and a stormy afternoon can warn the same person more than once (they are still in the inbox).
+    stormChannels: channelsFromEnv('STORM_ALERT_CHANNELS', 'telegram'),
 
     // The morning weather message to every Telegram chat connected to a profile with a saved area (MORNING_DIGEST=off turns it off).
     // Bangladesh time. A server that was down at the set time can still send it for `graceHours` afterwards; later than that it skips the day.

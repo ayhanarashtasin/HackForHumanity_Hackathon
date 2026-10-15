@@ -6,6 +6,7 @@ import { Subscriber } from '../../models/Subscriber.js';
 import { dhakaIso, haversineKm } from '../time.js';
 import { locationByPcode } from '../geo.js';
 import { loadGeoData } from '../lightningCampaign.js';
+import { latestStormSnapshot, stormDataStatus } from '../stormOutlook.js';
 import { allStatuses } from '../weatherStore.js';
 import { createXweatherClient } from '../xweather.js';
 import { createXweatherBudget } from '../xweatherBudget.js';
@@ -33,13 +34,14 @@ export function worstStatus(statuses) {
 export function hazardsFor(subscriber) {
   const data = subscriber.occupationData ?? {};
   const sensitive = subscriber.isHeatSensitive ? ['HEAT_STRESS'] : [];
+  // Every occupation gets the satellite storm-approach warning (PUBLIC-06).
   switch (subscriber.occupation) {
-    case 'farmer': return ['HEAVY_RAIN', 'HEAT_STRESS', 'LIGHTNING', ...(['planting', 'growing'].includes(data.cropStage) ? ['DRY_SPELL'] : [])];
-    case 'fisherman': return ['STRONG_WIND', ...(data.waterBody === 'river' ? [] : ['MARINE_WEATHER']), 'LIGHTNING', 'OFFICIAL_NOTICE', ...sensitive];
-    case 'construction': return ['HEAT_STRESS', 'STRONG_WIND', 'LIGHTNING'];
-    case 'vendor': return ['STRONG_WIND', 'HEAT_STRESS'];
-    case 'student_public': return ['HEAVY_RAIN', ...(data.outdoorPlay ? ['LIGHTNING'] : []), ...sensitive];
-    case 'rickshaw_labourer': return ['HEAT_STRESS', 'HEAVY_RAIN', 'LIGHTNING'];
+    case 'farmer': return ['HEAVY_RAIN', 'HEAT_STRESS', 'LIGHTNING', 'STORM_APPROACH', ...(['planting', 'growing'].includes(data.cropStage) ? ['DRY_SPELL'] : [])];
+    case 'fisherman': return ['STRONG_WIND', ...(data.waterBody === 'river' ? [] : ['MARINE_WEATHER']), 'LIGHTNING', 'STORM_APPROACH', 'OFFICIAL_NOTICE', ...sensitive];
+    case 'construction': return ['HEAT_STRESS', 'STRONG_WIND', 'LIGHTNING', 'STORM_APPROACH'];
+    case 'vendor': return ['STRONG_WIND', 'HEAT_STRESS', 'STORM_APPROACH'];
+    case 'student_public': return ['HEAVY_RAIN', ...(data.outdoorPlay ? ['LIGHTNING'] : []), 'STORM_APPROACH', ...sensitive];
+    case 'rickshaw_labourer': return ['HEAT_STRESS', 'HEAVY_RAIN', 'LIGHTNING', 'STORM_APPROACH'];
     default: return [];
   }
 }
@@ -77,6 +79,18 @@ export async function coverageFor(subscriber, nowMs = Date.now()) {
         checkedAt: checked ? dhakaIso(new Date(checked)) : null,
         provider: 'xweather',
         note: 'lightning-window',
+      });
+      continue;
+    }
+
+    if (hazard === 'STORM_APPROACH') {
+      const snapshot = await latestStormSnapshot();
+      rows.push({
+        hazard,
+        status: stormDataStatus(snapshot, nowMs),
+        checkedAt: snapshot ? dhakaIso(new Date(snapshot.observedAtMs)) : null,
+        provider: 'himawari',
+        note: 'satellite-nowcast',
       });
       continue;
     }
@@ -123,6 +137,13 @@ export async function sourceRows(nowMs = Date.now()) {
     { key: 'bmd', label: 'BMD forecast', status: toDataStatus(map.bmd.status), checkedAt: map.bmd.checkedAt, dataTime: map.bmd.dataTime, cadenceMinutes: env.weather.bmdCheckMinutes },
     { key: 'openMeteo', label: 'Open-Meteo forecast', status: toDataStatus(map.openMeteo.status), checkedAt: map.openMeteo.checkedAt, dataTime: map.openMeteo.dataTime, cadenceMinutes: env.weather.openMeteoMinutes },
   ];
+
+  // The satellite storm tracker: its newest analysed image, FRESH while it is recent enough to warn from.
+  const storm = await latestStormSnapshot();
+  rows.push({
+    key: 'storm-tracking', label: 'Himawari-9 storm tracking', status: stormDataStatus(storm, nowMs),
+    checkedAt: storm ? storm.observedAtMs : null, dataTime: storm ? storm.observedAtMs : null, cadenceMinutes: 10,
+  });
 
   const states = await JobState.find({ key: { $in: JOB_SOURCES.map((item) => item.key) } }).lean();
   const byKey = new Map(states.map((state) => [state.key, state]));

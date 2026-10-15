@@ -137,7 +137,11 @@ To see the line without waiting for real rain: create a profile at <http://local
 How the models were built and tested: [`ml-service/README.md`](ml-service/README.md).
 
 The same service powers the experimental **Storm movement** map layer: thunderstorm cells tracked on Himawari-9 satellite images, with
-their direction, speed and the upazilas they may reach in the next 90 minutes. It is map information only and never changes an alert.
+their direction, speed, coldest cloud-top temperature and the upazilas they may reach in the next 90 minutes. It reads JMA's raw
+Himawari data from NOAA's open-data bucket, which arrives about 15 minutes after each scan (NASA GIBS images, used by the map's
+satellite layer, arrive 45-60 minutes after). A strong storm heading for a subscriber's area within the hour sends a prototype
+storm warning (STORM_APPROACH, rule PUBLIC-06, Telegram only for now, not held by quiet hours), and /thunderstorm in the bot starts
+with what the satellite shows now. Details: [docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md).
 To present it without live storms, open <http://localhost:5173/map#o=storms&storm=replay> (a replay of 22 September 2026).
 
 ## Configuration
@@ -363,6 +367,7 @@ Use an appropriately registered sender ID. English SMS content is ASCII and limi
 | BMD bulletins (`bmd.gov.bd`) | Official marine, fishermen, and fleet documents | Only sufficiently verified, dated North Bay statements drive automatic marine notices. |
 | Open-Meteo | Forecast fallback, rainfall, precipitation probability, and thunderstorm potential | Review attribution and free-tier/non-commercial usage terms. |
 | NASA GIBS / JMA Himawari-9 | Infrared and visible satellite imagery | Browser-loaded tiles; delayed availability. |
+| NOAA Open Data / JMA Himawari-9 | Raw band 13 data for storm tracking | ML service downloads two of ten full-disk segments (about 5.5 MB) per 10-minute frame; attribution requested, no endorsement. |
 | Xweather | Hourly forecasts, maritime conditions, WBGT, and lightning products | Optional server-side credentials; quota-controlled background requests. |
 | OCHA/HDX COD-AB | Administrative boundaries | 495 upazila polygons, 12 city corporations, 64 districts, and 8 divisions in generated data; CC BY-IGO attribution. |
 | OpenFreeMap / OpenStreetMap | Basemap | Preserve map attribution and applicable usage terms. |
@@ -563,6 +568,7 @@ No project `LICENSE` file is currently included. Do not assume an open-source li
 
 - Forecasts and radar: © Bangladesh Meteorological Department.
 - Himawari-9 imagery: © Japan Meteorological Agency, via NASA GIBS.
+- Himawari-9 data for storm tracking: JMA Himawari-9, accessed from <https://registry.opendata.aws/noaa-himawari> (NOAA Open Data Dissemination). NOAA and JMA do not endorse this project.
 - Supplementary forecasts: Open-Meteo, with CC BY 4.0 attribution and applicable service terms.
 - Administrative boundaries: OCHA/HDX COD-AB, CC BY-IGO.
 - Basemap: OpenFreeMap, © OpenMapTiles, and © OpenStreetMap contributors.

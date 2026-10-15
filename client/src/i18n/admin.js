@@ -29,6 +29,8 @@ export const ADMIN = {
   'Stops new strong-wind events.': 'প্রবল বাতাসের নতুন ঘটনা তৈরি বন্ধ হবে।',
   'Stops lightning episodes from observed strikes.': 'পর্যবেক্ষিত বজ্রপাত থেকে নতুন ঘটনাপর্ব তৈরি বন্ধ হবে।',
   'Stops lightning episodes from threat polygons.': 'বজ্রপাতের আশঙ্কার এলাকা থেকে নতুন ঘটনাপর্ব তৈরি বন্ধ হবে।',
+  'Stops new storm-approach warnings from the satellite storm tracker.': 'স্যাটেলাইটে ঝড় শনাক্তকরণ থেকে নতুন "এগিয়ে আসা ঝড়" সতর্কবার্তা তৈরি বন্ধ হবে।',
+  'Storm approaching (satellite)': 'এগিয়ে আসা ঝড় (স্যাটেলাইট)', 'Himawari-9 storm tracking': 'হিমাওয়ারি-৯ দিয়ে ঝড় শনাক্তকরণ',
   'Stops marine-weather events for fishermen.': 'মৎস্যজীবীদের জন্য সমুদ্রের প্রতিকূল আবহাওয়ার ঘটনা তৈরি বন্ধ হবে।',
   'Stops dry-spell prompts for farmers.': 'কৃষকদের জন্য টানা শুষ্ক আবহাওয়ার বার্তা তৈরি বন্ধ হবে।',
   'Stops official-notice events.': 'সরকারি বিজ্ঞপ্তি থেকে নতুন ঘটনা তৈরি বন্ধ হবে।',

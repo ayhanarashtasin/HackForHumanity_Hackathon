@@ -3,6 +3,7 @@ import { farmerScenarios } from './farmer.js';
 import { fishermanScenarios } from './fisherman.js';
 import { activityOf, matchAreas } from './helpers.js';
 import { rickshawScenarios } from './rickshaw.js';
+import { stormScenarios } from './storm.js';
 import { studentScenarios } from './student.js';
 import { vendorScenarios } from './vendor.js';
 
@@ -15,6 +16,7 @@ export const scenarios = [
   ...vendorScenarios,
   ...studentScenarios,
   ...rickshawScenarios,
+  ...stormScenarios,
 ];
 
 const byHazard = new Map();
@@ -34,8 +36,9 @@ export function scenariosFor(hazardType) {
 // Areas of the subscriber that this scenario cares about and the event covers (most specific role first).
 // Someone from another occupation who triggers a scenario through what they are doing now (CTX-01) has no site, market or field,
 // so they are matched through their work and home areas (`crossRoles`).
-// VEND-03 follows a vendor's shared location too, because the market they are at today may not be a saved one.
-const PORTABLE = new Set(['PUBLIC-01', 'PUBLIC-02', 'PUBLIC-03', 'WORK-01', 'WORK-03', 'WORK-04', 'VEND-03']);
+// VEND-03 follows a vendor's shared location too, because the market they are at today may not be a saved one. PUBLIC-06 (a storm
+// heading for the place) is about wherever the person is now.
+const PORTABLE = new Set(['PUBLIC-01', 'PUBLIC-02', 'PUBLIC-03', 'PUBLIC-06', 'WORK-01', 'WORK-03', 'WORK-04', 'VEND-03']);
 
 export function matchFor(scenario, subscriber, event, nowMs = Date.now()) {
   if (scenario.match) return scenario.match(subscriber, event);

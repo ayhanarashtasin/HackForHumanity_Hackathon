@@ -108,12 +108,17 @@ _demo_lock = threading.Lock()
 
 @app.get('/storms/snapshot')
 def storm_snapshot(time: str = Query(pattern=r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$')):
-    """Storm cells, motion and 30/60/90-minute projection for one Himawari frame time (with the two frames before it)."""
+    """Storm cells, motion and 30/60/90-minute projection for one Himawari frame time (with the two frames before it).
+    404 while the source (STORM_SOURCE) has not published that frame yet: the caller asks again later, and nothing is cached
+    under that time."""
     if time not in _storm_cache:
         try:
-            frames = imagery.frames_before(time)
-        except Exception as error:  # GIBS unreachable: the caller keeps its previous snapshot
+            published = imagery.load_frame(time) is not None
+            frames = imagery.frames_before(time) if published else []
+        except Exception as error:  # source unreachable: the caller keeps its previous snapshot
             raise HTTPException(502, f'satellite frames unavailable: {error}') from error
+        if not published:
+            raise HTTPException(404, 'frame not published yet')
         _storm_cache[time] = tracker.snapshot(frames, 'live')
         for old in sorted(_storm_cache)[:-12]:
             del _storm_cache[old]
@@ -138,7 +143,8 @@ def storm_demo():
                 'bounds': {'north': imagery.NORTH + dlat, 'south': imagery.SOUTH + dlat, 'west': imagery.WEST + dlon, 'east': imagery.EAST + dlon},
                 'imageShiftKm': round(shift_km, 1),
                 'snapshots': [
-                    {**tracker.snapshot(imagery.frames_before(time, fetch=False), 'demo'), 'image': imagery.file_name(imagery.parse_time(time))}
+                    {**tracker.snapshot(imagery.frames_before(time, fetch=False, source='gibs'), 'demo'),
+                     'image': imagery.file_name(imagery.parse_time(time))}
                     for time in times[2:]
                 ],
             }

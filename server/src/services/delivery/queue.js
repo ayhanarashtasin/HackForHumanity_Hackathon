@@ -7,7 +7,7 @@ import { reevaluateSubscriber } from '../alerts/engine.js';
 import { ChannelError } from './errors.js';
 import { renderMessage } from './format.js';
 import {
-  dayStart, inQuietHours, isCritical, meetsMinSeverity, quietEndsAt, stageKey,
+  dayStart, hazardAllowsChannel, inQuietHours, isCritical, meetsMinSeverity, quietEndsAt, skipsQuietHours, stageKey,
 } from './policy.js';
 import { decrypt } from './secretBox.js';
 
@@ -75,7 +75,7 @@ export async function enqueueDeliveries({ channels, nowMs = Date.now() }) {
       // Stale or unavailable data never starts a message: the same rule the engine applies to new notifications.
       dataStatus: { $nin: ['STALE', 'UNAVAILABLE'] },
       updatedAt: { $gte: new Date(since) },
-    }, { subscriberId: 1, severity: 1, renotifications: 1, publishedAt: 1, lifecycle: 1 }).lean();
+    }, { subscriberId: 1, severity: 1, hazardType: 1, renotifications: 1, publishedAt: 1, lifecycle: 1 }).lean();
 
     const ops = [];
     for (const notification of notifications) {
@@ -83,7 +83,7 @@ export async function enqueueDeliveries({ channels, nowMs = Date.now() }) {
       const linked = linkedChannels(byId.get(String(notification.subscriberId)) ?? {});
 
       for (const channel of active) {
-        if (!linked[channel] || !meetsMinSeverity(channel, notification.severity)) continue;
+        if (!linked[channel] || !meetsMinSeverity(channel, notification.severity) || !hazardAllowsChannel(notification.hazardType, channel)) continue;
         ops.push({
           updateOne: {
             filter: { notificationId: notification._id, channel, stageKey: stageKey(notification) },
@@ -178,6 +178,7 @@ export async function dispatchDue({
     // Everything below is re-checked now, not when the row was queued: minutes may have passed.
     if (!notification || notification.status !== 'active' || +notification.validUntil <= nowMs) return skip('no_longer_active');
     if (stageKey(notification) !== row.stageKey) return skip('superseded');
+    if (!hazardAllowsChannel(notification.hazardType, row.channel)) return skip('channel_not_for_hazard');
     if (!subscriber || subscriber.expiresAt <= now) return skip('subscriber_inactive');
     if (subscriber.status !== 'active') return skip('subscriber_paused');
 
@@ -185,7 +186,7 @@ export async function dispatchDue({
     if (!target) return skip('channel_unlinked');
 
     const quiet = subscriber.preferences?.quietHours;
-    if (!isCritical(notification.severity) && inQuietHours(quiet, nowMs)) {
+    if (!skipsQuietHours(notification) && inQuietHours(quiet, nowMs)) {
       const resumeAt = quietEndsAt(quiet, nowMs);
       if (resumeAt >= +notification.validUntil) return skip('expired_in_quiet_hours');
       await finish({ status: 'pending', nextAttemptAt: new Date(resumeAt) });

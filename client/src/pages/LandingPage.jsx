@@ -307,7 +307,7 @@ export function LandingPage() {
         </div>
         <div className="container footer-fine">
           <p>
-            {tr('Forecast and radar © Bangladesh Meteorological Department. Himawari-9 imagery © JMA via NASA GIBS. Forecast supplement by Open-Meteo (CC BY 4.0). Boundaries: OCHA/HDX COD-AB (CC BY-IGO). Basemap labels: OpenFreeMap, © OpenMapTiles, data © OpenStreetMap contributors.')}
+            {tr('Forecast and radar © Bangladesh Meteorological Department. Himawari-9 imagery © JMA via NASA GIBS; storm tracking uses JMA Himawari-9 data via NOAA Open Data Dissemination. Forecast supplement by Open-Meteo (CC BY 4.0). Boundaries: OCHA/HDX COD-AB (CC BY-IGO). Basemap labels: OpenFreeMap, © OpenMapTiles, data © OpenStreetMap contributors.')}
           </p>
           <p>{tr('AkashSathi is not an official warning service. For official warnings, follow the Bangladesh Meteorological Department and local authorities.')}</p>
         </div>

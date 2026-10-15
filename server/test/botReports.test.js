@@ -28,6 +28,7 @@ function depsFor(options = {}, extra = {}) {
   return {
     loadForecast: ({ now }) => loadForecast({ ...inputs, now }),
     subscriberForChat: async () => null,
+    telegramLanguage: async () => null,
     lightningFor: async () => ({ pick: null, error: false }),
     alertsFor: async () => ({ items: [] }),
     engineStatus: async () => ({ enabled: true, lastCompletedMs: NOW - 60_000, lastStatus: 'ok' }),
@@ -105,6 +106,17 @@ test('places: an ambiguous name lists its candidates (at most five) and a distri
   assert.equal(narrowed.matches.length, 1);
   assert.equal(narrowed.matches[0].districtCode, DHAKA);
   assert.ok(findPlaces('sadar').matches.length <= 5, 'a broad word never floods the reply');
+});
+
+test('places: the district may follow without a comma, and the bot\'s own "(thana)" suggestion reads back', () => {
+  const MOHAMMADPUR_DHAKA = '302650';
+  assert.equal(findPlaces('Mohammadpur').matches.length, 2, 'Dhaka thana and Magura upazila');
+  assert.deepEqual(findPlaces('Mohammadpur Dhaka').matches.map((place) => place.id), [MOHAMMADPUR_DHAKA]);
+  assert.equal(findPlaces('Mohammadpur Magura').matches[0].districtCode, '4055');
+  assert.deepEqual(findPlaces('Mohammadpur, Dhaka (thana)').matches.map((place) => place.id), [MOHAMMADPUR_DHAKA]);
+  assert.deepEqual(findPlaces('মোহাম্মদপুর, ঢাকা (থানা)').matches.map((place) => place.id), [MOHAMMADPUR_DHAKA]);
+  assert.equal(findPlaces('Badda Dhaka').matches[0].id, BADDA);
+  assert.equal(findPlaces('Atlantis Dhaka').matches.length, 0, 'a district word does not make up a place');
 });
 
 test('places: nothing is made up for a name that does not exist or is too short', () => {
@@ -487,6 +499,41 @@ test('answers: the thunderstorm outlook gives the peak, flags a modelled thunder
   assert.match(bn, /শিলাবৃষ্টিসহ।/, 'a Bangla full stop');
 });
 
+// What data.js stormFor returns: the satellite image 15 minutes old, a cell arriving `minutes` from now (null = none heading here).
+function stormNow({ minutes = 25, over = false, status = 'FRESH', cell = {} } = {}) {
+  const hit = minutes === null ? null : {
+    over,
+    minutesFromNow: minutes,
+    arrivalMs: NOW + minutes * 60_000,
+    cell: { intensity: 6, minTempC: -78.2, trend: 'growing', motion: { speedKmh: 24.9, towards: 'S' }, ...cell },
+  };
+  return async () => ({ status, observedAtMs: NOW - 15 * 60_000, hit: status === 'FRESH' ? hit : null });
+}
+
+test('answers: /thunderstorm leads with what the satellite shows now, counted from now, and is never an all-clear', async () => {
+  const coming = plain(await ask('thunderstorm', ['Badda'], {}, { stormFor: stormNow() }));
+  assert.match(coming, /Right now \(satellite\)\n⛈ A storm cloud may reach this area around 10:25 \(in about 25 minutes\)\./);
+  assert.match(coming, /Extreme · cloud top -78 °C · moving south at 25 km\/h · growing/);
+  assert.match(coming, /Satellite image 09:45, 15 min old\./);
+  assert.match(coming, /not a lightning observation/);
+  assert.ok(coming.indexOf('Right now') < coming.indexOf('Peak potential'), 'the satellite comes before the forecast');
+  assert.deepEqual(lintText(coming), []);
+
+  assert.match(plain(await ask('thunderstorm', ['Badda'], {}, { stormFor: stormNow({ minutes: -3 }) })), /may be reaching this area now \(expected 09:57\)/);
+  assert.match(plain(await ask('thunderstorm', ['Badda'], {}, { stormFor: stormNow({ minutes: -15, over: true }) })), /was over this area on the image/);
+
+  const none = plain(await ask('thunderstorm', ['Badda'], {}, { stormFor: stormNow({ minutes: null }) }));
+  assert.match(none, /No tracked storm cloud is heading here on the latest image\. Storms can also form overhead\./);
+  assert.deepEqual(lintText(none), []);
+  assert.match(plain(await ask('thunderstorm', ['Badda'], {}, { stormFor: stormNow({ status: 'STALE' }) })), /latest satellite image \(today 09:45\) is too old to use/);
+  assert.match(plain(await ask('thunderstorm', ['Badda'], {}, { stormFor: stormNow({ status: 'UNAVAILABLE' }) })), /Satellite storm tracking is not available right now/);
+  assert.match(plain(await ask('thunderstorm', ['Badda'], {}, { stormFor: async () => { throw new Error('db down'); } })), /not available right now/);
+
+  const bn = plain(await ask('thunderstorm', ['Badda', 'bn'], {}, { stormFor: stormNow() }));
+  assert.match(bn, /এই মুহূর্তে \(স্যাটেলাইট\)\n⛈ একটি ঝড়ের মেঘ ১০:২৫ নাগাদ \(প্রায় ২৫ মিনিটে\)/);
+  assert.doesNotMatch(plain(await ask('rain', ['Badda'], {}, { stormFor: stormNow() })), /Right now \(satellite\)/, 'only /thunderstorm');
+});
+
 test('answers: lightning reports the recorded count, check time and search window', async () => {
   const lightning = (pick, error = false) => ({ lightningFor: async () => ({ pick, error }) });
   const reported = plain(await ask('lightning', ['Badda'], {}, lightning({ kind: 'reported', sampledMs: NOW - 600_000, count: 4, radiusKm: 100 })));
@@ -629,6 +676,44 @@ test('bot: /update offers a one-time location share; a shared location reports n
   assert.equal(channels.telegram.sent[2].content.removeKeyboard, true);
   assert.equal((await handleTelegramUpdate(location, { channels, now, deps })).duplicate, true);
   assert.equal((await handleTelegramUpdate({ ...location, update_id: 3, message: { ...location.message, chat: { id: 4242, type: 'group' } } }, { channels, now, deps })).handled, false);
+});
+
+test('bot: after "Which place?" a typed name or a shared location answers the same command, for five minutes', async () => {
+  const channels = fakeChannels();
+  const deps = depsFor({ pcodes: [BADDA, SAVAR, '302650'] }, { stormFor: stormNow() });
+  const at = (minutes) => new Date(NOW + minutes * 60_000);
+
+  assert.equal((await handleTelegramUpdate(message('/thunderstorm', { updateId: 1 }), { channels, now: at(0), deps })).action, 'ask-place');
+  assert.equal(channels.telegram.sent.at(-1).content.requestLocation, true, 'every command offers the location button');
+  assert.equal((await handleTelegramUpdate(message('Mohammadpur Dhaka', { updateId: 2 }), { channels, now: at(1), deps })).action, 'thunderstorm');
+  assert.match(channels.telegram.sent.at(-1).content.text, /Mohammadpur[\s\S]*Right now \(satellite\)/);
+  assert.equal((await handleTelegramUpdate(message('Badda', { updateId: 3 }), { channels, now: at(2), deps })).action, 'help', 'the question was answered');
+
+  await handleTelegramUpdate(message('/thunderstorm', { updateId: 4 }), { channels, now: at(10), deps });
+  const location = { update_id: 5, message: { chat: { id: 4242, type: 'private' }, from: {}, date: at(11).getTime() / 1000, message_id: 15, location: { latitude: 23.85, longitude: 90.26 } } };
+  assert.equal((await handleTelegramUpdate(location, { channels, now: at(11), deps })).action, 'thunderstorm', 'a shared location answers it too');
+  assert.match(channels.telegram.sent.find((sent) => /Right now/.test(sent.content.text ?? '') && /Savar/.test(sent.content.text)).content.text, /nearest available area/);
+
+  await handleTelegramUpdate(message('/rain', { updateId: 6 }), { channels, now: at(20), deps });
+  assert.equal((await handleTelegramUpdate(message('Badda', { updateId: 7 }), { channels, now: at(26), deps })).action, 'help', 'too late: the question has lapsed');
+
+  await handleTelegramUpdate(message('/thunderstorm Atlantis', { updateId: 8 }), { channels, now: at(30), deps });
+  assert.equal((await handleTelegramUpdate(message('Badda', { updateId: 9 }), { channels, now: at(31), deps })).action, 'thunderstorm', 'a name that matched nothing can be sent again');
+});
+
+test('bot: several matching places come with a button each, which answers the same command', async () => {
+  const channels = fakeChannels();
+  const deps = depsFor({ pcodes: [BADDA, '302650'] });
+  const now = new Date(NOW);
+  assert.equal((await handleTelegramUpdate(message('/thunderstorm Mohammadpur', { updateId: 1 }), { channels, now, deps })).action, 'ambiguous');
+  const { buttons, text } = channels.telegram.sent[0].content;
+  assert.deepEqual(buttons.map((row) => row[0].data), ['r:thunderstorm:302650:en', 'r:thunderstorm:405566:en']);
+  assert.match(buttons[0][0].text, /^Mohammadpur, Dhaka \(City thana\)$/);
+  assert.deepEqual(findPlaces(buttons[0][0].text).matches.map((place) => place.id), ['302650'], 'the label reads back as the same place');
+  assert.match(text, /Tap one below/);
+  assert.equal((await handleTelegramUpdate(press(buttons[0][0].data, { updateId: 2 }), { channels, now, deps })).action, 'thunderstorm');
+  assert.match(channels.telegram.sent.at(-1).content.text, /Mohammadpur/);
+  for (const row of buttons) assert.ok(Buffer.byteLength(row[0].data) <= 64);
 });
 
 test('bot: /follow requires an explicitly shared live location; only its edited updates refresh alerts', async () => {

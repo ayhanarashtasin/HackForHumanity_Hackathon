@@ -1,6 +1,9 @@
 import { env } from '../../config/env.js';
 import { locationByPcode } from '../geo.js';
 import { loadGeoData } from '../lightningCampaign.js';
+import {
+  latestStormSnapshot, stormDataStatus, stormNear, stormReach,
+} from '../stormOutlook.js';
 import { dhakaParts, haversineKm } from '../time.js';
 import { fetchStrikes, fetchThreats, probeCircle } from '../xweatherLightning.js';
 import { thunderInForecast } from '../xweatherForecast.js';
@@ -53,15 +56,16 @@ function thunderPotential(sources, pcodes, nowMs) {
   });
 }
 
-// Pure decision for one circle: should it be probed now, and under which gate?
+// Pure decision for one circle: should it be probed now, and under which gate? The gate opens for thunder in the forecast, for a storm
+// cell on the satellite image over or heading for one of its areas (stormOutlook.js), and for an hour after lightning was seen.
 export function decideProbe({
-  nowMs, lastProbeAttemptMs, lastPositiveMs, forecastSignal, baselineEnabled, localHour,
+  nowMs, lastProbeAttemptMs, lastPositiveMs, forecastSignal, stormSignal = false, baselineEnabled, localHour,
 }) {
   const continuing = lastPositiveMs !== null && nowMs - lastPositiveMs <= CONTINUE_FOR;
-  const open = forecastSignal || continuing;
+  const open = forecastSignal || stormSignal || continuing;
   const since = lastProbeAttemptMs === null ? Infinity : nowMs - lastProbeAttemptMs;
 
-  if (open) return { gate: 'open', due: since >= PROBE_EVERY, reasons: [forecastSignal ? 'thunder-potential' : null, continuing ? 'recent-lightning' : null].filter(Boolean) };
+  if (open) return { gate: 'open', due: since >= PROBE_EVERY, reasons: [forecastSignal ? 'thunder-potential' : null, stormSignal ? 'satellite-storm' : null, continuing ? 'recent-lightning' : null].filter(Boolean) };
   const baselineHours = localHour >= BASELINE_FROM_HOUR && localHour < BASELINE_TO_HOUR;
   if (baselineEnabled && baselineHours) return { gate: 'baseline', due: since >= BASELINE_EVERY, reasons: ['daytime-baseline'] };
   return { gate: 'closed', due: false, reasons: [] };
@@ -84,6 +88,8 @@ export async function refreshLightning({
   const sources = loadSources(nowMs);
   const allPcodes = [...new Set([...circles.values()].flatMap((entry) => entry.pcodes))];
   const forecasts = await loadForecastInputs(allPcodes, nowMs);
+  const storm = await latestStormSnapshot();
+  const stormHits = stormDataStatus(storm, nowMs) === 'FRESH' ? stormReach(storm, allPcodes, nowMs) : new Map();
   const localHour = dhakaParts(new Date(nowMs)).hh;
 
   // Circles whose gate is already open go first, so a tight budget is spent where lightning is most likely.
@@ -98,6 +104,7 @@ export async function refreshLightning({
       lastProbeAttemptMs: probe ? +new Date(probe.attemptedAt ?? probe.fetchedAt) : null,
       lastPositiveMs: positive,
       forecastSignal,
+      stormSignal: entry.pcodes.some((pcode) => stormNear(stormHits.get(pcode))),
       baselineEnabled: env.alerts.lightningBaseline,
       localHour,
     });

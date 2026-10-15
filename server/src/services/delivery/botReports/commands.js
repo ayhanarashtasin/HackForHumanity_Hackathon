@@ -4,7 +4,7 @@ import { defaultDeps } from './data.js';
 import { findPlaces, placeById, placesForAreas } from './places.js';
 import { forecastFor } from './readings.js';
 import {
-  COMMAND_NAMES, buttonsFor, renderAlerts, renderAmbiguous, renderAskPlace, renderForecast, renderHeat, renderLightning, renderNotFound, renderRain,
+  COMMAND_NAMES, buttonsFor, candidateButtons, renderAlerts, renderAmbiguous, renderAskPlace, renderForecast, renderHeat, renderLightning, renderNotFound, renderRain,
   renderRoute, renderRoutePlaceError, renderRoutePrompt, renderStatus, renderThunderstorm, renderUpdate, renderWind,
 } from './text.js';
 
@@ -132,14 +132,15 @@ export async function answerCommand({
   } else if (parsed.query) {
     const { matches, total } = findPlaces(parsed.query);
     if (!matches.length) return { messages: [{ text: renderNotFound(lang, parsed.query) }], action: 'not-found', lang };
-    if (matches.length > 1) return { messages: [{ text: renderAmbiguous(lang, matches, total, command) }], action: 'ambiguous', lang };
+    if (matches.length > 1) return { messages: [{ text: renderAmbiguous(lang, matches, total, command), buttons: candidateButtons(matches, command, lang) }], action: 'ambiguous', lang };
     places = matches;
   } else {
     const current = subscriber?.currentArea?.expiresAt && +new Date(subscriber.currentArea.expiresAt) > nowMs
       ? placeById(subscriber.currentArea.upazilaPcode) : null;
     places = current ? [current] : (subscriber ? placesForAreas(subscriber.areas, 2) : []);
   }
-  if (!places.length) return { messages: [{ text: renderAskPlace(lang), ...(command === 'update' ? { requestLocation: true } : {}) }], action: 'ask-place', lang };
+  // The bot remembers this question for a few minutes (telegramBot.js), so a typed place name or a shared location answers it.
+  if (!places.length) return { messages: [{ text: renderAskPlace(lang), requestLocation: true }], action: 'ask-place', lang };
 
   const ctx = deps.loadForecast({ now: nowMs });
   const render = pickRenderer(command);
@@ -153,9 +154,12 @@ export async function answerCommand({
     const forecast = forecastFor(place, ctx);
     let lightning;
     if (command === 'update' || command === 'lightning') lightning = await deps.lightningFor(place, { nowMs }).catch(() => ({ pick: null, error: true }));
+    // The satellite storm tracker's "right now" for /thunderstorm.
+    let storm;
+    if (command === 'thunderstorm' && deps.stormFor) storm = await deps.stormFor(place, { nowMs }).catch(() => ({ status: 'UNAVAILABLE', hit: null }));
     const text = command === 'lightning'
       ? renderLightning(forecast, { lang, nowMs, lightning, place })
-      : render(forecast, { lang, nowMs, lightning, alertCount });
+      : render(forecast, { lang, nowMs, lightning, alertCount, storm });
     messages.push({ text });
   }
   if (command === 'update') messages[0].buttons = buttonsFor(places[0], lang);
@@ -167,7 +171,7 @@ export async function answerCommand({
 \n${messages[0].text}`;
     if (!current) messages.push({ text: lang === 'bn' ? 'বর্তমান আবহাওয়ার জন্য অবস্থান পাঠান। এতে স্বয়ংক্রিয় অবস্থান অনুসরণ চালু হবে না।' : 'Share your location for current-area weather. This does not turn on live tracking.', requestLocation: true });
   }
-  if (sharedPlace && command === 'update') {
+  if (sharedPlace) {
     messages[0].text = `${lang === 'bn' ? '📍 আপনি এখন যে অবস্থান পাঠিয়েছেন তার নিকটতম পূর্বাভাস এলাকার তথ্য।' : '📍 Forecast for the nearest available area to the location you just shared.'}\n${messages[0].text}`;
     messages.push({ text: sharedPlace === 'live'
       ? (lang === 'bn' ? 'লাইভ অবস্থান অনুসরণ চালু আছে। থামাতে /unfollow পাঠান বা Telegram-এ শেয়ারিং বন্ধ করুন।' : 'Live location following is on. Send /unfollow or stop sharing in Telegram to end it.')

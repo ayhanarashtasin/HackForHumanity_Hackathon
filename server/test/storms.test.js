@@ -21,6 +21,21 @@ function fakeFetch(body, { ok = true } = {}) {
   return { fetchImpl, calls };
 }
 
+// A fake ML service: a frame in `published` gets a snapshot of that frame, any other frame a 404 ("not published yet").
+function fakeMl(published) {
+  const asked = [];
+  const fetchImpl = async (url) => {
+    const time = new URL(url).searchParams.get('time');
+    asked.push(time);
+    return published.includes(time)
+      ? { ok: true, status: 200, json: async () => ({ ...SNAPSHOT, observedAt: time, frames: [time] }) }
+      : { ok: false, status: 404, json: async () => ({ detail: 'frame not published yet' }) };
+  };
+  return { fetchImpl, asked };
+}
+
+const later = (minutes) => new Date(Date.parse(FRAME) + minutes * 60_000).toISOString().replace('.000Z', 'Z');
+
 before(async () => {
   server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
@@ -42,13 +57,58 @@ test('without the ML service the storm job does nothing', async () => {
   assert.equal(getStorms().enabled, false);
 });
 
-test('the newest frame is analysed once and kept', async () => {
+test('each frame is analysed once, and the next one is picked up without waiting for the satellite list', async () => {
   env.alerts.mlServiceUrl = ML_URL;
-  const { fetchImpl, calls } = fakeFetch(SNAPSHOT);
-  await refreshStorms({ fetchImpl, frameTime: FRAME });
-  await refreshStorms({ fetchImpl, frameTime: FRAME });
-  assert.deepEqual(calls, [`${ML_URL}/storms/snapshot?time=${encodeURIComponent(FRAME)}`], 'the same frame is not analysed twice');
+  const published = [FRAME];
+  const { fetchImpl, asked } = fakeMl(published);
+  const now = Date.parse(FRAME) + 60 * 60_000;
+  await refreshStorms({ fetchImpl, frameTime: FRAME, now });
+  await refreshStorms({ fetchImpl, frameTime: FRAME, now });
+  assert.equal(asked.filter((time) => time === FRAME).length, 1, 'the same frame is not analysed twice');
+  assert.equal(getStorms().live.observedAt, FRAME);
+
+  // The list still names FRAME (it is refreshed only every 30 minutes), but the next frame is now published.
+  published.push(later(10));
+  await refreshStorms({ fetchImpl, frameTime: FRAME, now });
+  assert.equal(getStorms().live.observedAt, later(10));
   assert.equal(getStorms().live.cells[0].id, 'c1');
+  assert.equal(getStorms().error, null);
+});
+
+test('frames that cannot exist yet are not asked for', async () => {
+  env.alerts.mlServiceUrl = ML_URL;
+  const { fetchImpl, asked } = fakeMl([FRAME]);
+  await refreshStorms({ fetchImpl, frameTime: FRAME, now: Date.parse(FRAME) + 15 * 60_000 });
+  assert.deepEqual(asked, [FRAME, later(10)]);
+});
+
+test('without a satellite list the job starts 30 minutes ago', async () => {
+  env.alerts.mlServiceUrl = ML_URL;
+  const { fetchImpl, asked } = fakeMl([]);
+  await refreshStorms({ fetchImpl, frameTime: undefined, now: Date.parse(FRAME) + 30 * 60_000 + 5_000 });
+  assert.deepEqual(asked, [FRAME, later(10)]);
+});
+
+test('a frame the satellite skipped does not stop the job, and it catches up in one run', async () => {
+  env.alerts.mlServiceUrl = ML_URL;
+  const { fetchImpl } = fakeMl([FRAME, later(20), later(30), later(40)]);
+  await refreshStorms({ fetchImpl, frameTime: FRAME, now: Date.parse(FRAME) + 3 * 3_600_000 });
+  assert.equal(getStorms().live.observedAt, later(40));
+});
+
+test('the job jumps to the listed frame when it has fallen far behind', async () => {
+  env.alerts.mlServiceUrl = ML_URL;
+  await refreshStorms({ fetchImpl: fakeMl([FRAME]).fetchImpl, frameTime: FRAME, now: Date.parse(FRAME) + 30 * 60_000 });
+  const { fetchImpl, asked } = fakeMl([later(180)]);
+  await refreshStorms({ fetchImpl, frameTime: later(180), now: Date.parse(FRAME) + 200 * 60_000 });
+  assert.equal(asked[0], later(180), 'the hours in between are not walked through');
+  assert.equal(getStorms().live.observedAt, later(180));
+});
+
+test('an older ML service that answers a missing frame with the one before it is not taken for the new frame', async () => {
+  env.alerts.mlServiceUrl = ML_URL;
+  await refreshStorms({ fetchImpl: fakeFetch(SNAPSHOT).fetchImpl, frameTime: FRAME, now: Date.parse(FRAME) + 60 * 60_000 });
+  assert.equal(getStorms().live.observedAt, FRAME);
   assert.equal(getStorms().error, null);
 });
 
@@ -59,6 +119,10 @@ test('a failed analysis keeps the previous snapshot and records why', async () =
   assert.equal(getStorms().live.observedAt, FRAME);
   assert.match(getStorms().error, /502/);
   await assert.rejects(refreshStorms({ fetchImpl: fakeFetch({ cells: 'nope' }).fetchImpl, frameTime: '2026-09-22T09:20:00Z' }), /unexpected/);
+  // The job runs every few minutes: the same error again is recorded but not thrown (and logged) again.
+  await refreshStorms({ fetchImpl: fakeFetch({ cells: 'nope' }).fetchImpl, frameTime: '2026-09-22T09:20:00Z' });
+  assert.match(getStorms().error, /unexpected/);
+  assert.equal(getStorms().live.observedAt, FRAME);
 });
 
 test('the replay points its images at this API and drops unexpected names', async () => {

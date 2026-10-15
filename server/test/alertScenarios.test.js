@@ -337,7 +337,7 @@ test('a farmer is matched through the field area, not just the home area', () =>
 test('the catalogue rule IDs that are implemented as scenarios', () => {
   assert.deepEqual([...scenarioIds].sort(), [
     'CONS-01', 'CONS-02', 'CONS-03', 'CONS-04', 'FARM-01', 'FARM-02', 'FARM-03', 'FARM-04', 'FARM-05', 'FISH-01', 'FISH-02', 'FISH-03', 'FISH-04',
-    'PUBLIC-01', 'PUBLIC-02', 'PUBLIC-03', 'VEND-01', 'VEND-02', 'VEND-03', 'WORK-01', 'WORK-03', 'WORK-04',
+    'PUBLIC-01', 'PUBLIC-02', 'PUBLIC-03', 'PUBLIC-06', 'VEND-01', 'VEND-02', 'VEND-03', 'WORK-01', 'WORK-03', 'WORK-04',
   ]);
 });
 

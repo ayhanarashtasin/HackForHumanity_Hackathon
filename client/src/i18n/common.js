@@ -28,6 +28,7 @@ export const COMMON = {
   'Xweather forecast (WBGT, rain probability)': 'Xweather পূর্বাভাস (WBGT, বৃষ্টির সম্ভাবনা)',
   'Xweather maritime': 'Xweather-এর সমুদ্রের তথ্য',
   'Xweather lightning': 'Xweather-এর বজ্রপাতের তথ্য',
+  'Himawari-9 storm tracking': 'হিমাওয়ারি-৯ দিয়ে ঝড় শনাক্তকরণ',
   'Checked when forecasts indicate thunderstorm potential and hourly in daytime. A check covers the previous 5 minutes only, so this is not continuous monitoring and an unforecast storm can be missed.': 'পূর্বাভাসে বজ্রঝড়ের সম্ভাবনা থাকলে এবং দিনের বেলা প্রতি ঘণ্টায় যাচাই করা হয়। প্রতিবার শুধু আগের ৫ মিনিটের তথ্য দেখা হয়। তাই এটি সার্বক্ষণিক নজরদারি নয়; পূর্বাভাসে না থাকা ঝড় বাদ পড়তে পারে।',
   'The location catalogue is missing. Run "npm run build:geo".': 'এলাকার তালিকা পাওয়া যায়নি। সার্ভারের দায়িত্বে থাকলে "npm run build:geo" চালান।',
   'The request timed out.': 'নির্ধারিত সময়ে সাড়া পাওয়া যায়নি। আবার চেষ্টা করুন।',

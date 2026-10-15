@@ -13,6 +13,15 @@ export const stageKey = (notification) => `${notification.severity}:${notificati
 
 export const isCritical = (severity) => severity === 'CRITICAL';
 
+// A storm-approach warning (STORM_APPROACH) is over within the hour: held for quiet hours it would only expire unsent, so like a
+// CRITICAL alert it goes out at night too (the person's daily cap still applies). It only uses env.channels.stormChannels.
+const URGENT_HAZARDS = new Set(['STORM_APPROACH']);
+export const skipsQuietHours = (notification) => isCritical(notification.severity) || URGENT_HAZARDS.has(notification.hazardType);
+
+export function hazardAllowsChannel(hazardType, channel, stormChannels = env.channels.stormChannels) {
+  return hazardType !== 'STORM_APPROACH' || stormChannels.includes(channel);
+}
+
 export function meetsMinSeverity(channel, severity, minimum = env.channels.minSeverity) {
   return (SEVERITY_RANK[severity] ?? 0) >= (SEVERITY_RANK[minimum[channel]] ?? 1);
 }

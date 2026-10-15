@@ -9,6 +9,7 @@ import { refreshLightning } from './lightningGate.js';
 import { lightningStage } from './lightningEpisodes.js';
 import { officialStage } from './officialNotices.js';
 import { loadSnapshots, marineKey, upazilaKey } from './snapshots.js';
+import { stormStage } from './stormEpisodes.js';
 
 // One cycle of the alert job: refresh what is due from Xweather through the token governor, then run the engine on the cached data.
 // The browser never triggers any of this: pages read MongoDB only.
@@ -135,6 +136,6 @@ export async function runAlertCycle({
   const xweatherOn = env.alerts.xweatherEnabled && client?.hasCredentials?.();
   const fetched = xweatherOn ? await runFetchTasks({ nowMs, client, budget, log }) : null;
   const bulletins = env.alerts.bulletinsEnabled ? await runBulletins({ nowMs, fetchImpl }) : null;
-  const engine = await recordJob('alert-engine', async () => ({ status: 'ok', stats: await runTick({ nowMs, extraStages: [lightningStage, officialStage] }) }), nowMs);
+  const engine = await recordJob('alert-engine', async () => ({ status: 'ok', stats: await runTick({ nowMs, extraStages: [stormStage, lightningStage, officialStage] }) }), nowMs);
   return { fetched, bulletins, engine };
 }

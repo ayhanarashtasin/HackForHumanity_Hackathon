@@ -27,6 +27,7 @@ The latest local verification used Node.js **24.14.0**. [GitHub CI](../.github/w
 | **M7** Hardening | **Mostly open** | CONS-04 and VEND-03 are now scenarios (14 October 2026). No recovery code or rule editor. Bangla is unreviewed. Quiet hours are now enforced for external channels (see below). |
 | **Delivery channels** (plan: "Later") | **Built** | Telegram bot, WhatsApp (templates) and SMS (Twilio or generic HTTP). Mocked-provider tests only; not run against live accounts. See the README. |
 | **Stored history** | **Built** | Per-district run summaries with a TTL, and `GET /api/weather/history`. |
+| **Satellite storm warnings** | **Built (prototype)** | STORM_APPROACH / PUBLIC-06 from the Himawari-9 storm tracker, Telegram only. See below. |
 | **Telegram weather commands** | **Built** | `/update`, `/heat`, `/rain`, `/wind`, `/thunderstorm`, `/lightning`, `/forecast`, `/alerts`, `/status`, with a menu and buttons. See below. |
 
 ## What the last pass changed
@@ -60,7 +61,7 @@ The latest local verification used Node.js **24.14.0**. [GitHub CI](../.github/w
 - *Anyone can use the weather commands*, connected or not. The profile is used only to find the saved area and the active alerts; replies never contain occupation, crop, shift or the reason an alert was sent. A typed Bangla place name gets a Bangla reply unless the profile says otherwise.
 - *Request limit* 30 per chat per 10 minutes, in memory (`TELEGRAM_COMMAND_LIMIT`); `/start`, `/stop` and `/help` are not limited.
 
-**Not done.** Choosing between ambiguous places with buttons (the bot lists the exact command to send instead); the Bangla text, like all Bangla here, needs a fluent reader; `/forecast` shows no observed values or official extremes.
+**Not done.** The Bangla text, like all Bangla here, needs a fluent reader; `/forecast` shows no observed values or official extremes.
 
 ### Compact report formatting
 
@@ -116,6 +117,20 @@ Fixed:
 Result: no page overflows at 375px; no control lacks an accessible name; every focusable control shows an indicator; no animations run with reduced motion; no text under 11px. What the audit still lists is understood: disabled controls (exempt from contrast), checkboxes whose 44px label is the target, the MapLibre attribution toggle (library control, 24px), and the "Data"/"Map" footer links whose widened hit area is a pseudo-element the audit cannot measure.
 
 Not done: the site has no dark theme; nothing was tested on a physical phone or with a screen reader; the Bangla strings are unreviewed.
+
+## Satellite storm warnings and the storm-aware /thunderstorm (16 October 2026)
+
+**Data.** The storm tracker (`ml-service/storm/`) now reads JMA's raw Himawari-9 band 13 from NOAA's open-data bucket (`storm/himawari.py`, `STORM_SOURCE=noaa`), which arrives about 15 minutes after each scan instead of 45-60 minutes for the NASA GIBS images, and carries real cloud-top temperatures. The server asks for each new frame every `STORM_MINUTES` (2) instead of waiting for the 30-minute satellite list. Each cell now lists every upazila it may reach (`{pcode, etaMin}`); the old 40-place cut-off dropped hundreds of places for large cells.
+
+**Alert.** `STORM_APPROACH` (`services/alerts/stormEpisodes.js`, rules in `config/alertRules.js`, shared reading in `services/stormOutlook.js`) and scenario **PUBLIC-06** (`scenarios/storm.js`, catalogue row added): a cell with tops colder than -66 °C, not weakening and moving, whose straight-line track reaches a person's saved area or live location within 60 minutes **counted from now** (image age subtracted). One episode per area, WARNING for every occupation with occupation advice, level 3 within 30 minutes, valid until an hour after the expected arrival, ends by time (no all-clear), an image older than 60 minutes is STALE (cannot create or move a warning), at most one warning per area in 3 hours. Delivery: not held by quiet hours (the user's decision: it would expire unsent), Telegram only (`STORM_ALERT_CHANNELS`), daily cap still applies. The same signal opens the Xweather lightning gate (reason `satellite-storm`), so real strikes then raise the existing CRITICAL lightning alert.
+
+**Telegram.** `/thunderstorm` leads with "Right now (satellite)": the soonest cell reaching the place, counted from now, with its cloud-top temperature, movement and trend, or "nothing tracked on this image" (never an all-clear), STALE or unavailable. After "Which place?" (or a not-found or ambiguous name) the bot remembers the command for 5 minutes, so a typed name or a shared location answers it; every command offers the location button; ambiguous names come with a button per place; "Mohammadpur Dhaka" (no comma) and the bot's own "Mohammadpur, Dhaka (City thana)" both resolve.
+
+**Replay of the saved storm day** (22 September 2026, 13:20-18:00, NOAA data, every one of 544 places assumed to have a subscriber): 296 warnings to 283 places, at most 2 to any place; 74% were followed by the storm cloud covering the place within 90 minutes; median 25 minutes between the message and that image; of 310 places a storm cloud reached during the afternoon, 47% were warned beforehand (the rest mostly had storms forming overhead, or weaker cells). One afternoon is a small test.
+
+**Verification.** Server suite with MongoDB-backed tests against a local throwaway MongoDB: 408 passed (new: `stormAlerts.test.js`, `alertStorm.test.js`, storm cases in the bot, message, scenario and delivery tests); client 105 passed; ml-service 15 passed; build passes. One unrelated morning-digest test failed once in a full run and passed in two further full runs and on its own (timing). Not run against a live Telegram chat or during a live storm.
+
+**Not done.** WhatsApp and SMS for storm warnings (a config change); storms that form overhead get no advance warning (no growth/cooling detection yet); the map panel still counts arrival from the image time; the map's satellite picture is still GIBS, so outlines sit ahead of it; Bangla needs a fluent reader.
 
 ## Known gaps (not fixed, so nobody mistakes them for done)
 

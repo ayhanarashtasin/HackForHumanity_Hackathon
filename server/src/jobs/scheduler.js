@@ -68,8 +68,8 @@ export async function startJobs() {
       every('open-meteo', env.weather.openMeteoMinutes, refreshOpenMeteo),
       every('radar', env.weather.radarMinutes, () => refreshRadar()),
       every('satellite', env.weather.satelliteMinutes, () => refreshSatellite()),
-      // Experimental storm movement from the newest satellite frame (needs the ML service; a no-op without it).
-      every('storms', 10, () => refreshStorms()),
+      // Experimental storm movement from each new satellite frame (needs the ML service; a no-op without it).
+      every('storms', env.weather.stormMinutes, () => refreshStorms()),
     );
   }
 

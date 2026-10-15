@@ -1,8 +1,8 @@
 """Storm-cell detection, motion and short projection from Himawari infrared frames.
 
-1. Colour -> intensity class. The GIBS band-13 palette is grey for warm surfaces and ordinary cloud, then cyan, blue, green, yellow,
-   red and dark red as cloud tops get colder; tall thunderstorm tops are the coldest. Classes are ordinal (1 = cyan ... 6 = dark red),
-   not degrees: GIBS publishes no colour table for this layer.
+1. Intensity class. The GIBS band-13 palette is grey for warm surfaces and ordinary cloud, then cyan, blue, green, yellow,
+   red and dark red as cloud tops get colder; tall thunderstorm tops are the coldest. GIBS publishes no colour table, so classes are
+   ordinal (1 = cyan ... 6 = dark red). NOAA frames carry real temperatures, classed with CLASS_EDGES_C (class 4 = -58 C or colder).
 2. Cells = connected areas of class >= 4 (yellow and colder), larger than MIN_AREA_KM2.
 3. Motion = dense optical flow (Farneback) from the current frame back to the frame 10-20 minutes earlier, averaged over each cell.
 4. Parallax: Himawari-9 sits over 140.7 E and sees Bangladesh at about 62 degrees from vertical, so a 12 km cloud top appears about
@@ -33,9 +33,20 @@ COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
 LOCATIONS_FILE = Path(__file__).resolve().parents[2] / 'server' / 'data' / 'locations.json'
 
 
-# ---------- colour -> intensity ----------
+# Brightness-temperature edges (degrees C) of classes 1-6 for NOAA frames: the edges between the GIBS colour classes, fitted on the
+# 31 frames of the saved storm day (1-6% of pixels fall on the other side of an edge), so both sources give the same classes.
+CLASS_EDGES_C = (-27, -36, -47, -58, -66, -72)
+
+
+# ---------- colour or temperature -> intensity ----------
 def intensity(image):
-    """uint8 grid of classes 0-6 for a BGR frame."""
+    """uint8 grid of classes 0-6 for a frame: a BGR GIBS image, or a 2-D grid of brightness temperatures in kelvin (NOAA)."""
+    if image.ndim == 2:
+        celsius = image - 273.15
+        grid = np.zeros(image.shape, np.uint8)
+        for level, edge in enumerate(CLASS_EDGES_C, start=1):
+            grid[celsius <= edge] = level
+        return grid
     spread = image.max(axis=2).astype(int) - image.min(axis=2)
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     hue, value = hsv[..., 0].astype(int), hsv[..., 2].astype(int)
@@ -166,7 +177,7 @@ def locations():
         data = json.loads(LOCATIONS_FILE.read_text(encoding='utf-8'))
         rows = data['locations']
         _locations = {
-            'rows': [{'pcode': r['pcode'], 'name': r['name'], 'nameBn': r.get('nameBn'), 'district': r.get('district')} for r in rows],
+            'rows': [{'pcode': r['pcode']} for r in rows],
             'lat': np.array([r['lat'] for r in rows]), 'lon': np.array([r['lon'] for r in rows]),
         }
     return _locations
@@ -179,16 +190,18 @@ def projected(center, motion, minutes, radius_km):
     return lat, lon, radius_km + 5 + 0.25 * distance
 
 
-def reaches(center, motion, radius_km, horizon=90, step=5, limit=40):
-    """Upazilas inside the cell now (eta 0) or inside its projected circle within `horizon` minutes, soonest first."""
+def reaches(center, motion, radius_km, horizon=90, step=5):
+    """Every upazila inside the cell now (eta 0) or inside its projected circle within `horizon` minutes, soonest first, as
+    {pcode, etaMin}. None is left out: the alert engine warns the places a storm is heading for, and a big cell can already cover
+    dozens of upazilas (names come from the pcode on the server)."""
     places = locations()
     eta = np.full(len(places['rows']), np.inf)
     for minutes in range(0, horizon + 1, step if motion else horizon + 1):
         lat, lon, radius = projected(center, motion, minutes, radius_km)
         hit = (haversine_km(places['lat'], places['lon'], lat, lon) <= radius) & np.isinf(eta)
         eta[hit] = minutes
-    order = [i for i in np.argsort(eta) if np.isfinite(eta[i])][:limit]
-    return [{**places['rows'][i], 'etaMin': int(eta[i])} for i in order]
+    order = [i for i in np.argsort(eta, kind='stable') if np.isfinite(eta[i])]
+    return [{'pcode': places['rows'][i]['pcode'], 'etaMin': int(eta[i])} for i in order]
 
 
 # ---------- one snapshot ----------
@@ -198,6 +211,7 @@ def snapshot(frames, source='live'):
         return {'source': source, 'observedAt': None, 'frames': [], 'cells': [], 'note': 'no-frames'}
     times = [when for when, _ in frames]
     grids = [intensity(image) for _, image in frames]
+    kelvin = frames[-1][1] if frames[-1][1].ndim == 2 else None  # real temperatures only from NOAA frames
     current, earlier = grids[-1], grids[0] if len(grids) > 1 else None
     minutes = (times[-1] - times[0]).total_seconds() / 60 if earlier is not None else 0
     flow = flow_back(current, earlier) if earlier is not None and minutes > 0 else None
@@ -219,6 +233,7 @@ def snapshot(frames, source='live'):
             'intensity': cell['max_class'],
             'intensityLabel': LABELS.get(cell['max_class'], 'strong'),
             'extremeShare': round(cell['extreme_share'], 3),
+            'minTempC': None if kelvin is None else round(float(np.nanmin(kelvin[cell['mask'] == 1])) - 273.15, 1),
             'trend': cell_trend(cell, earlier, motion) if earlier is not None else None,
             'motion': None if motion is None else {
                 'speedKmh': round(motion['speed_kmh'], 1), 'bearingDeg': round(motion['bearing_deg']),
@@ -237,6 +252,7 @@ def snapshot(frames, source='live'):
         'observedAt': format_time(times[-1]),
         'frames': [format_time(when) for when in times],
         'motionMinutes': round(minutes),
-        'assumptions': {'cloudTopKm': CLOUD_TOP_KM, 'minClass': MIN_CLASS, 'minAreaKm2': MIN_AREA_KM2},
+        'assumptions': {'cloudTopKm': CLOUD_TOP_KM, 'minClass': MIN_CLASS, 'minAreaKm2': MIN_AREA_KM2,
+                        'imagery': 'gibs' if kelvin is None else 'noaa', 'minTempC': None if kelvin is None else CLASS_EDGES_C[MIN_CLASS - 1]},
         'cells': cells,
     }

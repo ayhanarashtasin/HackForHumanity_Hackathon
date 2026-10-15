@@ -1,15 +1,25 @@
-"""Himawari-9 infrared frames over Bangladesh, as images on a fixed latitude/longitude grid.
+"""Himawari-9 infrared frames over Bangladesh, on a fixed latitude/longitude grid.
 
-NASA GIBS serves Himawari AHI band 13 ("clean" infrared, cloud-top temperature) through WMS in EPSG:4326, so one request returns one
-image for the whole box with pixels equally spaced in degrees. GIBS keeps only about six weeks of frames, so the demo day is kept
-in storm/data/ and every live frame is cached in storm/cache/.
+Two sources of the same band 13 ("clean" infrared, cloud-top temperature) frames, chosen with STORM_SOURCE:
+  noaa (default)  JMA's raw data on NOAA's open-data bucket (storm/himawari.py): real brightness temperatures, about 15 minutes late.
+  gibs            NASA GIBS colour images through WMS in EPSG:4326 (one request returns the whole box with pixels equally spaced in
+                  degrees): colours instead of temperatures, about 45-60 minutes late.
+GIBS keeps only about six weeks of frames, so the demo day is kept in storm/data/ (as GIBS images). Live frames are cached in
+storm/cache/ for CACHE_DAYS: the tracker needs a frame for only 20 minutes, and both sources keep them far longer.
 """
+import os
+import time
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import cv2
 import numpy as np
+
+from . import himawari
+
+SOURCE = os.environ.get('STORM_SOURCE', 'noaa').strip().lower()
+CACHE_DAYS = 2
 
 # The box covers Bangladesh plus the upstream hills (Meghalaya, Tripura) and the head of the Bay, where storms come from.
 NORTH, SOUTH, WEST, EAST = 28.0, 19.0, 86.0, 95.0
@@ -55,9 +65,14 @@ def _usable(image):
     return image is not None and image.shape[:2] == (SIZE, SIZE) and int(image.std()) > 5
 
 
-def load_frame(when, fetch=True):
-    """BGR image for a time (datetime or ISO text), from the demo set, the cache or GIBS. None when the time is not available."""
+def load_frame(when, fetch=True, source=None):
+    """The frame for a time (datetime or ISO text), or None when it is not available (yet): a BGR image from GIBS (the demo set,
+    the cache or GIBS), or with source 'noaa' a 2-D grid of brightness temperatures in kelvin (the cache or NOAA)."""
     when = parse_time(when) if isinstance(when, str) else when
+    return _load_noaa(when, fetch) if (source or SOURCE) == 'noaa' else _load_gibs(when, fetch)
+
+
+def _load_gibs(when, fetch):
     for folder in (DEMO_DIR, CACHE_DIR):
         path = folder / file_name(when)
         if path.exists():
@@ -71,18 +86,43 @@ def load_frame(when, fetch=True):
     image = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
     if not _usable(image):
         return None
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    (CACHE_DIR / file_name(when)).write_bytes(raw)
+    _cache(file_name(when), raw)
     return image
 
 
-def frames_before(when, count=3, step_minutes=10, fetch=True):
-    """[(time, image)] for `when` and the frames 10 and 20 minutes earlier, oldest first; missing frames are left out."""
+def _load_noaa(when, fetch):
+    # Cached as a 16-bit PNG of hundredths of a kelvin (0 = no measurement): lossless and about a third of the raw float size.
+    name = file_name(when).replace('.png', '-b13.png')
+    path = CACHE_DIR / name
+    stored = cv2.imread(str(path), cv2.IMREAD_UNCHANGED) if path.exists() else None
+    if stored is None or stored.shape != (SIZE, SIZE):
+        if not fetch:
+            return None
+        segments = himawari.download(when)
+        if segments is None:
+            return None
+        kelvin = himawari.to_grid(segments, NORTH, SOUTH, WEST, EAST, SIZE)
+        stored = np.nan_to_num(kelvin * 100, nan=0).round().clip(0, 65535).astype(np.uint16)
+        _cache(name, cv2.imencode('.png', stored)[1].tobytes())
+    return np.where(stored > 0, stored / 100, np.nan).astype(np.float32)
+
+
+def _cache(name, data):
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    (CACHE_DIR / name).write_bytes(data)
+    cutoff = time.time() - CACHE_DAYS * 86_400
+    for old in CACHE_DIR.glob('*.png'):
+        if old.stat().st_mtime < cutoff:
+            old.unlink(missing_ok=True)
+
+
+def frames_before(when, count=3, step_minutes=10, fetch=True, source=None):
+    """[(time, frame)] for `when` and the frames 10 and 20 minutes earlier, oldest first; missing frames are left out."""
     when = parse_time(when) if isinstance(when, str) else when
     out = []
     for back in range(count - 1, -1, -1):
         at = when - timedelta(minutes=back * step_minutes)
-        image = load_frame(at, fetch=fetch)
-        if image is not None:
-            out.append((at, image))
+        frame = load_frame(at, fetch=fetch, source=source)
+        if frame is not None:
+            out.append((at, frame))
     return out

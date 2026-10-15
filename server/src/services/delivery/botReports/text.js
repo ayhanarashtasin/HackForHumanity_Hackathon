@@ -1,6 +1,6 @@
 import { env } from '../../../config/env.js';
 import {
-  BN_MONTHS, EN_MONTHS, PROVIDER_LABELS, dayWord, localizeDigits, whenText,
+  BN_MONTHS, COMPASS_WORDS, EN_MONTHS, PROVIDER_LABELS, dayWord, localizeDigits, whenText,
 } from '../../alerts/messages.js';
 import {
   DHAKA_OFFSET_MS, addDays, dhakaDate, formatHm,
@@ -57,7 +57,7 @@ export function makeText(lang, nowMs) {
     return s(`${n(Math.round(minutes / 60))} h ago`, `${n(Math.round(minutes / 60))} ঘণ্টা আগে`);
   };
   return {
-    L, s, n, hm, when, range, day, c, mm, kph, pct, ago,
+    L, nowMs, s, n, hm, when, range, day, c, mm, kph, pct, ago,
   };
 }
 
@@ -335,15 +335,74 @@ export function renderWind(f, { lang, nowMs }) {
 }
 
 // ---------- /thunderstorm ----------
-export function renderThunderstorm(f, { lang, nowMs }) {
+const STORM_INTENSITY = {
+  4: { en: 'Strong', bn: 'প্রবল' }, 5: { en: 'Severe', bn: 'তীব্র' }, 6: { en: 'Extreme', bn: 'চরম' },
+};
+const STORM_TREND = {
+  growing: { en: 'growing', bn: 'বাড়ছে' }, steady: { en: 'steady', bn: 'স্থির' }, weakening: { en: 'weakening', bn: 'দুর্বল হচ্ছে' },
+};
+
+// "Right now (satellite)": what the storm tracker's newest image says about the place, counted from now (data.js stormFor).
+// `storm` undefined = not asked (no section). Never an all-clear: no cell heading here is only "nothing tracked on this image".
+function stormLines(storm, T) {
+  if (storm === undefined) return [];
+  const lines = [bold(T.s('Right now (satellite)', 'এই মুহূর্তে (স্যাটেলাইট)'))];
+  if (!storm || storm.status === 'UNAVAILABLE') {
+    lines.push(T.s('Satellite storm tracking is not available right now.', 'স্যাটেলাইটে ঝড় শনাক্তকরণ এখন পাওয়া যাচ্ছে না।'));
+    return [...lines, ''];
+  }
+  if (storm.status === 'STALE') {
+    lines.push(T.s(`The latest satellite image (${T.when(storm.observedAtMs)}) is too old to use.`, `সর্বশেষ স্যাটেলাইট ছবি (${T.when(storm.observedAtMs)}) ব্যবহারের জন্য বেশি পুরোনো।`));
+    return [...lines, ''];
+  }
+  const age = Math.max(0, Math.round((T.nowMs - storm.observedAtMs) / 60_000));
+  const image = T.s(`Satellite image ${T.hm(storm.observedAtMs)}, ${T.n(age)} min old.`, `স্যাটেলাইট ছবি ${T.hm(storm.observedAtMs)}, ${T.n(age)} মিনিট আগের।`);
+  const { hit } = storm;
+  if (!hit) {
+    lines.push(
+      T.s('No tracked storm cloud is heading here on the latest image. Storms can also form overhead.', 'সর্বশেষ ছবিতে শনাক্ত কোনো ঝড়ের মেঘ এদিকে আসছে না। মাথার ওপরেও নতুন ঝড় তৈরি হতে পারে।'),
+      esc(image),
+      '',
+    );
+    return lines;
+  }
+
+  if (hit.over) {
+    lines.push(T.s('⛈ A storm cloud was over this area on the image.', '⛈ ছবিতে এই এলাকার ওপর একটি ঝড়ের মেঘ ছিল।'));
+  } else if (hit.minutesFromNow <= 0) {
+    lines.push(T.s(`⛈ A storm cloud may be reaching this area now (expected ${T.hm(hit.arrivalMs)}).`, `⛈ একটি ঝড়ের মেঘ হয়তো এখনই এই এলাকায় পৌঁছাচ্ছে (আনুমানিক ${T.hm(hit.arrivalMs)})।`));
+  } else {
+    lines.push(T.s(
+      `⛈ A storm cloud may reach this area around ${T.hm(hit.arrivalMs)} (in about ${T.n(hit.minutesFromNow)} minutes).`,
+      `⛈ একটি ঝড়ের মেঘ ${T.hm(hit.arrivalMs)} নাগাদ (প্রায় ${T.n(hit.minutesFromNow)} মিনিটে) এই এলাকায় পৌঁছাতে পারে।`,
+    ));
+  }
+  const { cell } = hit;
+  const facts = [T.s(STORM_INTENSITY[cell.intensity]?.en ?? 'Strong', STORM_INTENSITY[cell.intensity]?.bn ?? 'প্রবল')];
+  if (Number.isFinite(cell.minTempC)) facts.push(T.s(`cloud top ${T.c(cell.minTempC)}`, `মেঘের চূড়া ${T.c(cell.minTempC)}`));
+  if (cell.motion) {
+    const dir = COMPASS_WORDS[cell.motion.towards];
+    facts.push(T.s(`moving ${dir?.en ?? ''} at ${T.kph(cell.motion.speedKmh)}`, `${dir?.bn ?? ''} দিকে ${T.kph(cell.motion.speedKmh)} বেগে যাচ্ছে`));
+  }
+  if (cell.trend && STORM_TREND[cell.trend]) facts.push(T.s(STORM_TREND[cell.trend].en, STORM_TREND[cell.trend].bn));
+  lines.push(esc(facts.join(' · ')), esc(image));
+  lines.push(italic(T.s('A satellite estimate that can be about 30 km off, not a lightning observation. /lightning shows real lightning checks.', 'স্যাটেলাইটভিত্তিক অনুমান, প্রায় ৩০ কিমি এদিক-ওদিক হতে পারে; বজ্রপাতের পর্যবেক্ষণ নয়। প্রকৃত বজ্রপাতের তথ্য: /lightning')));
+  return [...lines, ''];
+}
+
+export function renderThunderstorm(f, { lang, nowMs, storm = undefined }) {
   const T = makeText(lang, nowMs);
+  const now = stormLines(storm, T);
   const values = f.available ? f.thunder.values : null;
-  if (!f.available || !values) return unavailable(f, f.place, T, T.s('The thunderstorm outlook', 'বজ্রঝড়ের পূর্বাভাস'));
-  const win = windowIdx(f, 24);
-  const peak = peakOf(values, win);
-  if (!peak) return unavailable(f, f.place, T, T.s('The thunderstorm outlook', 'বজ্রঝড়ের পূর্বাভাস'));
+  const win = values ? windowIdx(f, 24) : null;
+  const peak = values ? peakOf(values, win) : null;
+  if (!peak) {
+    const missing = unavailable(f, f.place, T, T.s('The thunderstorm outlook', 'বজ্রঝড়ের পূর্বাভাস'));
+    return now.length ? fit([missing, '', ...now].join('\n').trimEnd()) : missing;
+  }
 
   const lines = reportHeader(f.place, T, '⛈', 'Thunderstorm forecast', 'বজ্রঝড়ের পূর্বাভাস', [f.thunder.info]);
+  lines.push(...now);
   lines.push(`${bold(T.s('Peak potential (24 h)', 'সর্বোচ্চ সম্ভাবনা (২৪ ঘণ্টা)'))}: ${esc(thunderName(peak.value, T))}`);
   if (peak.value >= 1) {
     const gust = f.cols.wg?.[peak.index];
@@ -507,7 +566,7 @@ const COMMAND_HELP = {
     ['heat', 'heat index and advice'],
     ['rain', 'rain, next 24 hours'],
     ['wind', 'wind and gusts'],
-    ['thunderstorm', 'thunderstorm outlook'],
+    ['thunderstorm', 'storms on the satellite now, and the outlook'],
     ['lightning', 'lightning that was recorded'],
     ['forecast', 'the days ahead'],
     ['route', 'weather between two places'],
@@ -521,7 +580,7 @@ const COMMAND_HELP = {
     ['heat', 'হিট ইনডেক্স ও পরামর্শ'],
     ['rain', 'বৃষ্টি, পরবর্তী ২৪ ঘণ্টা'],
     ['wind', 'বাতাস ও দমকা হাওয়া'],
-    ['thunderstorm', 'বজ্রঝড়ের পূর্বাভাস'],
+    ['thunderstorm', 'স্যাটেলাইটে এখনকার ঝড় ও পূর্বাভাস'],
     ['lightning', 'রেকর্ড হওয়া বজ্রপাত'],
     ['forecast', 'আগামী দিনগুলো'],
     ['route', 'দুই জায়গার মাঝের আবহাওয়া'],
@@ -560,8 +619,8 @@ export function renderHelp(lang, { webUrl = env.channels.publicUrl } = {}) {
 export function renderAskPlace(lang) {
   const T = makeText(lang, 0);
   return T.s(
-    'Which place?\nExample: /update Badda or /heat Savar, Dhaka\nUse a saved area: /help',
-    'কোন জায়গা?\nউদাহরণ: /update বাড্ডা বা /heat Savar, Dhaka\nসংরক্ষিত এলাকা ব্যবহার করতে: /help',
+    'Which place? Send its name, for example Mohammadpur, Dhaka or Badda, or share your location with the button below.\nUse a saved area: /help',
+    'কোন জায়গা? নাম পাঠান, যেমন Mohammadpur, Dhaka বা বাড্ডা, অথবা নিচের বোতাম দিয়ে অবস্থান পাঠান।\nসংরক্ষিত এলাকা ব্যবহার করতে: /help',
   );
 }
 
@@ -612,17 +671,26 @@ export function renderRoute(route, { lang, nowMs }) {
   return fit(lines.join('\n'));
 }
 
+// "Mohammadpur, Dhaka (thana)": a candidate place with its district and kind, for the list and its buttons.
+function candidateLabel(place, T) {
+  const parent = parentOf(place);
+  const parentName = parent ? (T.L === 'bn' ? parent.nameBn || parent.name : parent.name) : '';
+  const label = place.level === 'district' ? nameOf(place, T.L) : `${nameOf(place, T.L)}, ${parentName}`;
+  return `${label} (${KIND_NAMES[T.L][place.kind]})`;
+}
+
 export function renderAmbiguous(lang, matches, total, command) {
   const T = makeText(lang, 0);
-  const lines = [T.s('More than one place matches. Send the name with its district, for example:', 'একাধিক জায়গা মিলেছে। জেলার নামসহ পাঠান, যেমন:')];
-  for (const place of matches) {
-    const parent = parentOf(place);
-    const parentName = parent ? (T.L === 'bn' ? parent.nameBn || parent.name : parent.name) : '';
-    const label = place.level === 'district' ? nameOf(place, T.L) : `${nameOf(place, T.L)}, ${parentName}`;
-    lines.push(`/${command} ${esc(label)}  (${esc(KIND_NAMES[T.L][place.kind])})`);
-  }
+  const lines = [T.s('More than one place matches. Tap one below, or send the name with its district, for example:', 'একাধিক জায়গা মিলেছে। নিচে একটি বেছে নিন, অথবা জেলার নামসহ পাঠান, যেমন:')];
+  for (const place of matches) lines.push(`/${command} ${esc(candidateLabel(place, T))}`);
   if (total > matches.length) lines.push(T.s(`…and ${T.n(total - matches.length)} more.`, `…এবং আরও ${T.n(total - matches.length)}টি।`));
   return lines.join('\n');
+}
+
+// One button per candidate place; pressing it runs the same command for that place (telegramBot.js handleButton).
+export function candidateButtons(matches, command, lang) {
+  const T = makeText(lang, 0);
+  return matches.map((place) => [{ text: candidateLabel(place, T), data: `r:${command}:${place.id}:${T.L}` }]);
 }
 
 export const renderBusy = (lang) => makeText(lang, 0).s(

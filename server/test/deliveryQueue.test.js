@@ -312,6 +312,19 @@ dbTest('a message that became invalid while it waited is dropped at send time, w
   assert.ok((await rows({ subscriberId: third })).every((row) => row.skippedReason === 'channel_unlinked'));
 });
 
+dbTest('a storm-approach warning goes out during quiet hours, and only on Telegram (STORM_ALERT_CHANNELS)', async () => {
+  const quiet = { enabled: true, start: formatHm(new Date(now - HOUR)), end: formatHm(new Date(now + HOUR)) };
+  const channels = channelSet();
+  const sleeper = await person({ quiet, sms: true });
+  await alertFor(sleeper, {
+    scenarioId: 'PUBLIC-06', hazardType: 'STORM_APPROACH', severity: 'WARNING', title: 'Storm may reach Badda within the hour', validUntil: new Date(now + 50 * MINUTE),
+  });
+  await runDeliveryCycle({ channels, nowMs: now });
+  assert.equal(channels.telegram.sent.length, 1, 'not held: it would be over before quiet hours end');
+  assert.equal(channels.sms.sent.length, 0, 'SMS is not a storm channel yet');
+  assert.deepEqual((await rows({ subscriberId: sleeper })).map((row) => row.channel), ['telegram']);
+});
+
 dbTest('quiet hours hold non-urgent messages until they end, expire them if the alert ends first, and never delay CRITICAL (CTX-04)', async () => {
   const quiet = { enabled: true, start: formatHm(new Date(now - HOUR)), end: formatHm(new Date(now + HOUR)) };
   const channels = channelSet();
@@ -618,7 +631,7 @@ dbTest('the weather commands for a connected chat use its saved area and active 
   const help = await ask('/help', 18, 'en');
   assert.equal(help.parseMode, 'HTML');
   assert.match(help.text, /<b>AkashSathi · Commands<\/b>/);
-  assert.match(help.text, /\/thunderstorm — thunderstorm outlook/);
+  assert.match(help.text, /\/thunderstorm — storms on the satellite now, and the outlook/);
 });
 
 dbTest('lightning: the most recent stored check for the circle around a place is what is reported, and nothing is called when none exists', async () => {

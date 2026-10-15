@@ -65,40 +65,59 @@ to Open-Meteo forecasts. Past forecasts do not store rain probability, which the
 
 ## Storm movement (experimental)
 
-`storm/` tracks thunderstorm cells on Himawari-9 infrared images (band 13, every 10 minutes, from NASA GIBS) and shows them on the
-weather map as **Map layers → Storm movement**. It never creates, changes or cancels an alert.
+`storm/` tracks thunderstorm cells on Himawari-9 infrared frames (band 13, every 10 minutes) and shows them on the weather map as
+**Map layers → Storm movement**. The server also turns a strong cell heading for a subscriber's area into a prototype storm warning
+(`server/src/services/alerts/stormEpisodes.js`, rule PUBLIC-06); the tracker itself only describes the image.
+
+Where the frames come from (`STORM_SOURCE`):
+
+| Source | Arrives after the scan | What it holds |
+|---|---|---|
+| `noaa` (default) | about 15 minutes | JMA's raw data (Himawari Standard Data) on NOAA's open-data bucket: real brightness temperatures |
+| `gibs` | 45–60 minutes | NASA GIBS colour images: colour classes, no temperatures |
+
+`storm/himawari.py` downloads the two full-disk segments (of ten) that cover the box, about 5.5 MB per frame, decodes them as
+JMA's *Himawari Standard Data User's Guide* describes, calibrates the counts to brightness temperature and resamples them to the
+same 450 × 450 latitude/longitude grid as the GIBS frames. Decoded frames are cached in `storm/cache/` as 16-bit PNGs (about
+290 KB each) and deleted after two days. Data: JMA Himawari-9, accessed from <https://registry.opendata.aws/noaa-himawari>
+(NOAA Open Data Dissemination); NOAA and JMA ask for attribution and do not endorse this project.
 
 How it works (`storm/tracker.py`):
 
-1. The satellite colour scale is turned into intensity classes: grey for warm ground and ordinary cloud, then cyan, blue, green,
-   yellow, red and dark red as cloud tops get colder (classes, not °C: GIBS publishes no colour table for this layer).
-2. Cells are the connected areas of yellow or colder, at least 200 km².
+1. Cloud tops are put into intensity classes 1–6. GIBS images: grey for warm ground and ordinary cloud, then cyan, blue, green,
+   yellow, red and dark red as cloud tops get colder (GIBS publishes no colour table). NOAA temperatures: colder than −27, −36, −47,
+   −58, −66 and −72 °C, the edges between the GIBS colours fitted on the 31 frames of the saved storm day (1–6% of pixels fall on
+   the other side of an edge), so both sources give the same classes.
+2. Cells are the connected areas of class 4 or colder (yellow, or −58 °C), at least 200 km². With NOAA frames each cell also
+   reports its coldest cloud top (`minTempC`).
 3. Motion is dense optical flow (OpenCV Farneback) between the newest frame and the one 20 minutes earlier, averaged over each cell.
 4. Positions are moved about 22 km east-south-east: Himawari-9 sits over 140.7°E and sees Bangladesh at about 62° from vertical, so a
    12 km cloud top appears displaced away from the satellite (parallax).
 5. Each cell is projected 30, 60 and 90 minutes ahead in a straight line, in a circle that widens with distance, and the upazilas
    inside it are listed with their arrival times.
 
-The Node backend asks for the newest frame every 10 minutes (`GET /storms/snapshot?time=...`) and keeps each result for 30 days in
-MongoDB (`StormSnapshot`), which is the future test set. `GET /storms/demo` replays the saved storm day, **22 September 2026**,
+The Node backend asks for the frame after the last one it analysed every 2 minutes (`STORM_MINUTES`; `GET /storms/snapshot?time=...`
+answers 404 until GIBS has published that frame), so a frame is analysed within minutes of reaching GIBS. It keeps each result for
+30 days in MongoDB (`StormSnapshot`), which is the future test set. `GET /storms/demo` replays the saved storm day, **22 September 2026**,
 13:00–18:00 Bangladesh time (`storm/data/demo-2026-09-22/`, kept in git because GIBS deletes frames after about six weeks). The map
 opens it directly with `/map#o=storms&storm=replay`.
 
 ### How accurate is it?
 
-`python -m storm.validate` follows every cell 60 minutes forward on the saved day, without using the tracker's own motion, and
-compares (`reports/storm_validation.json`):
+`python -m storm.validate [gibs|noaa]` follows every cell 60 minutes forward on the saved day, without using the tracker's own
+motion, and compares (`reports/storm_validation.json`, `reports/storm_validation_noaa.json`):
 
-| 60 minutes ahead (418 cases) | Median position error |
-|---|---|
-| Tracker (straight-line motion) | **30.5 km** |
-| "The storm stays where it is" | 34.6 km |
+| 60 minutes ahead | GIBS images (418 cases) | NOAA temperatures (425 cases) |
+|---|---|---|
+| Tracker (straight-line motion), median error | **30.5 km** | **28.4 km** |
+| "The storm stays where it is", median error | 34.6 km | 33.4 km |
+| Tracker closer | 59% | 58% |
 
-The tracker is closer in about 59% of cases (61% of the cells that really moved). The gain is modest: most of the remaining
+Both sources track about equally well; the NOAA data arrives 30–45 minutes sooner. The gain is modest: most of the remaining
 error comes from storms growing, splitting and merging, which straight-line motion cannot capture. One day is a small test; the
 live history in MongoDB will give a larger one.
 
-Limits: cloud-top intensity is not lightning; the 12 km cloud height in the parallax correction is an assumption; frames reach GIBS
-about 45–60 minutes late, so live positions are where storms were then.
+Limits: cloud-top intensity is not lightning; the 12 km cloud height in the parallax correction is an assumption; frames arrive about
+15 minutes (NOAA) or 45–60 minutes (GIBS) after the scan, so live positions are where storms were then.
 
 Tests: `python -m unittest discover tests` (synthetic storms moved by a known distance).

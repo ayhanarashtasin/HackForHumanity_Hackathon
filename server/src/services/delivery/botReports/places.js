@@ -92,14 +92,22 @@ export function parentOf(place) {
 const KIND_WORDS = new Map([
   ['district', 'district'], ['zila', 'district'], ['জেলা', 'district'],
   ['upazila', 'upazila'], ['upazilla', 'upazila'], ['উপজেলা', 'upazila'],
-  ['thana', 'thana'], ['থানা', 'thana'],
+  ['thana', 'thana'], ['থানা', 'thana'], ['city thana', 'thana'], ['সিটি থানা', 'thana'],
+  ['city corporation', 'city-corporation'], ['সিটি কর্পোরেশন', 'city-corporation'],
 ]);
 
 function splitQuery(query) {
-  const [namePart, ...rest] = String(query ?? '').split(',');
-  const words = normalize(namePart).split(' ').filter(Boolean);
+  // "Mohammadpur, Dhaka (thana)" is how the bot's own suggestions read: a kind in brackets at the end is a hint, never part of a name.
+  let text = String(query ?? '');
   let hint = null;
-  if (words.length > 1 && KIND_WORDS.has(words.at(-1))) hint = KIND_WORDS.get(words.pop());
+  const bracket = /\(([^()]*)\)\s*$/.exec(text);
+  if (bracket) {
+    hint = KIND_WORDS.get(normalize(bracket[1])) ?? null;
+    text = text.slice(0, bracket.index);
+  }
+  const [namePart, ...rest] = text.split(',');
+  const words = normalize(namePart).split(' ').filter(Boolean);
+  if (!hint && words.length > 1 && KIND_WORDS.has(words.at(-1))) hint = KIND_WORDS.get(words.pop());
   return { name: words.join(' '), hint, qualifier: normalize(rest.join(' ')) };
 }
 
@@ -109,7 +117,19 @@ const wordsOf = (key) => key.split(' ');
 // 1 the whole name, 2 the start of the name or of a word in it, 3 anywhere in the name.
 export function findPlaces(query) {
   ensure();
-  const { name, hint, qualifier } = splitQuery(query);
+  const parts = splitQuery(query);
+  const found = matchPlaces(parts);
+  if (found.matches.length || parts.qualifier) return found;
+  // "Mohammadpur Dhaka" without the comma: the last word (or two) may be the district.
+  const words = parts.name.split(' ');
+  for (let k = 1; k <= Math.min(2, words.length - 1); k += 1) {
+    const retry = matchPlaces({ ...parts, name: words.slice(0, -k).join(' '), qualifier: words.slice(-k).join(' ') });
+    if (retry.matches.length) return retry;
+  }
+  return found;
+}
+
+function matchPlaces({ name, hint, qualifier }) {
   if (name.length < 2) return { matches: [], total: 0 };
 
   let pool = index;

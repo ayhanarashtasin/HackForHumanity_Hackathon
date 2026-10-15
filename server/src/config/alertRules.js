@@ -24,11 +24,15 @@ export const HAZARD_TYPES = [
   'STRONG_WIND',
   'OBSERVED_LIGHTNING',
   'LIGHTNING_THREAT',
+  'STORM_APPROACH',
   'MARINE_WEATHER',
   'DRY_SPELL',
   'OFFICIAL_NOTICE',
   'ADMIN_NOTICE',
 ];
+
+// The storm tracker's intensity classes as cloud-top temperatures (ml-service/storm/tracker.py CLASS_EDGES_C): class n = this cold or colder.
+export const STORM_CLASS_C = { 4: -58, 5: -66, 6: -72 };
 
 // ---------- detection rules (stage 1) ----------
 export const hazardRules = {
@@ -64,6 +68,17 @@ export const hazardRules = {
     horizonMinutes: 60, // the provider's nowcast horizon
     imminentMinutes: 30, // level 3 when the threat period starts within this many minutes
   },
+  // A thunderstorm cell on the Himawari-9 infrared image (ml-service storm tracker) whose straight-line track reaches the area.
+  // Times are counted from NOW: the image is minutes old (about 15 from NOAA), so its own arrival times are shifted by its age.
+  STORM_APPROACH: {
+    horizonMinutes: 60, // [P] warn when the cell may arrive within this many minutes from now
+    lateMinutes: 10, // [P] ...or arrived this recently (the image is old; the person has not been warned yet)
+    soonMinutes: 30, // [P] level 3 when the arrival is this close
+    minIntensity: 5, // [P] tracker class 5 = cloud tops colder than -66 C; class 4 (-58 C) cells are shown on the map only
+    maxImageAgeMinutes: 60, // [P] an older image is STALE: it can neither create nor move an alert
+    passMinutes: 60, // [P] the alert stays valid this long after the expected arrival (the storm passing)
+    cooldownHours: 3, // [P] at most one storm warning per area in this many hours
+  },
   MARINE_WEATHER: {
     lookaheadHours: 24,
     waveM: { 1: 1.5, 2: 2.1, 3: 3.0 }, // [M] NWS small-craft seas criteria start at about 5-7 ft; no BMD wave criterion found
@@ -97,6 +112,7 @@ export const freshness = {
   lightningProbe: { maxCheckAgeMs: 15 * MINUTE, baselineMaxCheckAgeMs: 3 * HOUR },
   lightningThreat: { maxCheckAgeMs: 30 * MINUTE },
   bulletins: { maxCheckAgeMs: 3 * HOUR },
+  storm: { maxImageAgeMs: hazardRules.STORM_APPROACH.maxImageAgeMinutes * MINUTE },
 };
 
 // ---------- scenario timing and de-duplication ----------
@@ -133,6 +149,7 @@ export function ruleCatalogue() {
   const threat = hazardRules.LIGHTNING_THREAT;
   const marine = hazardRules.MARINE_WEATHER;
   const dry = hazardRules.DRY_SPELL;
+  const storm = hazardRules.STORM_APPROACH;
 
   return [
     row('HEAVY_RAIN.L1', 'HEAVY_RAIN', 1, `3 h rain >= ${rain[1].rain3hMm} mm and (probability >= ${rain[1].popMin}% or probability not available)`, ['M', 'P'], `৩ ঘণ্টায় বৃষ্টি অন্তত ${rain[1].rain3hMm} মিমি এবং বৃষ্টির সম্ভাবনা অন্তত ${rain[1].popMin}% (অথবা সম্ভাবনার তথ্য নেই)।`),
@@ -147,6 +164,9 @@ export function ruleCatalogue() {
     row('OBSERVED_LIGHTNING.EPISODE', 'OBSERVED_LIGHTNING', null, `An episode closes ${ltg.episodeCloseMinutes} minutes after the last strike when no threat period is still ahead`, ['M'], `সর্বশেষ বজ্রপাতের ${ltg.episodeCloseMinutes} মিনিট পরে ঘটনাপর্ব শেষ হয়, যদি সামনে আর কোনো আশঙ্কার সময়সীমা না থাকে।`),
     row('LIGHTNING_THREAT.L3', 'LIGHTNING_THREAT', 3, `A threat polygon covers the area point and starts within ${threat.imminentMinutes} minutes`, ['P'], `বজ্রপাতের আশঙ্কার বহুভুজ এলাকাটির নির্ধারিত বিন্দুকে ঘিরে আছে এবং আগামী ${threat.imminentMinutes} মিনিটের মধ্যে প্রযোজ্য হবে।`),
     row('LIGHTNING_THREAT.L2', 'LIGHTNING_THREAT', 2, `A threat polygon covers the area point and starts within ${threat.horizonMinutes} minutes`, ['P'], `বজ্রপাতের আশঙ্কার বহুভুজ এলাকাটির নির্ধারিত বিন্দুকে ঘিরে আছে এবং আগামী ${threat.horizonMinutes} মিনিটের মধ্যে প্রযোজ্য হবে।`),
+    row('STORM_APPROACH.L2', 'STORM_APPROACH', 2, `A satellite storm cell (tops colder than ${STORM_CLASS_C[storm.minIntensity]} C, not weakening) may reach the area within ${storm.horizonMinutes} minutes from now on a straight-line track`, ['P'], `স্যাটেলাইটে শনাক্ত ঝড়ের মেঘ (চূড়া ${STORM_CLASS_C[storm.minIntensity]}°সে.-এর চেয়ে ঠান্ডা, দুর্বল হচ্ছে না) সরলরেখায় চললে এখন থেকে ${storm.horizonMinutes} মিনিটের মধ্যে এলাকায় পৌঁছাতে পারে।`),
+    row('STORM_APPROACH.L3', 'STORM_APPROACH', 3, `The same, arriving within ${storm.soonMinutes} minutes`, ['P'], `একই, ${storm.soonMinutes} মিনিটের মধ্যে পৌঁছালে।`),
+    row('STORM_APPROACH.LIMITS', 'STORM_APPROACH', null, `A satellite image older than ${storm.maxImageAgeMinutes} minutes is not used; at most one storm warning per area in ${storm.cooldownHours} hours`, ['P'], `${storm.maxImageAgeMinutes} মিনিটের বেশি পুরোনো স্যাটেলাইট ছবি ব্যবহার হয় না; প্রতিটি এলাকায় ${storm.cooldownHours} ঘণ্টায় সর্বোচ্চ একবার ঝড়ের সতর্কবার্তা।`),
     row('MARINE_WEATHER.WAVE', 'MARINE_WEATHER', null, `Significant wave height: level 1 >= ${marine.waveM[1]}, level 2 >= ${marine.waveM[2]}, level 3 >= ${marine.waveM[3]} m`, ['M'], `উল্লেখযোগ্য ঢেউয়ের উচ্চতা: স্তর ১ ≥ ${marine.waveM[1]}, স্তর ২ ≥ ${marine.waveM[2]}, স্তর ৩ ≥ ${marine.waveM[3]} মিটার।`),
     row('MARINE_WEATHER.GUST', 'MARINE_WEATHER', null, `Gust: level 1 >= ${marine.gustKph[1]}, level 2 >= ${marine.gustKph[2]}, level 3 >= ${marine.gustKph[3]} km/h`, ['B'], `সমুদ্র এলাকায় দমকা হাওয়া: স্তর ১ ≥ ${marine.gustKph[1]}, স্তর ২ ≥ ${marine.gustKph[2]}, স্তর ৩ ≥ ${marine.gustKph[3]} কিমি/ঘণ্টা।`),
     row('DRY_SPELL', 'DRY_SPELL', 1, `At least ${dry.minDays} consecutive forecast days below ${dry.dryDayMm} mm and mean maximum >= ${dry.meanTmaxMinC} C`, ['M', 'P'], `পূর্বাভাসে টানা অন্তত ${dry.minDays} দিন দৈনিক বৃষ্টি ${dry.dryDayMm} মিমির কম এবং গড় সর্বোচ্চ তাপমাত্রা অন্তত ${dry.meanTmaxMinC}°সে.।`),
