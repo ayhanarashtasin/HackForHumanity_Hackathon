@@ -418,23 +418,31 @@ function checkConfirmations(entry, body) {
   }
 }
 
-// A retry or a double click with the same key gets the first result back and sends nothing. Checked before the preview, which a first
-// send has already used up.
+// A retry or a double click with the same key gets the first result back and sends nothing — but only once that first attempt actually
+// finished. An attempt recorded as 'failed' sent nothing usable, so it must never be replayed as if it had: the caller gets a real
+// retry instead (claim() below reclaims the same key rather than leaving it permanently stuck on the dead attempt).
 async function previousSend(key) {
   if (typeof key !== 'string' || key.length < 8 || key.length > 80) return null;
   const previous = await AdminAction.findOne({ idempotencyKey: key }).lean();
-  if (!previous) return null;
+  if (!previous || previous.outcome === 'failed') return null;
   if (previous.outcome === 'pending') throw new HttpError(409, 'This send is already in progress.');
   return { replayed: true, outcome: previous.outcome, result: previous.result ?? null };
 }
 
-// Claims the idempotency key before anything is sent: of two simultaneous clicks, only one can insert it.
+// Claims the idempotency key before anything is sent: of two simultaneous clicks, only one can insert it. A key whose only previous
+// attempt failed is reclaimed (put back to pending and reused) instead of blocking every later retry forever.
 async function claim(key, fields) {
   if (typeof key !== 'string' || key.length < 8 || key.length > 80) throw badRequest('A send needs an idempotency key of 8 to 80 characters.');
   try {
     return { action: await audit({ ...fields, idempotencyKey: key, outcome: 'pending' }), replay: null };
   } catch (error) {
     if (error?.code !== 11000) throw error;
+    const reclaimed = await AdminAction.findOneAndUpdate(
+      { idempotencyKey: key, outcome: 'failed' },
+      { $set: { ...fields, outcome: 'pending', reason: null } },
+      { new: true },
+    );
+    if (reclaimed) return { action: reclaimed, replay: null };
     const previous = await AdminAction.findOne({ idempotencyKey: key }).lean();
     if (previous?.outcome === 'pending') throw new HttpError(409, 'This send is already in progress.');
     return { action: null, replay: { replayed: true, outcome: previous?.outcome, result: previous?.result ?? null } };
@@ -535,7 +543,9 @@ export async function withdraw({ batchId = null, eventId = null, reason = null }
   if (eventId) {
     const event = await HazardEvent.findById(eventId).catch(() => null);
     if (!event) throw notFound('That alert was not found.');
-    events = [event];
+    // Already withdrawn (or expired): say so below, through the same "nothing to withdraw" path as an exhausted batch, instead of
+    // silently re-withdrawing it and overwriting who withdrew it, when and why with a second, unrelated reason.
+    if (event.lifecycle === 'active') events = [event];
   } else {
     events = await HazardEvent.find({ batchId, lifecycle: 'active' });
   }

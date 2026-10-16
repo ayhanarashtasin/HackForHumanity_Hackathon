@@ -636,6 +636,67 @@ dbTest('withdrawing a send marks it withdrawn, never an all-clear, and a second 
   assert.ok(history.automatic.length >= 1);
 });
 
+dbTest('withdrawing an automatic (engine-detected) event by its own id cannot be repeated either', async () => {
+  const farmer = new Client();
+  await farmer.call('/alerts/subscribe', { method: 'POST', body: farmerForm() });
+  await liveWeather({ rainMm: 25 });
+  const admin = await adminSignIn();
+  const { runTick } = await import('../src/services/alerts/engine.js');
+  await runTick({});
+
+  const before = (await admin.call('/admin/history')).json.data;
+  const eventId = before.automatic.find((event) => event.lifecycle === 'active').id;
+
+  const first = await admin.call(`/admin/alerts/${eventId}/withdraw`, { method: 'POST', body: { reason: 'False positive' } });
+  assert.equal(first.status, 200);
+  assert.equal(first.json.data.events, 1);
+  const event = await HazardEvent.findById(eventId).lean();
+  assert.equal(event.lifecycle, 'withdrawn');
+  assert.equal(event.withdrawal.reason, 'False positive');
+
+  // Withdrawing the same event id again must not silently "succeed" a second time: nothing new is withdrawn, so it is 404, exactly
+  // like a repeated withdrawal by batch id already is above. Overwriting who withdrew it, when and why is never acceptable either.
+  const second = await admin.call(`/admin/alerts/${eventId}/withdraw`, { method: 'POST', body: { reason: 'Someone else, later, different reason' } });
+  assert.equal(second.status, 404);
+  const unchanged = await HazardEvent.findById(eventId).lean();
+  assert.equal(unchanged.withdrawal.reason, 'False positive', 'the first withdrawal record is not overwritten by the repeat');
+  assert.equal(unchanged.revision, event.revision, 'and nothing about it was touched again');
+
+  const history = (await admin.call('/admin/history')).json.data;
+  assert.equal(history.sends.filter((entry) => entry.action === 'withdraw').length, 1, 'only the one real withdrawal is in the audit trail');
+});
+
+dbTest('a send that fails is not replayed as "already sent": the same click retries for real', async () => {
+  const farmer = new Client();
+  await farmer.call('/alerts/subscribe', { method: 'POST', body: farmerForm() });
+  const admin = await adminSignIn();
+  const declare = {
+    mode: 'declare', hazardType: 'HEAVY_RAIN', level: 1, hours: 4, roles: ['farmer'], areas: { upazilas: [BADDA] },
+  };
+
+  // Record a failed attempt under a known key, the same way send() itself would after an exception (e.g. the rate limit, or any
+  // other failure between claiming the key and finishing).
+  const key = 'retry-after-failure-0001';
+  await AdminAction.create({
+    at: new Date(), action: 'declare', idempotencyKey: key, outcome: 'failed', reason: 'At most 20 sends an hour.',
+  });
+
+  const preview = (await admin.call('/admin/preview', { method: 'POST', body: declare })).json.data;
+  const retried = await admin.call('/admin/send', { method: 'POST', body: { ...declare, idempotencyKey: key, previewToken: preview.previewToken } });
+  assert.equal(retried.status, 201, 'a real attempt, not a replay of the dead one');
+  assert.equal(retried.json.data.replayed, false);
+  assert.equal(retried.json.data.result.sent, 1, 'the alert actually went out this time, not "0 sent"');
+  assert.equal(await Notification.countDocuments({ occupation: 'farmer' }), 1);
+  const action = await AdminAction.findOne({ idempotencyKey: key }).lean();
+  assert.equal(action.outcome, 'ok', 'the one row for this key now reflects the real send, not the dead attempt');
+
+  // The key is now used up by a real send, exactly like any other: replaying it again sends nothing more.
+  const replay = await admin.call('/admin/send', { method: 'POST', body: { ...declare, idempotencyKey: key, previewToken: preview.previewToken } });
+  assert.equal(replay.status, 200);
+  assert.equal(replay.json.data.replayed, true);
+  assert.equal(await Notification.countDocuments({ occupation: 'farmer' }), 1, 'still just the one notification');
+});
+
 dbTest('hold and kill switches are validated, audited and visible; a hold keeps alerts away from the inbox until they are released', async () => {
   const farmer = new Client();
   await farmer.call('/alerts/subscribe', { method: 'POST', body: farmerForm() });
