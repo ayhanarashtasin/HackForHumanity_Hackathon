@@ -526,6 +526,53 @@ dbTest('declare a hazard: role-specific wording, a support check, typed and crit
   assert.equal((await admin.call('/admin/preview', { method: 'POST', body: { ...strike, areas: { districts: ['9999'] } } })).status, 400);
 });
 
+dbTest('declare a hazard: everyone chosen in the area receives it, even an occupation with no catalogue scenario for this hazard', async () => {
+  const farmer = new Client();
+  await farmer.call('/alerts/subscribe', { method: 'POST', body: farmerForm() }); // matches FARM-01
+  const fisherman = new Client();
+  // HEAVY_RAIN has no fisherman scenario at all (fisherman.js only covers lightning and marine/wind hazards).
+  await fisherman.call('/alerts/subscribe', { method: 'POST', body: { ...farmerForm(), occupation: 'fisherman', occupationData: { waterBody: 'river', status: 'ashore' } } });
+  const admin = await adminSignIn();
+  const rain = { mode: 'declare', hazardType: 'HEAVY_RAIN', level: 2, hours: 4, roles: ['farmer', 'fisherman'], areas: { upazilas: [BADDA] } };
+
+  const preview = (await admin.call('/admin/preview', { method: 'POST', body: rain })).json.data;
+  assert.equal(preview.totals.newRecipients, 2, 'both the matched farmer and the unmatched fisherman are counted');
+  assert.deepEqual(preview.groups.map((g) => g.scenarioId).sort(), ['ADMIN-GENERAL', 'FARM-01']);
+  const general = preview.groups.find((g) => g.scenarioId === 'ADMIN-GENERAL');
+  assert.equal(general.occupation, 'fisherman');
+  assert.equal(general.hazardType, 'HEAVY_RAIN');
+  assert.equal(general.level, 2);
+
+  assert.equal(preview.requires.typed, null, 'no cached weather data either way: the support check is unknown, not "no"');
+  const sent = await admin.call('/admin/send', { method: 'POST', body: { ...rain, idempotencyKey: 'declare-general-0001', previewToken: preview.previewToken } });
+  assert.equal(sent.status, 201);
+  assert.equal(sent.json.data.result.sent, 2);
+
+  const farmerNote = await Notification.findOne({ occupation: 'farmer' }).lean();
+  assert.equal(farmerNote.scenarioId, 'FARM-01');
+  // Stored bilingually, so the inbox's language toggle can show this already-sent alert either way, not only new ones.
+  assert.equal(farmerNote.lang, 'en');
+  assert.equal(farmerNote.translations.en.title, farmerNote.title);
+  assert.notEqual(farmerNote.translations.bn.title, farmerNote.title);
+  assert.match(farmerNote.translations.bn.message, /[ঀ-৿]/u, 'the Bangla reading is actually in Bangla');
+  assert.equal(farmerNote.translations.bn.affectedArea.upazilaPcode, farmerNote.affectedArea.upazilaPcode, 'the place itself does not change with language');
+
+  const fishermanNote = await Notification.findOne({ occupation: 'fisherman' }).lean();
+  assert.equal(fishermanNote.scenarioId, 'ADMIN-GENERAL');
+  assert.equal(fishermanNote.origin, 'admin-declared');
+  assert.equal(fishermanNote.ruleVersion, 'admin');
+  assert.equal(fishermanNote.severity, 'WARNING', 'declared level 2, non-lightning: WARNING, never CRITICAL for a hazard the catalogue itself never sends as CRITICAL');
+  assert.match(fishermanNote.message, /An administrator has declared heavy rain/);
+  assert.match(fishermanNote.translations.bn.message, /ঘোষণা করেছেন/, 'the generic fallback is bilingual too');
+  assert.match(fishermanNote.message, /not detected from weather data/);
+  assert.equal((await fisherman.call('/alerts/inbox')).json.data.items[0].scenarioId, 'ADMIN-GENERAL');
+
+  // Sending again for the same declaration does not duplicate either notification.
+  const again = (await admin.call('/admin/preview', { method: 'POST', body: rain })).json.data;
+  assert.equal(again.totals.newRecipients, 0);
+  assert.equal(again.totals.alreadySent, 2);
+});
+
 dbTest('a free message: validated, linted, labelled as the administrator and never as BMD', async () => {
   const vendor = new Client();
   await vendor.call('/alerts/subscribe', { method: 'POST', body: { ...farmerForm(), occupation: 'vendor', occupationData: { outdoorStall: true, shelterAccess: 'partial', hoursOutdoor: '4to8' } } });

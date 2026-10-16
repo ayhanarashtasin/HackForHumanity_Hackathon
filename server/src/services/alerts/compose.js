@@ -4,6 +4,26 @@ import {
   ACTIONS, ADVICE, PROVIDER_LABELS, activityLabelFor, areaText, confidenceLine, describeHazard, fill, localizeDigits, pick, reasonText, titleFor, whenText, zoneName,
 } from './messages.js';
 
+// Generic (non-scenario) wording for a declared hazard, used only for a subscriber in scope whom no catalogue scenario matched.
+const GENERIC_ACTIONS = {
+  HEAVY_RAIN: ['check_forecast'],
+  HEAT_STRESS: ['rest_shade', 'drink_water', 'seek_medical'],
+  STRONG_WIND: ['check_forecast'],
+  OBSERVED_LIGHTNING: ['go_to_building', 'avoid_trees'],
+  LIGHTNING_THREAT: ['go_to_building', 'avoid_trees'],
+  MARINE_WEATHER: ['check_official_forecast'],
+  DRY_SPELL: ['check_forecast'],
+};
+const LIGHTNING_HAZARDS = new Set(['OBSERVED_LIGHTNING', 'LIGHTNING_THREAT']);
+
+// Lightning is always CRITICAL, the same rule every lightning scenario follows. Every other declared hazard stays ADVISORY/WARNING here
+// even at a declared level 3, because the catalogue's own scenarios for those hazards never reach CRITICAL either (heat, rain, wind,
+// dry spell): this fallback must not claim more urgency than the scenarios it is standing in for.
+function genericSeverity(hazardType, level) {
+  if (LIGHTNING_HAZARDS.has(hazardType)) return 'CRITICAL';
+  return level >= 2 ? 'WARNING' : 'ADVISORY';
+}
+
 // Stage 4a: turn (event, subscriber, scenario result) into the stored notification fields, in the subscriber's language.
 const districtByPcode = new Map(districts.map((district) => [district.pcode, district]));
 
@@ -129,6 +149,40 @@ export function composeNotification({
     dataStatus: event.dataStatus,
     ruleVersion: automatic ? RULE_VERSION : 'admin',
     ruleStatus: automatic ? RULE_STATUS : 'admin',
+  };
+}
+
+// A hazard the administrator declared, for a subscriber in the chosen area and role whose occupation (or current activity) matches no
+// catalogue scenario for it (ADMIN-GENERAL). Says what was declared and where, in the same wording describeHazard/titleFor already use
+// for a declaration, without inventing occupation-specific advice the catalogue does not have for them.
+export function composeGenericDeclaration({ event, subscriber, area, nowMs, lang = subscriber.language }) {
+  const affectedArea = affectedAreaFor(event, area, lang);
+  const finish = (value) => localizeDigits(value, lang);
+  const severity = genericSeverity(event.hazardType, event.level);
+
+  return {
+    scenarioId: 'ADMIN-GENERAL',
+    severity,
+    title: finish(titleFor(event, shortName(affectedArea, lang), lang)),
+    message: finish(describeHazard(event, { areaName: shortName(affectedArea, lang), nowMs, lang })),
+    recommendedActions: (GENERIC_ACTIONS[event.hazardType] ?? []).map((key) => ({ key, text: finish(pick(ACTIONS[key], lang)) })),
+    lang,
+    templateKey: 'ADMIN-GENERAL',
+    params: { level: event.level },
+    affectedArea: { ...affectedArea, text: finish(affectedArea.text) },
+    sourceReferences: [{ provider: 'admin', product: 'declared', observedAt: null, forecastIssuedAt: null, url: null }],
+    reasonForSelection: finish(lang === 'bn'
+      ? `প্রশাসক ${affectedArea.text}-এর জন্য এটি ঘোষণা করেছেন; আপনি এই এলাকায় নিবন্ধিত, তবে আপনার পেশার জন্য নির্দিষ্ট কোনো পরামর্শ এই ঝুঁকির ক্ষেত্রে প্রযোজ্য নয়।`
+      : `The administrator declared this for ${affectedArea.text}; you are registered in this area, but no occupation-specific advice in the catalogue applies to this hazard for you.`),
+    evidence: { asserted: event.evidence?.asserted ?? null, matchedArea: { role: area.role, upazilaPcode: area.upazilaPcode, districtPcode: area.districtPcode, matchMethod: area.matchMethod } },
+    hazardType: event.hazardType,
+    hazardLevel: event.level,
+    validFrom: event.validFrom,
+    validUntil: event.validUntil,
+    origin: 'admin-declared',
+    dataStatus: event.dataStatus,
+    ruleVersion: 'admin',
+    ruleStatus: 'admin',
   };
 }
 

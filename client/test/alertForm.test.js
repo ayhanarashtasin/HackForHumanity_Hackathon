@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { ageText, digits, evidenceRows, formatDhaka, number, referenceHref } from '../src/alert/format.js';
+import { ageText, digits, evidenceRows, formatDhaka, localized, number, referenceHref } from '../src/alert/format.js';
 import { criticalKey, optimisticRead, withOptimisticRead } from '../src/alert/inboxState.js';
 import { STRINGS, t } from '../src/alert/i18n.js';
 import {
@@ -294,6 +294,47 @@ test('the numbers behind an alert become labelled rows, in the page language', (
   assert.match(evidenceRows({ metrics: { rain3hMm: 62.5 } }, (key) => t('bn', key), 'bn')[0].value, /^৬২\.৫ /);
   assert.deepEqual(evidenceRows(null, tr, 'en'), []);
   assert.deepEqual(evidenceRows({ metrics: {} }, tr, 'en'), []);
+});
+
+test('a stored alert reads in whichever language the page is showing, not only the one it was sent in', () => {
+  const item = {
+    lang: 'en',
+    title: 'Heavy rain expected in Badda',
+    message: 'Rain is forecast...',
+    recommendedActions: [{ key: 'check_forecast', text: 'Check the latest forecast' }],
+    reasonForSelection: 'You are registered as a farmer...',
+    affectedArea: { scope: 'upazila', upazilaPcode: '302604', name: 'Badda', nameBn: 'বাড্ডা', text: 'Badda, Dhaka district' },
+    translations: {
+      en: {
+        title: 'Heavy rain expected in Badda',
+        message: 'Rain is forecast...',
+        recommendedActions: [{ key: 'check_forecast', text: 'Check the latest forecast' }],
+        reasonForSelection: 'You are registered as a farmer...',
+        affectedArea: { scope: 'upazila', upazilaPcode: '302604', name: 'Badda', nameBn: 'বাড্ডা', text: 'Badda, Dhaka district' },
+      },
+      bn: {
+        title: 'বাড্ডায় ভারী বৃষ্টির সম্ভাবনা',
+        message: 'বৃষ্টির পূর্বাভাস...',
+        recommendedActions: [{ key: 'check_forecast', text: 'সর্বশেষ পূর্বাভাস দেখুন' }],
+        reasonForSelection: 'আপনি কৃষক হিসেবে নিবন্ধিত...',
+        affectedArea: { scope: 'upazila', upazilaPcode: '302604', name: 'Badda', nameBn: 'বাড্ডা', text: 'বাড্ডা, ঢাকা জেলা' },
+      },
+    },
+  };
+  const en = localized(item, 'en');
+  assert.equal(en.lang, 'en');
+  assert.equal(en.title, 'Heavy rain expected in Badda');
+  const bn = localized(item, 'bn');
+  assert.equal(bn.lang, 'bn');
+  assert.equal(bn.title, 'বাড্ডায় ভারী বৃষ্টির সম্ভাবনা');
+  assert.equal(bn.affectedArea.text, 'বাড্ডা, ঢাকা জেলা');
+  assert.equal(bn.recommendedActions[0].text, 'সর্বশেষ পূর্বাভাস দেখুন');
+
+  // An alert from before `translations` existed, or free admin text left untranslated: falls back to what was actually stored and sent.
+  const untranslated = { ...item, translations: null };
+  const fallback = localized(untranslated, 'bn');
+  assert.equal(fallback.lang, 'en', 'shown in the language it was actually sent in, not silently mistranslated');
+  assert.equal(fallback.title, 'Heavy rain expected in Badda');
 });
 
 test('answers are described in plain words for the review step', () => {

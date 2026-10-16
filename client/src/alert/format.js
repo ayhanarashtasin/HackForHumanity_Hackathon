@@ -9,6 +9,16 @@ export function digits(text, lang) {
   return lang === 'bn' ? String(text).replace(/\d/g, (digit) => BN_DIGITS[Number(digit)]) : String(text);
 }
 
+// An alert's own text in the given language: the alternative reading the server stored (`translations`) if there is one, else the
+// language it was actually composed and sent in (`item.lang`, what a profile edit changes going forward). An older alert from before
+// `translations` existed, or free text the administrator left untranslated, has no `translations` and falls back the same way.
+export function localized(item, lang) {
+  const alt = item.translations?.[lang];
+  return alt ? { ...alt, lang } : {
+    title: item.title, message: item.message, recommendedActions: item.recommendedActions, reasonForSelection: item.reasonForSelection, affectedArea: item.affectedArea, lang: item.lang,
+  };
+}
+
 // "10 Oct, 15:42" / "১০ অক্টোবর, ১৫:৪২". Returns '' for a missing or invalid date.
 export function formatDhaka(value, lang = 'en', { withDate = true } = {}) {
   const time = value instanceof Date ? value.getTime() : Date.parse(value);

@@ -25,7 +25,7 @@ import { listInbox, unreadCount } from './inbox.js';
 import { ACTIONS, HAZARD_LABELS, lintText } from './messages.js';
 import { OCCUPATION_DEFS } from './schema.js';
 import { buildAreaForecast, loadSources } from './normalize.js';
-import { applyAdminMessage, applyEvent } from './notify.js';
+import { applyAdminMessage, applyEvent, applyGenericDeclaration } from './notify.js';
 import { HttpError, badRequest, notFound } from './errors.js';
 import { createSubscriber } from './subscribers.js';
 import { getSettings, updateSettings } from './settings.js';
@@ -350,9 +350,15 @@ export async function preview(body, { nowMs = Date.now() } = {}) {
     const summary = await applyEvent(event, {
       nowMs, settings: {}, roles: params.roles, audience: params.audience, dryRun: true, publishNow: true, bypassCap: true, publishedBy: 'admin',
     });
-    const critical = LIGHTNING.includes(params.hazardType) || summary.groups.some((group) => group.severity === 'CRITICAL');
+    // A declared hazard reaches everyone in the chosen area and role, not only the occupations and conditions the catalogue happens to
+    // cover: anyone the scenarios left out (summary.matchedSubscriberIds) gets the same declaration in generic, occupation-neutral wording.
+    const general = await applyGenericDeclaration(event, {
+      nowMs, roles: params.roles, audience: params.audience, excludeIds: summary.matchedSubscriberIds, dryRun: true, publishedBy: 'admin',
+    });
+    const groups = [...summary.groups, ...general.groups];
+    const critical = LIGHTNING.includes(params.hazardType) || groups.some((group) => group.severity === 'CRITICAL');
     const requires = { critical, typed: support.supported === 'no' ? 'SEND' : null };
-    const token = remember(params, { requires, recipients: summary.inserted });
+    const token = remember(params, { requires, recipients: summary.inserted + general.inserted });
     return {
       ...common,
       previewToken: token,
@@ -361,8 +367,12 @@ export async function preview(body, { nowMs = Date.now() } = {}) {
       validUntil: dhakaIso(event.validUntil),
       updatesExisting: Boolean(existing),
       support,
-      groups: summary.groups,
-      totals: { newRecipients: summary.inserted, released: 0, alreadySent: summary.groups.reduce((sum, group) => sum + group.alreadySent, 0) },
+      groups,
+      totals: {
+        newRecipients: summary.inserted + general.inserted,
+        released: 0,
+        alreadySent: groups.reduce((sum, group) => sum + group.alreadySent, 0),
+      },
       requires,
       warnings: support.supported === 'no' ? ['The cached weather data does not show this hazard for the chosen areas.'] : [],
     };
@@ -476,7 +486,17 @@ export async function send(body, { nowMs = Date.now() } = {}) {
       const summary = await applyEvent(event, {
         nowMs, settings: {}, roles: params.roles, audience: params.audience, publishNow: true, bypassCap: true, publishedBy: 'admin', batchId,
       });
-      result = { batchId, eventId: String(event._id), sent: summary.inserted, updated: summary.updated + summary.escalated, alreadySent: summary.groups.reduce((sum, group) => sum + group.alreadySent, 0), updatesExisting: Boolean(existing) };
+      const general = await applyGenericDeclaration(event, {
+        nowMs, roles: params.roles, audience: params.audience, excludeIds: summary.matchedSubscriberIds, publishedBy: 'admin', batchId,
+      });
+      result = {
+        batchId,
+        eventId: String(event._id),
+        sent: summary.inserted + general.inserted,
+        updated: summary.updated + summary.escalated,
+        alreadySent: summary.groups.reduce((sum, group) => sum + group.alreadySent, 0) + general.groups.reduce((sum, group) => sum + group.alreadySent, 0),
+        updatesExisting: Boolean(existing),
+      };
     } else {
       const event = await HazardEvent.create(eventDocument(params, nowMs, { eventKey: `adm:${batchId}`, batchId }));
       const summary = await applyAdminMessage(event, {

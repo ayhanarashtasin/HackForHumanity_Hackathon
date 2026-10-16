@@ -31,7 +31,7 @@ export function DeclareTab({ onOpenHistory }) {
   return (
     <SendSurface mode="declare" flow={flow} problems={problems} previewLabel={tr('Preview declaration')} onOpenHistory={onOpenHistory}>
       <Notice tone="info" icon="shield">
-        <strong>{tr('Declared by administrator, not detected from weather data.')}</strong> {tr('Use this for a real situation the data has not caught up with, or for a demonstration with demo subscribers only.')}
+        <strong>{tr('Declared by administrator, not detected from weather data.')}</strong> {tr('Use this for a real situation the data has not caught up with, or for a demonstration with demo subscribers only.')} {tr('Everyone chosen in the area receives it: the catalogue wording where a scenario applies, a general notice for the hazard where none does.')}
       </Notice>
 
       <div className="adm-grid-3">
