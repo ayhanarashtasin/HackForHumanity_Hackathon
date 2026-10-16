@@ -3,7 +3,7 @@ import { notifyRules } from '../../config/alertRules.js';
 import { env } from '../../config/env.js';
 import { Notification } from '../../models/Notification.js';
 import { dhakaDate, dhakaWallTime } from '../time.js';
-import { composeAdminMessage, composeNotification } from './compose.js';
+import { composeAdminMessage, composeGenericDeclaration, composeNotification } from './compose.js';
 import { metricsChanged } from './events.js';
 import { findRecipients } from './recipients.js';
 import { evaluateSubscriber, scenariosFor } from './scenarios/index.js';
@@ -20,12 +20,23 @@ const purgeAfter = (validUntil) => new Date(+new Date(validUntil) + notifyRules.
 const CONTENT_FIELDS = [
   'severity', 'title', 'message', 'recommendedActions', 'lang', 'templateKey', 'params', 'affectedArea', 'sourceReferences',
   'reasonForSelection', 'evidence', 'hazardType', 'hazardLevel', 'validFrom', 'validUntil', 'dataStatus', 'ruleVersion', 'ruleStatus',
+  'translations',
 ];
 
 function pickContent(content) {
   const picked = Object.fromEntries(CONTENT_FIELDS.map((field) => [field, content[field]]));
   picked.purgeAfter = purgeAfter(content.validUntil);
   return picked;
+}
+
+// The fields of a composed notification that read differently in each language. A subscriber's own language stays the primary
+// title/message/etc. (what every other field and every delivery channel use); `translations` is only an alternative reading for the
+// in-app inbox, so switching the page's language shows an already-sent alert in the other language too, instead of only future ones.
+const LANG_FIELDS = ['title', 'message', 'recommendedActions', 'reasonForSelection', 'affectedArea'];
+const pickLangFields = (content) => Object.fromEntries(LANG_FIELDS.map((field) => [field, content[field]]));
+
+function translationsOf(compose, args) {
+  return { en: pickLangFields(compose({ ...args, lang: 'en' })), bn: pickLangFields(compose({ ...args, lang: 'bn' })) };
 }
 
 const sameInstant = (a, b) => +new Date(a) === +new Date(b);
@@ -104,7 +115,9 @@ export async function applyEvent(event, {
   dryRun = false, publishNow = false, bypassCap = false, publishedBy = 'engine', batchId = null,
 } = {}) {
   const recipients = await findRecipients(event, { roles, audience, nowMs, areaCodes, subscriberIds });
-  const summary = { recipients: recipients.length, inserted: 0, updated: 0, escalated: 0, released: 0, refreshed: 0, unchanged: 0, skippedCap: 0, held: 0, groups: [] };
+  const summary = {
+    recipients: recipients.length, inserted: 0, updated: 0, escalated: 0, released: 0, refreshed: 0, unchanged: 0, skippedCap: 0, held: 0, groups: [], matchedSubscriberIds: [],
+  };
   if (!recipients.length) return summary;
 
   const ids = recipients.map((subscriber) => subscriber._id);
@@ -127,12 +140,16 @@ export async function applyEvent(event, {
   const groups = new Map();
   const ops = [];
   const now = new Date(nowMs);
+  // Who the catalogue has something to say to, so a declaration can tell its caller who it left out (no occupation scenario applies).
+  const matched = new Set();
 
   for (const subscriber of recipients) {
     for (const { scenario, area, result } of evaluateSubscriber({ subscriber, event, nowMs })) {
       if (areaCodes?.length && !areaCodes.includes(area.upazilaPcode) && !areaCodes.includes(area.districtPcode)) continue;
+      matched.add(String(subscriber._id));
 
       const content = composeNotification({ scenarioId: scenario.id, result, event, subscriber, area, nowMs });
+      content.translations = translationsOf(composeNotification, { scenarioId: scenario.id, result, event, subscriber, area, nowMs });
       const key = groupKey(subscriber, scenario.id, content);
       let group = groups.get(key);
       if (!group) {
@@ -278,6 +295,7 @@ export async function applyEvent(event, {
   }
 
   summary.groups = [...groups.values()];
+  summary.matchedSubscriberIds = [...matched];
   if (!dryRun && ops.length) await writeOps(ops);
   return summary;
 }
@@ -305,6 +323,7 @@ export async function applyAdminMessage(event, {
     summary.recipients += 1;
 
     const content = composeAdminMessage({ event, subscriber, area, severity, title, text, actions, referenceUrl, nowMs });
+    content.translations = translationsOf(composeAdminMessage, { event, subscriber, area, severity, title, text, actions, referenceUrl, nowMs });
     const key = `${subscriber.occupation}|ADMIN-MSG|${content.affectedArea.scope}:${content.affectedArea.upazilaPcode ?? content.affectedArea.districtPcode}`;
     let group = groups.get(key);
     if (!group) {
@@ -337,6 +356,77 @@ export async function applyAdminMessage(event, {
           revision: 1,
           renotifications: 0,
           lifecycle: [{ at: now, type: 'created', note: 'Sent by the administrator.' }],
+          purgeAfter: purgeAfter(content.validUntil),
+        },
+      },
+    });
+  }
+
+  summary.groups = [...groups.values()];
+  if (!dryRun && ops.length) await writeOps(ops);
+  return summary;
+}
+
+// Admin-declared hazard, generic wording (ADMIN-GENERAL), for subscribers in the chosen area/role/audience whom no catalogue scenario
+// matched (excludeIds: applyEvent's matchedSubscriberIds). So "declare a hazard, choose an area" reaches everyone registered there, not
+// only the occupations and conditions (crop stage, shift, activity) the catalogue happens to cover for this hazard.
+export async function applyGenericDeclaration(event, {
+  nowMs = Date.now(), roles = null, audience = 'live', areaCodes = null, excludeIds = [], dryRun = false, publishedBy = 'admin', batchId = null,
+}) {
+  const recipients = await findRecipients(event, { roles, audience, nowMs, areaCodes });
+  const exclude = new Set(excludeIds.map(String));
+  const candidates = recipients.filter((subscriber) => !exclude.has(String(subscriber._id)));
+  const summary = { recipients: 0, inserted: 0, unchanged: 0, groups: [] };
+  const groups = new Map();
+  const ops = [];
+  const now = new Date(nowMs);
+
+  const existingRows = candidates.length
+    ? await Notification.find({ hazardEventId: event._id, scenarioId: 'ADMIN-GENERAL', subscriberId: { $in: candidates.map((subscriber) => subscriber._id) } }).lean()
+    : [];
+  const existing = new Set(existingRows.map((row) => String(row.subscriberId)));
+
+  for (const subscriber of candidates) {
+    const areas = subscriber.areas.filter((item) => (event.coverage.upazilaPcodes?.includes(item.upazilaPcode) || event.coverage.districtPcodes?.includes(item.districtPcode))
+      && (!areaCodes?.length || areaCodes.includes(item.upazilaPcode) || areaCodes.includes(item.districtPcode)));
+    if (!areas.length) continue;
+    const area = areas.find((item) => item.role === 'home') ?? areas[0];
+    summary.recipients += 1;
+
+    const content = composeGenericDeclaration({ event, subscriber, area, nowMs });
+    content.translations = translationsOf(composeGenericDeclaration, { event, subscriber, area, nowMs });
+    const key = `${subscriber.occupation}|ADMIN-GENERAL|${content.affectedArea.scope}:${content.affectedArea.upazilaPcode ?? content.affectedArea.districtPcode}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        ...newGroup(subscriber, 'ADMIN-GENERAL', content, dryRun
+          ? { en: composeGenericDeclaration({ event, subscriber, area, nowMs, lang: 'en' }), bn: composeGenericDeclaration({ event, subscriber, area, nowMs, lang: 'bn' }) }
+          : null),
+      };
+      groups.set(key, group);
+    }
+    group.recipients += 1;
+
+    if (existing.has(String(subscriber._id))) { summary.unchanged += 1; group.alreadySent += 1; continue; }
+    summary.inserted += 1;
+    group.newCount += 1;
+    if (dryRun) continue;
+    ops.push({
+      insertOne: {
+        document: {
+          ...content,
+          subscriberId: subscriber._id,
+          occupation: subscriber.occupation,
+          hazardEventId: event._id,
+          isDemo: Boolean(subscriber.isDemo || event.isDemo),
+          status: 'active',
+          publishedAt: now,
+          publishedBy,
+          batchId,
+          readAt: null,
+          revision: 1,
+          renotifications: 0,
+          lifecycle: [{ at: now, type: 'created', note: 'Sent by the administrator (general notice; no catalogue scenario applied to this profile).' }],
           purgeAfter: purgeAfter(content.validUntil),
         },
       },

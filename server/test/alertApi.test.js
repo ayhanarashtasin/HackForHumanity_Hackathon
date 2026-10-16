@@ -526,6 +526,53 @@ dbTest('declare a hazard: role-specific wording, a support check, typed and crit
   assert.equal((await admin.call('/admin/preview', { method: 'POST', body: { ...strike, areas: { districts: ['9999'] } } })).status, 400);
 });
 
+dbTest('declare a hazard: everyone chosen in the area receives it, even an occupation with no catalogue scenario for this hazard', async () => {
+  const farmer = new Client();
+  await farmer.call('/alerts/subscribe', { method: 'POST', body: farmerForm() }); // matches FARM-01
+  const fisherman = new Client();
+  // HEAVY_RAIN has no fisherman scenario at all (fisherman.js only covers lightning and marine/wind hazards).
+  await fisherman.call('/alerts/subscribe', { method: 'POST', body: { ...farmerForm(), occupation: 'fisherman', occupationData: { waterBody: 'river', status: 'ashore' } } });
+  const admin = await adminSignIn();
+  const rain = { mode: 'declare', hazardType: 'HEAVY_RAIN', level: 2, hours: 4, roles: ['farmer', 'fisherman'], areas: { upazilas: [BADDA] } };
+
+  const preview = (await admin.call('/admin/preview', { method: 'POST', body: rain })).json.data;
+  assert.equal(preview.totals.newRecipients, 2, 'both the matched farmer and the unmatched fisherman are counted');
+  assert.deepEqual(preview.groups.map((g) => g.scenarioId).sort(), ['ADMIN-GENERAL', 'FARM-01']);
+  const general = preview.groups.find((g) => g.scenarioId === 'ADMIN-GENERAL');
+  assert.equal(general.occupation, 'fisherman');
+  assert.equal(general.hazardType, 'HEAVY_RAIN');
+  assert.equal(general.level, 2);
+
+  assert.equal(preview.requires.typed, null, 'no cached weather data either way: the support check is unknown, not "no"');
+  const sent = await admin.call('/admin/send', { method: 'POST', body: { ...rain, idempotencyKey: 'declare-general-0001', previewToken: preview.previewToken } });
+  assert.equal(sent.status, 201);
+  assert.equal(sent.json.data.result.sent, 2);
+
+  const farmerNote = await Notification.findOne({ occupation: 'farmer' }).lean();
+  assert.equal(farmerNote.scenarioId, 'FARM-01');
+  // Stored bilingually, so the inbox's language toggle can show this already-sent alert either way, not only new ones.
+  assert.equal(farmerNote.lang, 'en');
+  assert.equal(farmerNote.translations.en.title, farmerNote.title);
+  assert.notEqual(farmerNote.translations.bn.title, farmerNote.title);
+  assert.match(farmerNote.translations.bn.message, /[ঀ-৿]/u, 'the Bangla reading is actually in Bangla');
+  assert.equal(farmerNote.translations.bn.affectedArea.upazilaPcode, farmerNote.affectedArea.upazilaPcode, 'the place itself does not change with language');
+
+  const fishermanNote = await Notification.findOne({ occupation: 'fisherman' }).lean();
+  assert.equal(fishermanNote.scenarioId, 'ADMIN-GENERAL');
+  assert.equal(fishermanNote.origin, 'admin-declared');
+  assert.equal(fishermanNote.ruleVersion, 'admin');
+  assert.equal(fishermanNote.severity, 'WARNING', 'declared level 2, non-lightning: WARNING, never CRITICAL for a hazard the catalogue itself never sends as CRITICAL');
+  assert.match(fishermanNote.message, /An administrator has declared heavy rain/);
+  assert.match(fishermanNote.translations.bn.message, /ঘোষণা করেছেন/, 'the generic fallback is bilingual too');
+  assert.match(fishermanNote.message, /not detected from weather data/);
+  assert.equal((await fisherman.call('/alerts/inbox')).json.data.items[0].scenarioId, 'ADMIN-GENERAL');
+
+  // Sending again for the same declaration does not duplicate either notification.
+  const again = (await admin.call('/admin/preview', { method: 'POST', body: rain })).json.data;
+  assert.equal(again.totals.newRecipients, 0);
+  assert.equal(again.totals.alreadySent, 2);
+});
+
 dbTest('a free message: validated, linted, labelled as the administrator and never as BMD', async () => {
   const vendor = new Client();
   await vendor.call('/alerts/subscribe', { method: 'POST', body: { ...farmerForm(), occupation: 'vendor', occupationData: { outdoorStall: true, shelterAccess: 'partial', hoursOutdoor: '4to8' } } });
@@ -587,6 +634,67 @@ dbTest('withdrawing a send marks it withdrawn, never an all-clear, and a second 
   assert.equal(history.sends.find((entry) => entry.action === 'send-weather').delivery.total, 1);
   assert.ok(history.sends.some((entry) => entry.action === 'withdraw'));
   assert.ok(history.automatic.length >= 1);
+});
+
+dbTest('withdrawing an automatic (engine-detected) event by its own id cannot be repeated either', async () => {
+  const farmer = new Client();
+  await farmer.call('/alerts/subscribe', { method: 'POST', body: farmerForm() });
+  await liveWeather({ rainMm: 25 });
+  const admin = await adminSignIn();
+  const { runTick } = await import('../src/services/alerts/engine.js');
+  await runTick({});
+
+  const before = (await admin.call('/admin/history')).json.data;
+  const eventId = before.automatic.find((event) => event.lifecycle === 'active').id;
+
+  const first = await admin.call(`/admin/alerts/${eventId}/withdraw`, { method: 'POST', body: { reason: 'False positive' } });
+  assert.equal(first.status, 200);
+  assert.equal(first.json.data.events, 1);
+  const event = await HazardEvent.findById(eventId).lean();
+  assert.equal(event.lifecycle, 'withdrawn');
+  assert.equal(event.withdrawal.reason, 'False positive');
+
+  // Withdrawing the same event id again must not silently "succeed" a second time: nothing new is withdrawn, so it is 404, exactly
+  // like a repeated withdrawal by batch id already is above. Overwriting who withdrew it, when and why is never acceptable either.
+  const second = await admin.call(`/admin/alerts/${eventId}/withdraw`, { method: 'POST', body: { reason: 'Someone else, later, different reason' } });
+  assert.equal(second.status, 404);
+  const unchanged = await HazardEvent.findById(eventId).lean();
+  assert.equal(unchanged.withdrawal.reason, 'False positive', 'the first withdrawal record is not overwritten by the repeat');
+  assert.equal(unchanged.revision, event.revision, 'and nothing about it was touched again');
+
+  const history = (await admin.call('/admin/history')).json.data;
+  assert.equal(history.sends.filter((entry) => entry.action === 'withdraw').length, 1, 'only the one real withdrawal is in the audit trail');
+});
+
+dbTest('a send that fails is not replayed as "already sent": the same click retries for real', async () => {
+  const farmer = new Client();
+  await farmer.call('/alerts/subscribe', { method: 'POST', body: farmerForm() });
+  const admin = await adminSignIn();
+  const declare = {
+    mode: 'declare', hazardType: 'HEAVY_RAIN', level: 1, hours: 4, roles: ['farmer'], areas: { upazilas: [BADDA] },
+  };
+
+  // Record a failed attempt under a known key, the same way send() itself would after an exception (e.g. the rate limit, or any
+  // other failure between claiming the key and finishing).
+  const key = 'retry-after-failure-0001';
+  await AdminAction.create({
+    at: new Date(), action: 'declare', idempotencyKey: key, outcome: 'failed', reason: 'At most 20 sends an hour.',
+  });
+
+  const preview = (await admin.call('/admin/preview', { method: 'POST', body: declare })).json.data;
+  const retried = await admin.call('/admin/send', { method: 'POST', body: { ...declare, idempotencyKey: key, previewToken: preview.previewToken } });
+  assert.equal(retried.status, 201, 'a real attempt, not a replay of the dead one');
+  assert.equal(retried.json.data.replayed, false);
+  assert.equal(retried.json.data.result.sent, 1, 'the alert actually went out this time, not "0 sent"');
+  assert.equal(await Notification.countDocuments({ occupation: 'farmer' }), 1);
+  const action = await AdminAction.findOne({ idempotencyKey: key }).lean();
+  assert.equal(action.outcome, 'ok', 'the one row for this key now reflects the real send, not the dead attempt');
+
+  // The key is now used up by a real send, exactly like any other: replaying it again sends nothing more.
+  const replay = await admin.call('/admin/send', { method: 'POST', body: { ...declare, idempotencyKey: key, previewToken: preview.previewToken } });
+  assert.equal(replay.status, 200);
+  assert.equal(replay.json.data.replayed, true);
+  assert.equal(await Notification.countDocuments({ occupation: 'farmer' }), 1, 'still just the one notification');
 });
 
 dbTest('hold and kill switches are validated, audited and visible; a hold keeps alerts away from the inbox until they are released', async () => {

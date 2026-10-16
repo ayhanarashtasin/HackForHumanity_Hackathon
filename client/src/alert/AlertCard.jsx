@@ -6,7 +6,7 @@ import { OfficialNotice } from '../components/OfficialNotice.jsx';
 import { SeverityChip } from '../components/SeverityChip.jsx';
 import { mapHref } from '../lib/alertForm.js';
 import { useAlert } from './context.js';
-import { evidenceRows, formatDhaka, number, referenceHref } from './format.js';
+import { evidenceRows, formatDhaka, localized, number, referenceHref } from './format.js';
 import { translate } from '../i18n/index.js';
 
 // One personal alert, with everything the plan requires on it: affected area, hazard and severity, source and time, validity,
@@ -38,6 +38,7 @@ export function AlertCard({ item, onRead }) {
   const { tr, lang, index } = useAlert();
   const [open, setOpen] = useState(false);
   const detailsId = useId();
+  const view = localized(item, lang);
   const unread = !item.readAt;
   const ended = item.status === 'expired' || item.status === 'withdrawn';
   const critical = item.severity === 'CRITICAL' && !ended;
@@ -68,9 +69,9 @@ export function AlertCard({ item, onRead }) {
         {item.dataStatus !== 'FRESH' && <DataStatus status={item.dataStatus} lang={lang} />}
       </header>
 
-      <h3 id={`${detailsId}-title`} lang={item.lang}>{item.title}</h3>
+      <h3 id={`${detailsId}-title`} lang={view.lang}>{view.title}</h3>
       <p className="alert-card-meta">
-        <span lang={item.lang}><Icon name="pin" size={16} />{item.affectedArea?.text}</span>
+        <span lang={view.lang}><Icon name="pin" size={16} />{view.affectedArea?.text}</span>
         <span><Icon name="clock" size={16} />
           {startsLater ? `${tr('card.from', { time: formatDhaka(item.validFrom, lang) })} · ` : ''}
           {tr('card.valid', { time: formatDhaka(item.validUntil, lang) })}
@@ -80,18 +81,18 @@ export function AlertCard({ item, onRead }) {
       {ended && <p className="alert-note alert-note--ended">{tr(item.status === 'withdrawn' ? 'card.withdrawn' : 'card.ended')}</p>}
       {item.evidence?.scopeUncertain && <p className="alert-note">{tr('card.scopeUncertain')}</p>}
 
-      <p className="alert-card-message" lang={item.lang}>{item.message}</p>
+      <p className="alert-card-message" lang={view.lang}>{view.message}</p>
       <OfficialNotice notice={item.evidence?.official} lang={lang} validityAssumed={item.evidence?.validityAssumed} />
 
       <section className="alert-card-why">
         <h4>{tr('card.why')}</h4>
-        <p lang={item.lang}>{item.reasonForSelection}</p>
+        <p lang={view.lang}>{view.reasonForSelection}</p>
       </section>
 
-      {item.recommendedActions?.length > 0 && (
+      {view.recommendedActions?.length > 0 && (
         <section className="alert-card-do">
           <h4>{tr('card.do')}</h4>
-          <ul lang={item.lang}>{item.recommendedActions.map((action) => <li key={action.key}><Icon name="check" size={16} />{action.text}</li>)}</ul>
+          <ul lang={view.lang}>{view.recommendedActions.map((action) => <li key={action.key}><Icon name="check" size={16} />{action.text}</li>)}</ul>
         </section>
       )}
 
@@ -110,7 +111,7 @@ export function AlertCard({ item, onRead }) {
       {open && (
         <div className="alert-card-details" id={detailsId}>
           <dl className="alert-dl">
-            <div><dt>{tr('card.area')}</dt><dd lang={item.lang}>{item.affectedArea?.text}</dd></div>
+            <div><dt>{tr('card.area')}</dt><dd lang={view.lang}>{view.affectedArea?.text}</dd></div>
             <div><dt>{tr('card.data')}</dt><dd><DataStatus status={item.dataStatus} lang={lang} /></dd></div>
             {item.hazardLevel > 0 && <div><dt>{tr('card.level')}</dt><dd>{number(item.hazardLevel, lang)} / {number(3, lang)}</dd></div>}
             {metrics.map((row) => <div key={row.key}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}

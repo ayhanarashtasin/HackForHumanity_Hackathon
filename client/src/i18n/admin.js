@@ -170,6 +170,7 @@ export const ADMIN = {
   'Preview declaration': 'ঘোষণা আগে দেখুন',
   'Declared by administrator, not detected from weather data.': 'এটি প্রশাসকের ঘোষণা, আবহাওয়ার তথ্য থেকে শনাক্ত করা নয়।',
   'Use this for a real situation the data has not caught up with, or for a demonstration with demo subscribers only.': 'বাস্তবে ঝুঁকি দেখা দিলেও তথ্য এখনো হালনাগাদ না হলে এটি ব্যবহার করুন। প্রদর্শনের জন্য শুধু পরীক্ষার প্রোফাইল বেছে নিন।',
+  'Everyone chosen in the area receives it: the catalogue wording where a scenario applies, a general notice for the hazard where none does.': 'বেছে নেওয়া এলাকার সবাই এটি পাবেন: যেখানে কোনো নিয়ম প্রযোজ্য সেখানে তার নির্দিষ্ট বার্তা, আর যেখানে প্রযোজ্য নয় সেখানে এই ঝুঁকির একটি সাধারণ বিজ্ঞপ্তি।',
   'Hazard': 'আবহাওয়াজনিত ঝুঁকি',
   'Choose a hazard…': 'ঝুঁকির ধরন বেছে নিন…',
   'Choose a hazard first.': 'আগে ঝুঁকির ধরন বেছে নিন।',

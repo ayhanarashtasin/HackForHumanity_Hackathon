@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePolled } from '../hooks/usePolled.js';
 import { alertApi } from '../services/alertApi.js';
 import { clearHint, setUnread } from './alertStore.js';
+import { localized } from './format.js';
 import { criticalKey, optimisticRead, withOptimisticRead } from './inboxState.js';
 
 const POLL_MS = 30_000;
@@ -9,7 +10,7 @@ const POLL_MS = 30_000;
 // The inbox: current alerts polled every 30 s (a read of our own database, never a provider request), earlier ones paged on demand.
 // Marking read is optimistic and shared by both lists. `announce` turns the title of a newly arrived CRITICAL alert into the text for a
 // polite live region. `onSignedOut` is called when the server says this browser has no profile any more (401).
-export function useInbox({ enabled, announce, onSignedOut }) {
+export function useInbox({ enabled, announce, lang, onSignedOut }) {
   const [readAt, setReadAt] = useState({}); // id -> optimistic read of one notification stage
   const [earlier, setEarlier] = useState({ items: [], hasMore: false, loaded: false, loadingMore: false, error: null });
   const [announcement, setAnnouncement] = useState('');
@@ -42,8 +43,8 @@ export function useInbox({ enabled, announce, onSignedOut }) {
     }
     const fresh = critical.filter((item) => !item.readAt && !knownCritical.current.has(criticalKey(item)));
     fresh.forEach((item) => knownCritical.current.add(criticalKey(item)));
-    if (fresh.length) setAnnouncement(announce(fresh[0].title));
-  }, [active, announce]);
+    if (fresh.length) setAnnouncement(announce(localized(fresh[0], lang).title));
+  }, [active, announce, lang]);
 
   const loadEarlier = useCallback(async () => {
     try {

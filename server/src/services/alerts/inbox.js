@@ -23,6 +23,7 @@ export function toItem(doc, now = new Date()) {
     message: doc.message,
     recommendedActions: doc.recommendedActions,
     lang: doc.lang,
+    translations: doc.translations ?? null,
     affectedArea: doc.affectedArea,
     sourceReferences: doc.sourceReferences,
     reasonForSelection: doc.reasonForSelection,

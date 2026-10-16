@@ -52,7 +52,7 @@ export default function AlertPage() {
 
   const ready = phase === 'ready';
   const announce = useCallback((title) => tr('inbox.live', { title }), [tr]);
-  const inbox = useInbox({ enabled: ready, announce, onSignedOut: session.signedOut });
+  const inbox = useInbox({ enabled: ready, announce, lang, onSignedOut: session.signedOut });
   const coverage = usePolled(alertApi.coverage, COVERAGE_POLL_MS, { enabled: ready });
   const status = usePolled(alertApi.status, COVERAGE_POLL_MS, { enabled: ready });
   const unread = useUnreadFromInbox(inbox);

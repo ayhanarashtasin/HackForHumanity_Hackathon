@@ -42,6 +42,10 @@ const notificationSchema = new mongoose.Schema(
     message: { type: String, required: true },
     recommendedActions: { type: [actionSchema], default: [] },
     lang: { type: String, enum: ['bn', 'en'], default: 'en' },
+    // The same alert read in the other language, so the inbox page's language toggle shows an already-stored alert correctly instead
+    // of only new ones: { en: {title, message, recommendedActions, reasonForSelection, affectedArea}, bn: {...} }. Everything else
+    // (severity, hazard, evidence, times...) does not vary by language, so it is not duplicated here.
+    translations: { type: mongoose.Schema.Types.Mixed, default: undefined },
     templateKey: { type: String, default: null },
     params: { type: mongoose.Schema.Types.Mixed, default: {} },
     affectedArea: {
