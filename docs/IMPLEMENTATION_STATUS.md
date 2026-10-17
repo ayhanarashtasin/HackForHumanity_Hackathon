@@ -4,6 +4,8 @@ Last verified: **11 October 2026**. This document says what is built against [`A
 
 ## Verification
 
+The table below records earlier verification results. Current installation and test commands are maintained in the [README](../README.md#testing).
+
 | Check | Result |
 | --- | --- |
 | `npm run test:db` (server, including MongoDB-backed tests, isolated random databases) | **354 passed, 0 failed, 0 skipped** |

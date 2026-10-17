@@ -57,6 +57,14 @@ export default function AlertPage() {
   const status = usePolled(alertApi.status, COVERAGE_POLL_MS, { enabled: ready });
   const unread = useUnreadFromInbox(inbox);
   const refreshLive = useCallback(() => { inbox.reload(); coverage.reload(); status.reload(); }, [inbox.reload, coverage.reload, status.reload]);
+  const currentAreaRef = useRef(null);
+  const currentAreaPcode = profile?.currentArea?.upazilaPcode ?? null;
+  useEffect(() => {
+    if (currentAreaRef.current !== currentAreaPcode) {
+      currentAreaRef.current = currentAreaPcode;
+      if (ready) refreshLive();
+    }
+  }, [currentAreaPcode, ready, refreshLive]);
 
   // Switching language also switches the language new alerts are written in (a profile edit); it is reverted if that fails.
   const setLang = useCallback(async (code) => {
@@ -164,7 +172,7 @@ export default function AlertPage() {
             <BulletinPanel bulletins={status.data?.bulletins ?? null} error={status.error} />
           </div>
           <aside className="alert-col-side">
-            <LiveLocation profile={profile} onProfile={session.setProfile} onUpdated={refreshLive} />
+            <LiveLocation profile={profile} onProfile={session.setCurrentArea} />
             <ActivityControl profile={profile} onChange={session.setProfile} />
             <ChannelsPanel />
             <ProfilePanel profile={profile} onEdit={() => { setNotice(null); setView('edit'); }} onProfile={session.setProfile} onDeleted={deleted} />

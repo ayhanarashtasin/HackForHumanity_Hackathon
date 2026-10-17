@@ -6,6 +6,8 @@ export const STORM_STEPS = [30, 60, 90];
 export const STORM_LABEL_CELLS = 8;
 // The upazilas a storm warning applies to are drawn in the WARNING amber of the alert ramp (docs/design.md): they are the same places.
 export const STORM_WARNING_COLOR = '#F2A03D';
+export const STORM_COLORS = { 4: '#E9B949', 5: '#E0703A', 6: '#B8322A' };
+export const STORM_INTENSITY = { 4: 'Strong', 5: 'Severe', 6: 'Extreme' };
 
 // Canvas text stays in English like every other map label.
 const clock = (ms) => formatClock(ms, 'en');
@@ -62,7 +64,7 @@ export function stormFeatures(snapshot, locationByPcode = new Map()) {
     const location = locationByPcode.get(arrival.pcode);
     if (!location) continue;
     const label = [location.name, clock(Date.parse(arrival.arrivalAt))].filter(Boolean).join(' ');
-    feature({ type: 'Point', coordinates: [location.lon, location.lat] }, { kind: 'arrival', soon: Boolean(arrival.soon), label });
+    feature({ type: 'Point', coordinates: [location.lon, location.lat] }, { id: arrival.pcode, kind: 'arrival', soon: Boolean(arrival.soon), label });
   }
   return features;
 }

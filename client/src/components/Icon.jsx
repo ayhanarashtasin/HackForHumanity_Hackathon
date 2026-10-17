@@ -2,6 +2,8 @@
 const SHAPES = {
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   close: <path d="M18 6 6 18M6 6l12 12" />,
+  maximize: <path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5" />,
+  minimize: <path d="M3 8h5V3M16 3v5h5M21 16h-5v5M8 21v-5H3" />,
   arrow: <path d="M5 12h14M13 6l6 6-6 6" />,
   check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
   map: <><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z" /><path d="M9 3v15M15 6v15" /></>,

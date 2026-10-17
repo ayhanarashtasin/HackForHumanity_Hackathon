@@ -5,7 +5,9 @@ import { neighbourhoodById } from '../lib/neighbourhoods.js';
 import { LABELS_ANCHOR, buildBaseStyle } from '../lib/mapStyle.js';
 import { BASEMAP, PALETTE, STATUS_COLORS } from '../lib/palette.js';
 import { SIGN_LAYERS, colorAt, dim, textOn } from '../lib/scales.js';
-import { STORM_WARNING_COLOR, arrivalTiers, stormFeatures } from '../lib/stormMap.js';
+import { WEATHER_ICON_SIZES, weatherIconSize, weatherMarkerLayout } from '../lib/weatherLayers.js';
+import { STORM_COLORS, STORM_WARNING_COLOR, arrivalTiers, stormFeatures } from '../lib/stormMap.js';
+import { INDICATOR_FILL_LAYERS, INDICATOR_HIT_LAYERS, LIGHTNING_COLORS, indicatorCandidates, indicatorFromFeature, indicatorKey } from '../lib/mapIndicators.js';
 import { translate } from '../i18n/index.js';
 import { MAP } from '../i18n/map.js';
 import { getLanguage } from '../i18n/language.js';
@@ -37,16 +39,7 @@ const NONE = pidFilter([]);
 const ROUTE_STOP_LAYERS = ['route-stop-circles', 'route-area-dots'];
 const TRANSPARENT = 'rgba(0,0,0,0)';
 
-export const LIGHTNING_COLORS = {
-  reported: '#FFB800',
-  none: PALETTE.sage,
-  stale: STATUS_COLORS.stale,
-  unavailable: STATUS_COLORS.unavailable,
-  'not-checked': STATUS_COLORS.unavailable,
-};
-
-// Storm cells by cloud-top intensity class from the tracker (4 yellow, 5 red, 6 dark red on the satellite palette).
-export const STORM_COLORS = { 4: '#E9B949', 5: '#E0703A', 6: '#B8322A' };
+export { LIGHTNING_COLORS, STORM_COLORS };
 const STORM_LAYERS = [
   'storm-arrival-fill', 'storm-arrival-line', 'storm-ring-fill', 'storm-ring', 'storm-cell', 'storm-cell-line', 'storm-track', 'storm-arrow',
   'storm-step', 'storm-step-label', 'storm-label', 'storm-arrival-label',
@@ -122,6 +115,8 @@ export class WeatherMap {
         'Mugda point: © OpenStreetMap contributors (ODbL)',
       ],
     }), 'bottom-left');
+    // MapLibre initially expands even compact credits; keep the long strip behind its info button.
+    container.querySelector('.maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-button')?.click();
     this.map.addControl(new NavigationControl({ showCompass: false }), 'bottom-right');
     this.setLanguage(getLanguage());
 
@@ -178,6 +173,7 @@ export class WeatherMap {
     map.addSource('user-position', { type: 'geojson', data: EMPTY });
     map.addSource('route', { type: 'geojson', data: EMPTY });
     map.addSource('route-stops', { type: 'geojson', data: EMPTY });
+    map.addSource('indicator-hover', { type: 'geojson', data: EMPTY });
 
     const before = LABELS_ANCHOR;
     const add = (layer, beforeId = before) => map.addLayer(layer, beforeId);
@@ -249,13 +245,32 @@ export class WeatherMap {
       });
     }
 
-    // Only Bangladesh is shown. Everything outside the national border (the neighbouring countries, the sea and their labels, and the
-    // parts of the radar and satellite images that spill past the border) is painted over with the canvas color. The mask sits above
-    // the basemap, weather fills and raster layers, and below the lightning circles, which can legitimately reach past the border.
+    // Country/weather fills otherwise cover the basemap's rivers. Keep real water polygons and centerlines above those fills,
+    // but below the outside mask and storm/lightning overlays; no hand-drawn substitute river routes.
+    for (const id of ['water', 'waterway-casing', 'waterway']) map.moveLayer(id, LABELS_ANCHOR);
+
+    // Hide neighbouring land and its labels. Restore ocean water above the mask so the Bay has its real coastline;
+    // storm and lightning layers stay above both, including storms approaching from the Bay.
     if (national) {
       map.addSource('outside', { type: 'geojson', data: outsideMask(national) });
       map.addLayer({ id: 'outside-mask', type: 'fill', source: 'outside', paint: { 'fill-color': BASEMAP.land, 'fill-antialias': false } });
     }
+    map.addLayer({
+      id: 'bay-water', type: 'fill', source: 'openmaptiles', 'source-layer': 'water',
+      filter: ['==', ['get', 'class'], 'ocean'], paint: { 'fill-color': BASEMAP.water },
+    });
+    // A local label keeps the northern Bay named even when the basemap's sea label falls outside the Bangladesh view.
+    map.addSource('bay-of-bengal', {
+      type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [90.3, 21] } },
+    });
+    map.addLayer({
+      id: 'bay-of-bengal-label', type: 'symbol', source: 'bay-of-bengal', maxzoom: 9,
+      layout: {
+        'text-field': 'Bay of Bengal', 'text-font': ['Noto Sans Italic'],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 5, 12, 8, 17], 'text-letter-spacing': 0.12,
+      },
+      paint: { 'text-color': BASEMAP.label, 'text-halo-color': BASEMAP.water, 'text-halo-width': 1.5 },
+    });
     // Drawn after the mask so the whole border line shows, not just its inner half.
     map.addLayer({
       id: 'national-line', type: 'line', source: 'national',
@@ -279,6 +294,8 @@ export class WeatherMap {
       },
       paint: { 'text-color': PALETTE.cream, 'text-opacity': 0.9, 'text-halo-color': BASEMAP.halo, 'text-halo-width': 1.4 },
     });
+    // Dense ward/union names yield to river names; weather symbols still have the highest placement priority.
+    map.moveLayer('names-areas', 'label-river');
     this.addMarkerLayer('markers-district', 'district', 0, UPAZILA_ZOOM);
     this.addMarkerLayer('markers-upazila', 'upazila', UPAZILA_ZOOM, 24);
     map.addLayer({
@@ -296,6 +313,14 @@ export class WeatherMap {
     map.addLayer({
       id: 'user-position-dot', type: 'circle', source: 'user-position', filter: ['==', ['geometry-type'], 'Point'],
       paint: { 'circle-radius': 6, 'circle-color': PALETTE.olive, 'circle-stroke-color': PALETTE.cream, 'circle-stroke-width': 3 },
+    });
+    map.addLayer({
+      id: 'indicator-hover-line', type: 'line', source: 'indicator-hover', filter: ['!=', ['geometry-type'], 'Point'],
+      paint: { 'line-color': PALETTE.cream, 'line-width': 3, 'line-opacity': 0.95 },
+    });
+    map.addLayer({
+      id: 'indicator-hover-point', type: 'circle', source: 'indicator-hover', filter: ['==', ['geometry-type'], 'Point'],
+      paint: { 'circle-radius': 12, 'circle-color': TRANSPARENT, 'circle-stroke-color': PALETTE.cream, 'circle-stroke-width': 2.5 },
     });
     // Alternative routes: dashed and muted under the chosen one, with a wide invisible line so they are easy to point at and click.
     map.addLayer({ id: 'route-alt-casing', type: 'line', source: 'route', filter: ['==', ['get', 'role'], 'alternative'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': PALETTE.cream, 'line-width': 6, 'line-opacity': 0.75 } });
@@ -331,7 +356,12 @@ export class WeatherMap {
 
     map.on('click', (event) => this.onClick(event));
     map.on('mousemove', (event) => this.onMouseMove(event));
-    map.on('mouseout', () => { this.setHover(null, null); this.handlers.onRouteHover?.(null); });
+    map.on('mouseout', event => {
+      if (event.originalEvent?.relatedTarget?.closest?.('.map-inspection')) return;
+      if (!this.inspection?.pinned) this.clearInspection();
+      this.handlers.onRouteHover?.(null);
+    });
+    map.on('movestart', () => this.clearInspection());
 
     this.ready = true;
     this.handlers.onReady?.();
@@ -348,7 +378,8 @@ export class WeatherMap {
       filter: ['==', ['get', 'level'], level],
       layout: {
         'icon-image': ['get', 'icon'],
-        'icon-size': ['interpolate', ['linear'], ['zoom'], 5, 0.58, 8, 0.72, 11, 0.9],
+        'icon-size': ['interpolate', ['linear'], ['zoom'], ...WEATHER_ICON_SIZES.flat()],
+        'icon-offset': ['get', 'iconOffset'],
         'icon-rotate': ['get', 'rot'],
         'icon-rotation-alignment': 'map',
         'icon-allow-overlap': false,
@@ -356,7 +387,11 @@ export class WeatherMap {
         'text-font': ['Noto Sans Bold'],
         'text-size': ['interpolate', ['linear'], ['zoom'], 5, 10, 11, 13],
         'text-anchor': ['case', isBadge, 'center', 'top'],
-        'text-offset': ['case', isBadge, ['literal', [0, 0]], ['literal', [0, 0.95]]],
+        'text-offset': ['interpolate', ['linear'], ['zoom'],
+          5, ['array', 'number', 2, ['get', 'textOffsetSmall']],
+          8, ['array', 'number', 2, ['get', 'textOffsetMedium']],
+          11, ['array', 'number', 2, ['get', 'textOffsetLarge']],
+        ],
         'text-allow-overlap': false,
         'text-optional': true,
         'symbol-sort-key': ['get', 'sort'],
@@ -381,7 +416,7 @@ export class WeatherMap {
       source: 'markers',
       minzoom,
       maxzoom,
-      filter: ['==', ['get', 'level'], level],
+      filter: ['all', ['==', ['get', 'level'], level], ['==', ['get', 'primary'], true]],
       layout: {
         'text-field': ['get', 'name'],
         'text-font': ['Noto Sans Regular'],
@@ -483,7 +518,9 @@ export class WeatherMap {
   setStorms({ visible, snapshot, image }) {
     if (!this.ready) return;
     const { map } = this;
-    map.getSource('storms').setData({ type: 'FeatureCollection', features: visible ? stormFeatures(snapshot, this.locationByPcode) : [] });
+    this.stormSnapshot = visible ? snapshot : null;
+    this.stormFeatures = visible ? stormFeatures(snapshot, this.locationByPcode) : [];
+    map.getSource('storms').setData({ type: 'FeatureCollection', features: this.stormFeatures });
     for (const id of STORM_LAYERS) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');
 
     const tiers = arrivalTiers(visible ? snapshot?.arrivals ?? [] : [], this.catalogue.polygons);
@@ -504,29 +541,32 @@ export class WeatherMap {
   }
 
   // ---------- weather signs ----------
-  // Recomputes every marker and polygon color for one sign layer at one forecast step.
-  setSigns({ layerId, snapshot, stepIndex, status }) {
+  // Each selected variable gets its own symbol; only the chosen color layer paints administrative areas.
+  setSigns({ layerId, layerIds = [layerId], snapshot, stepIndex, status }) {
     if (!this.ready) return;
 
     const cfg = SIGN_LAYERS[layerId];
-    this.signState = { layerId, stepIndex };
+    this.signState = { layerId, layerIds, stepIndex };
     const hasData = snapshot && snapshot.steps?.length;
-    const stale = status === 'stale';
+    const statusFor = id => id === 'thunder' ? snapshot?.sources?.openMeteo?.status ?? status : status;
+    const stale = statusFor(layerId) === 'stale';
     const tint = (color) => (stale ? dim(color) : color);
     const valuesByPcode = new Map();
 
-    const features = this.baseMarkers.map((base) => {
+    const features = this.baseMarkers.flatMap((base) => layerIds.map((id, index) => {
+      const markerCfg = SIGN_LAYERS[id];
       const series = hasData ? (base.level === 'district' ? snapshot.districts[base.id] : snapshot.locations[base.id]) : null;
-      const key = base.level === 'district' ? cfg.districtSeries : cfg.series;
+      const key = base.level === 'district' ? markerCfg.districtSeries : markerCfg.series;
       const raw = series?.[key]?.[stepIndex];
-      if (base.level === 'upazila') valuesByPcode.set(base.id, raw ?? null);
+      if (base.level === 'upazila' && id === layerId) valuesByPcode.set(base.id, raw ?? null);
 
       let props;
       if (raw === null || raw === undefined) {
         props = { icon: 'dot', color: STATUS_COLORS.unavailable, label: '', textColor: PALETTE.cream, sort: 1000, rot: 0 };
       } else {
-        const mark = cfg.mark(raw, { dir: series?.wd?.[stepIndex] });
-        const color = mark.value === null ? PALETTE.sage : tint(colorAt(cfg.scale, mark.value));
+        const mark = markerCfg.mark(raw, { dir: series?.wd?.[stepIndex] });
+        const rawColor = mark.value === null ? PALETTE.sage : colorAt(markerCfg.scale, mark.value);
+        const color = mark.value !== null && statusFor(id) === 'stale' ? dim(rawColor) : rawColor;
         props = {
           icon: mark.icon,
           color,
@@ -540,13 +580,16 @@ export class WeatherMap {
       return {
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [base.lon, base.lat] },
-        properties: { level: base.level, id: base.id, name: base.name, ...props },
+        properties: {
+          level: base.level, id: base.id, name: base.name, signLayer: id, primary: id === layerId, ...props,
+          ...weatherMarkerLayout(index, layerIds.length, props.rot, props.icon === 'badge'),
+        },
       };
-    });
+    }));
     this.map.getSource('markers').setData({ type: 'FeatureCollection', features });
 
     const fillFor = (value) => {
-      if (value === null || value === undefined) return null;
+      if (!cfg || value === null || value === undefined) return null;
       const mark = cfg.mark(value, {});
       if (mark.value === null || (cfg.fillMin !== undefined && mark.value < cfg.fillMin)) return null;
       return tint(colorAt(cfg.scale, mark.value));
@@ -562,7 +605,7 @@ export class WeatherMap {
       setFill('areas', area.id, fillFor(parent ? mean(parent.src.map((pcode) => valuesByPcode.get(pcode))) : null));
     }
     for (const district of this.catalogue.districts) {
-      setFill('districts', district.pcode, fillFor(hasData ? snapshot.districts[district.pcode]?.[cfg.districtSeries]?.[stepIndex] : null));
+      setFill('districts', district.pcode, fillFor(cfg && hasData ? snapshot.districts[district.pcode]?.[cfg.districtSeries]?.[stepIndex] : null));
     }
   }
 
@@ -683,6 +726,8 @@ export class WeatherMap {
       }
     }
 
+    this.lightningFeatures = visible ? features : [];
+    this.lightningItems = visible ? items : [];
     this.map.getSource('lightning').setData({ type: 'FeatureCollection', features });
     for (const layer of this.map.getStyle().layers.filter((l) => l.id.startsWith('lightning-'))) {
       this.map.setLayoutProperty(layer.id, 'visibility', visible ? 'visible' : 'none');
@@ -691,14 +736,6 @@ export class WeatherMap {
 
   // ---------- interaction ----------
   onClick(event) {
-    const lightning = this.map.getLayer('lightning-labels') && this.map.getLayoutProperty('lightning-labels', 'visibility') === 'visible'
-      ? this.map.queryRenderedFeatures(event.point, { layers: ['lightning-labels', 'lightning-points'] })[0]
-      : null;
-    if (lightning) {
-      this.handlers.onLightningSelect?.(lightning.properties.id);
-      return;
-    }
-
     // A tap on a route stop shows its weather (there is no hover on touch screens).
     const stop = this.routeStopAt(event.point);
     if (stop) {
@@ -713,8 +750,92 @@ export class WeatherMap {
       return;
     }
 
+    if (this.handlers.onHover) {
+      const candidates = this.indicatorsAt(event.point);
+      if (candidates.length) {
+        this.inspect(candidates[0], event.point, true, candidates.slice(1).map(item => item.picked));
+        if (candidates[0].picked.type === 'weather') this.handlers.onSelect?.(candidates[0].picked);
+        if (candidates[0].picked.type === 'lightning') this.handlers.onLightningSelect?.(candidates[0].picked.id);
+        return;
+      }
+    }
     const selection = this.pick(event.point);
+    if (selection && this.handlers.onHover) this.inspect({ picked: selection }, event.point, true);
+    else this.clearInspection();
     this.handlers.onSelect?.(selection);
+  }
+
+  indicatorsAt(point) {
+    const visible = layers => layers.filter(id => this.map.getLayer(id) && this.map.getLayoutProperty(id, 'visibility') !== 'none');
+    const hitLayers = visible(INDICATOR_HIT_LAYERS);
+    const fillLayers = visible(INDICATOR_FILL_LAYERS);
+    const box = [[point.x - 5, point.y - 5], [point.x + 5, point.y + 5]];
+    const project = coordinates => this.map.project(coordinates);
+    const iconSize = weatherIconSize(this.map.getZoom());
+    // An exact outline hit beats a nearby expanded dot, otherwise tiny rings become impossible to inspect when zoomed out.
+    const candidates = [
+      ...indicatorCandidates(hitLayers.length ? this.map.queryRenderedFeatures(point, { layers: hitLayers }) : [], point, project, iconSize),
+      ...indicatorCandidates(hitLayers.length ? this.map.queryRenderedFeatures(box, { layers: hitLayers }) : [], point, project, iconSize),
+      ...indicatorCandidates(fillLayers.length ? this.map.queryRenderedFeatures(point, { layers: fillLayers }) : [], point, project, iconSize),
+    ];
+    const seen = new Set();
+    return candidates.filter(({ picked }) => {
+      const key = indicatorKey(picked);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  inspect(candidate, point, pinned = false, also = []) {
+    const key = indicatorKey(candidate.picked);
+    const same = key === this.inspection?.key;
+    if (!same) {
+      clearTimeout(this.inspectionTimer);
+      this.handlers.onHover?.(null);
+      const target = !candidate.picked.type || candidate.picked.type === 'weather' ? this.polygonTarget(candidate.picked) : null;
+      this.setHover(target?.source ?? null, target?.id ?? null);
+      this.map.setPaintProperty('indicator-hover-point', 'circle-translate', [
+        (candidate.feature?.properties?.markerShift ?? 0) * weatherIconSize(this.map.getZoom()), 0,
+      ]);
+      this.map.getSource('indicator-hover')?.setData({ type: 'FeatureCollection', features: candidate.feature ? [{
+        type: 'Feature', geometry: candidate.feature.geometry, properties: {},
+      }] : [] });
+    }
+    this.inspection = { ...candidate, key, point, pinned, also, shown: same && this.inspection.shown };
+    const show = () => {
+      if (!this.inspection) return;
+      this.inspection.shown = true;
+      const current = this.inspection;
+      this.handlers.onHover?.(current.picked, { x: current.point.x, y: current.point.y, pinned: current.pinned, also: current.also });
+    };
+    if (pinned || this.inspection.shown) { clearTimeout(this.inspectionTimer); show(); }
+    else if (!same) this.inspectionTimer = setTimeout(show, 200);
+  }
+
+  clearInspection() {
+    clearTimeout(this.inspectionTimer);
+    if (!this.inspection && !this.hovered.source) return;
+    this.inspection = null;
+    this.setHover(null, null);
+    this.map.getSource('indicator-hover')?.setData(EMPTY);
+    this.handlers.onHover?.(null);
+  }
+
+  // The map key offers a native select for keyboard/screen-reader access to the same cards as the canvas.
+  inspectTarget(picked) {
+    if (!this.ready || !picked) return;
+    const layers = { cell: 'storm-cell', ring: 'storm-ring', step: 'storm-step', track: 'storm-track', arrival: 'storm-arrival-label' };
+    const features = picked.type === 'storm'
+      ? (this.stormFeatures ?? []).map(feature => ({ ...feature, layer: { id: layers[feature.properties.kind] ?? 'storm-label' } }))
+      : (this.lightningFeatures ?? []).map(feature => ({ ...feature, layer: { id: feature.geometry.type === 'Point' ? 'lightning-labels' : 'lightning-fill' } }));
+    const feature = features.find(feature => indicatorKey(indicatorFromFeature(feature)) === indicatorKey(picked));
+    if (!feature) return;
+    const cell = this.stormSnapshot?.cells?.find(cell => cell.id === picked.id);
+    const center = picked.minutes ? cell?.forecast?.find(step => step.minutes === picked.minutes) : cell?.center;
+    const location = center ?? this.lightningItems?.find(item => item.id === picked.id);
+    const point = location ? this.map.project([location.lon, location.lat]) : { x: 24, y: 90 };
+    this.inspect({ picked, feature }, point, true);
   }
 
   // Marker first, then the most detailed visible administrative polygon.
@@ -747,33 +868,35 @@ export class WeatherMap {
   }
 
   onMouseMove(event) {
+    if (this.inspection?.pinned) return;
     const stop = this.routeStopAt(event.point);
     this.handlers.onRouteHover?.(stop, stop ? { x: event.point.x, y: event.point.y } : null);
     if (stop) {
       this.map.getCanvas().style.cursor = 'pointer';
-      this.setHover(null, null);
-      this.handlers.onHover?.(null);
+      this.clearInspection();
       return;
     }
     const alternative = this.routeAlternativeAt(event.point);
     if (alternative !== null) {
       this.map.getCanvas().style.cursor = 'pointer';
-      this.setHover(null, null);
-      this.handlers.onHover?.(null);
+      this.clearInspection();
+      return;
+    }
+    const candidates = this.handlers.onHover ? this.indicatorsAt(event.point) : [];
+    if (candidates.length) {
+      this.map.getCanvas().style.cursor = 'pointer';
+      this.inspect(candidates[0], event.point, false, candidates.slice(1).map(item => item.picked));
       return;
     }
     const picked = this.pick(event.point);
     this.map.getCanvas().style.cursor = picked ? 'pointer' : '';
 
     if (!picked) {
-      this.setHover(null, null);
-      this.handlers.onHover?.(null);
+      this.clearInspection();
       return;
     }
 
-    const target = this.polygonTarget(picked);
-    this.setHover(target?.source ?? null, target?.id ?? null);
-    this.handlers.onHover?.(picked, { x: event.point.x, y: event.point.y });
+    this.inspect({ picked }, event.point);
   }
 
   // Which polygon represents a selection, if any (point-only city thanas have none).
@@ -903,6 +1026,7 @@ export class WeatherMap {
 
   destroy() {
     this.destroyed = true;
+    clearTimeout(this.inspectionTimer);
     this.map.remove();
   }
 }

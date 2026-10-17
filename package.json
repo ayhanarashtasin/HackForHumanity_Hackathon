@@ -14,18 +14,12 @@
     "dev:server": "npm run dev --workspace server",
     "dev:client": "npm run dev --workspace client",
     "ml": "node scripts/ml-service.mjs",
-    "demo:rain": "node scripts/demo-rain-alert.mjs",
     "build": "npm run build --workspace client",
     "start": "npm run start --workspace server",
     "preview": "npm run preview --workspace client",
-    "test": "npm run test --workspaces --if-present",
-    "test:db": "npm run test:db --workspace server",
-    "build:geo": "node scripts/build-geo.mjs",
-    "build:outline": "node scripts/build-outline.mjs"
+    "test": "npm run test --workspaces --if-present"
   },
   "devDependencies": {
-    "concurrently": "^10.0.6",
-    "fflate": "^0.8.3",
-    "mapshaper": "^0.7.83"
+    "concurrently": "^10.0.6"
   }
 }

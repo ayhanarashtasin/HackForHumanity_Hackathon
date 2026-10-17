@@ -1,4 +1,7 @@
-import { Suspense, lazy, useLayoutEffect, useMemo } from 'react';
+import { Suspense, lazy, useEffect, useLayoutEffect, useMemo } from 'react';
+import { syncLocationArea } from './alert/locationSync.js';
+import { LocationNotice } from './components/LocationNotice.jsx';
+import { useUserLocation } from './hooks/useUserLocation.js';
 import { useRoute } from './lib/router.js';
 import { useLanguage } from './i18n/index.js';
 import { LandingPage } from './pages/LandingPage.jsx';
@@ -23,6 +26,13 @@ const LOADING = { map: 'Loading map…', route: 'Loading route planner…', aler
 export default function App() {
   const route = useRoute();
   const { lang, tr } = useLanguage();
+  const location = useUserLocation();
+
+  useEffect(() => {
+    if (route !== 'admin' && location.status === 'ready' && location.alertsEnabled && location.source === 'capture') {
+      syncLocationArea().catch(() => {}); // LocationNotice reports the failure; browsing is never blocked.
+    }
+  }, [route, location.status, location.revision, location.alertsEnabled, location.source]);
 
   // The map page is a fixed full-screen app; the landing, alert and admin pages scroll like normal documents (see landing.css and styles.css).
   useLayoutEffect(() => {
@@ -49,13 +59,10 @@ export default function App() {
 
   // Chosen once per screen: switching between the loaded component and its lazy twin mid-visit would remount the page and lose its state.
   const Page = useMemo(() => (isLazyPage(route) ? (loadedPage(route) ?? LAZY[route]) : null), [route]);
-  if (Page) {
-    return (
-      <Suspense fallback={<div className="splash" role="status">{tr(LOADING[route])}</div>}>
-        <Page />
-      </Suspense>
-    );
-  }
-
-  return <LandingPage />;
+  return (
+    <>
+      {Page ? <Suspense fallback={<div className="splash" role="status">{tr(LOADING[route])}</div>}><Page /></Suspense> : <LandingPage />}
+      <LocationNotice hidden={route === 'admin' || route === 'home'} />
+    </>
+  );
 }

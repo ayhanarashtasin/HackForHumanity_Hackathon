@@ -5,7 +5,7 @@ import { MAP } from '../i18n/map.js';
 export function LocationAccess({ location, onLocate, onSearch }) {
   const { tr } = useLanguage(MAP);
   const busy = location.status === 'locating' || location.status === 'resolving';
-  const problem = ['denied', 'error', 'outside', 'unsupported'].includes(location.status);
+  const problem = ['denied', 'error', 'outside', 'unsupported', 'inaccurate'].includes(location.status);
   return (
     <section className="location-access" aria-labelledby="location-access-title">
       <span className={`location-illustration${busy ? ' is-locating' : ''}`}><Icon name="locate" size={38} /></span>
@@ -21,7 +21,7 @@ export function LocationAccess({ location, onLocate, onSearch }) {
         {tr(busy ? 'Finding your upazila…' : problem ? 'Try my location again' : 'Use my location')}
       </button>
       <button type="button" className="map-secondary-button" onClick={onSearch}><Icon name="search" size={18} /> {tr('Search for an upazila')}</button>
-      <small className="location-privacy">{tr('Your position is used in this browser to find your area. It is not sent to the weather service.')}</small>
+      <small className="location-privacy">{tr('Your location is shared across maps and alerts in this tab. Only your area code is sent to your alert profile, never precise coordinates. Live following stays optional.')}</small>
       <div className="access-features">
         <div><Icon name="pin" /><span><strong>{tr('Your area, identified')}</strong><small>{tr('Upazila boundaries across Bangladesh')}</small></span></div>
         <div><Icon name="cloud" /><span><strong>{tr('The whole weather picture')}</strong><small>{tr('Temperature, rain, wind and more')}</small></span></div>

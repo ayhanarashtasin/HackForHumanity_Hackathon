@@ -13,6 +13,8 @@ const FONT_ITALIC = ['Noto Sans Italic'];
 export const LABELS_ANCHOR = 'labels-first';
 
 const englishName = ['coalesce', ['get', 'name_en'], ['get', 'name:latin']];
+const riverName = ['coalesce', ['get', 'name:en'], ['get', 'name:latin'], ''];
+const surfaceWaterway = ['!=', ['get', 'brunnel'], 'tunnel'];
 
 function label(id, sourceLayer, filter, layout, paint, extra = {}) {
   return {
@@ -36,8 +38,14 @@ export function buildBaseStyle() {
       { id: 'background', type: 'background', paint: { 'background-color': BASEMAP.land } },
       { id: 'water', type: 'fill', source: SOURCE, 'source-layer': 'water', paint: { 'fill-color': BASEMAP.water } },
       {
-        id: 'waterway', type: 'line', source: SOURCE, 'source-layer': 'waterway', minzoom: 7,
-        paint: { 'line-color': BASEMAP.water, 'line-width': ['interpolate', ['linear'], ['zoom'], 7, 0.5, 12, 2.5] },
+        id: 'waterway-casing', type: 'line', source: SOURCE, 'source-layer': 'waterway', minzoom: 5,
+        filter: surfaceWaterway, layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': BASEMAP.labelDim, 'line-opacity': 0.4, 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 2.5, 8, 3.5, 12, 6.5, 16, 10] },
+      },
+      {
+        id: 'waterway', type: 'line', source: SOURCE, 'source-layer': 'waterway', minzoom: 5,
+        filter: surfaceWaterway, layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': BASEMAP.water, 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 1.2, 8, 2, 12, 4.5, 16, 8] },
       },
       {
         id: 'roads-minor', type: 'line', source: SOURCE, 'source-layer': 'transportation', minzoom: 10,
@@ -54,6 +62,12 @@ export function buildBaseStyle() {
       label('labels-first', 'water_name', ['match', ['get', 'class'], ['ocean', 'sea', 'bay'], true, false], {
         'text-font': FONT_ITALIC, 'text-size': ['interpolate', ['linear'], ['zoom'], 4, 11, 8, 15], 'text-letter-spacing': 0.15,
       }, { 'text-color': BASEMAP.labelDim, 'text-opacity': 0.7 }),
+      label('label-river', 'waterway', ['all', surfaceWaterway, ['!=', riverName, '']], {
+        // Natural Earth calls the main channel Brahmaputra at low zoom; use its Bangladesh name too.
+        'text-field': ['match', riverName, 'Brahmaputra', 'Jamuna', 'Ganges', 'Padma', riverName],
+        'text-font': FONT_ITALIC, 'text-size': ['interpolate', ['linear'], ['zoom'], 5, 10, 9, 12, 12, 13],
+        'symbol-placement': 'line', 'symbol-spacing': 350, 'text-max-angle': 35, 'text-letter-spacing': 0.05,
+      }, { 'text-color': BASEMAP.label, 'text-halo-color': BASEMAP.water, 'text-halo-width': 1.6 }, { minzoom: 5 }),
       label('label-country', 'place', ['==', ['get', 'class'], 'country'], {
         'text-font': FONT_BOLD, 'text-size': ['interpolate', ['linear'], ['zoom'], 3, 11, 7, 16],
         'text-transform': 'uppercase', 'text-letter-spacing': 0.12,

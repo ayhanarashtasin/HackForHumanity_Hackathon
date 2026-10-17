@@ -1,27 +1,59 @@
-import { SIGN_LAYERS } from '../lib/scales.js';
-import { resolveSelection, valueAt } from '../lib/series.js';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { describeIndicator, tooltipPosition } from '../lib/mapIndicators.js';
+import { Icon } from './Icon.jsx';
 import { useLanguage } from '../i18n/index.js';
 import { MAP } from '../i18n/map.js';
 
-export function Tooltip({ hover, snapshot, catalogue, signLayer, stepIndex }) {
-  const { lang, tr, number } = useLanguage(MAP);
-  if (!hover) return null;
+export function Tooltip({ hover, context, onDismiss }) {
+  const { lang, tr } = useLanguage(MAP);
+  const ref = useRef(null);
+  const [position, setPosition] = useState({ left: 8, top: 8 });
+  const card = useMemo(() => hover ? describeIndicator(hover.picked, { ...context, lang }) : null, [hover, context, lang]);
+  const also = useMemo(() => [...new Set((hover?.also ?? []).map(picked => describeIndicator(picked, { ...context, lang })?.title).filter(title => title && title !== card?.title))].slice(0, 3), [hover, context, lang, card]);
 
-  const resolved = resolveSelection(hover.picked, snapshot, catalogue, lang);
-  if (!resolved) return null;
+  useLayoutEffect(() => {
+    if (!ref.current || !card) return;
+    const element = ref.current;
+    const place = () => {
+      const bounds = element.parentElement.getBoundingClientRect();
+      element.style.maxHeight = `${Math.max(40, bounds.height - 16)}px`;
+      const next = tooltipPosition(hover, element.getBoundingClientRect(), bounds);
+      setPosition(current => current.left === next.left && current.top === next.top ? current : next);
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(element.parentElement);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [hover, card]);
 
-  const layer = SIGN_LAYERS[signLayer];
-  const value = valueAt(resolved, layer.series, layer.districtSeries, stepIndex);
-  const text = value === null ? tr('No data') : signLayer === 'thunder'
-    ? tr(['None', 'Low', 'Moderate', 'High'][Math.round(value)])
-    : `${number(Number(value).toFixed(signLayer === 'rain' ? 1 : 0))} ${tr(layer.unit)}`;
+  useLayoutEffect(() => {
+    if (!hover?.pinned || !ref.current) return;
+    const previous = document.activeElement;
+    const element = ref.current;
+    element.focus({ preventScroll: true });
+    return () => {
+      if (element.contains(document.activeElement) && previous?.isConnected) previous.focus({ preventScroll: true });
+    };
+  }, [hover?.pinned]);
+
+  if (!hover || !card) return null;
 
   return (
-    <div className="tooltip" style={{ left: hover.x + 14, top: hover.y + 14 }} role="tooltip">
-      <strong>{resolved.name}</strong>
-      {lang === 'en' && resolved.nameBn && <span lang="bn">{resolved.nameBn}</span>}
-      <span>{tr(layer.label)}: <b>{text}</b></span>
-      <small>{tr(resolved.kind)}</small>
+    <div ref={ref} id="map-indicator-tooltip" className={`map-inspection${hover.pinned ? ' is-pinned' : ''}`} style={position}
+      role={hover.pinned ? 'dialog' : 'tooltip'} aria-label={card.title} tabIndex={hover.pinned ? -1 : undefined}
+      onMouseLeave={() => { if (!hover.pinned) onDismiss(); }}
+      onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); onDismiss(); } }}>
+      <header>
+        <span className="inspection-swatch" style={{ background: card.color }} aria-hidden="true" />
+        <div><small>{card.eyebrow}</small><strong>{card.title}</strong></div>
+        {hover.pinned && <button type="button" className="icon-button" onClick={onDismiss} aria-label={tr('Close indicator details')}><Icon name="close" size={17} /></button>}
+      </header>
+      <dl>{card.rows.map(({ label, value }) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+      <p className="inspection-note">{card.note}</p>
+      {hover.pinned && card.detail && <p className="inspection-note">{card.detail}</p>}
+      {also.length > 0 && <p className="inspection-also">{tr('Also here: {items}', { items: also.join(' · ') })}</p>}
+      {!hover.pinned && <small className="inspection-hint">{tr('Click or tap to keep these details open.')}</small>}
     </div>
   );
 }

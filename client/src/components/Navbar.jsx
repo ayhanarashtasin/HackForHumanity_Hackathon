@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useUnreadBadge } from '../alert/useUnreadBadge.js';
-import { useRoute } from '../lib/router.js';
+import { navigate, useRoute } from '../lib/router.js';
 import { prefetchPage } from '../pages/pageLoader.js';
 import { Icon } from './Icon.jsx';
 import { Link } from './Link.jsx';
@@ -88,10 +88,25 @@ export function Navbar({ onLanguageChange, languageDisabled = false }) {
     };
   }, [open]);
 
-  // On the landing page the links scroll to their section; from any other page they go back to it.
+  // On the landing page the links scroll to their section; from any other page they go back to it without a full reload.
   const sectionLink = (link) => (
     <li key={link.id}>
-      <a href={onHome ? `#${link.id}` : `/#${link.id}`} aria-current={onHome && active === link.id ? 'location' : undefined} onClick={() => setOpen(false)}>{tr(link.label)}</a>
+      <a
+        href={onHome ? `#${link.id}` : `/#${link.id}`}
+        aria-current={onHome && active === link.id ? 'location' : undefined}
+        onClick={(event) => {
+          setOpen(false);
+          if (!onHome) {
+            event.preventDefault();
+            navigate(`/#${link.id}`);
+            requestAnimationFrame(() => {
+              document.getElementById(link.id)?.scrollIntoView({ behavior: 'smooth' });
+            });
+          }
+        }}
+      >
+        {tr(link.label)}
+      </a>
     </li>
   );
 

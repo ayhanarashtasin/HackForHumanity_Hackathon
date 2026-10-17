@@ -2,35 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 import { Icon } from './Icon.jsx';
 import { errorText, useLanguage } from '../i18n/index.js';
 import { MAP } from '../i18n/map.js';
-import { containsPoint } from '../lib/locate.js';
+import { requestUserLocation } from '../lib/userLocation.js';
 import { placesFor } from '../lib/neighbourhoods.js';
 import { weatherApi } from '../services/weatherApi.js';
 
-const LOCATION_ERRORS = {
-  1: 'Location access is blocked. Allow location in your browser’s site settings, then try again. Or search for your upazila above.',
-  3: 'Finding your location took too long. Try again, or search for your upazila.',
-};
-
 // The start can be the device position. The upazila it falls in is looked up only to label the field; the route uses the exact point.
-function currentPlace(catalogue) {
-  return new Promise((resolve, reject) => {
-    if (!window.isSecureContext || !navigator.geolocation) {
-      reject(new Error('Location needs a supported browser and a secure (HTTPS) connection. You can still search for your upazila.'));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(async ({ coords }) => {
-      const place = { level: 'current', pcode: 'current-location', name: 'My location', nameBn: 'আমার অবস্থান', lat: coords.latitude, lon: coords.longitude };
-      try {
-        const response = await fetch('/data/bd-upazila.geojson');
-        const feature = response.ok ? (await response.json()).features.find((item) => containsPoint(item.geometry, place.lon, place.lat)) : null;
-        const polygon = feature && catalogue?.polygons[feature.properties.pid];
-        if (polygon) place.area = { name: polygon.name, nameBn: polygon.nameBn };
-      } catch { /* the label is optional */ }
-      resolve(place);
-    }, (error) => {
-      reject(new Error(LOCATION_ERRORS[error.code] ?? 'Your device could not find its location. Try again, or search for your upazila.'));
-    }, { enableHighAccuracy: true, timeout: 15_000, maximumAge: 60_000 });
-  });
+async function currentPlace() {
+  const location = await requestUserLocation();
+  if (location.status !== 'ready') throw new Error(location.message);
+  return { level: 'current', pcode: 'current-location', name: 'My location', nameBn: 'আমার অবস্থান', ...location.position };
 }
 
 function PlaceField({ field, label, catalogue, value, onChange, onSelect }) {
@@ -156,7 +136,7 @@ export function RoutePlanner({ catalogue, onRoute }) {
     setLocating(true);
     setError('');
     try {
-      updateStart(await currentPlace(catalogue));
+      updateStart(await currentPlace());
     } catch (locationError) {
       setError(errorText(locationError.message, lang, MAP));
     } finally {

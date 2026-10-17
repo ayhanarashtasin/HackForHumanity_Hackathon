@@ -30,7 +30,7 @@ export const alertApi = {
   deleteProfile: () => request('/alerts/me', { method: 'DELETE' }),
   setActivity: (body) => request('/alerts/me/activity', { method: 'PUT', ...json(body) }),
   setStatus: (status) => request('/alerts/me/status', { method: 'PUT', ...json({ status }) }),
-  setCurrentArea: (upazilaPcode) => request('/alerts/me/current-area', { method: 'PUT', ...json({ upazilaPcode }) }),
+  setCurrentArea: (upazilaPcode, signal) => request('/alerts/me/current-area', { method: 'PUT', ...json({ upazilaPcode }), signal }),
   coverage: (signal) => request('/alerts/me/coverage', { signal }),
   inbox: ({ view = 'active', before = null, limit = 30 } = {}, signal) => {
     const query = new URLSearchParams({ view, limit: String(limit) });

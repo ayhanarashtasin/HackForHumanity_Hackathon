@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LayerMenu } from '../components/LayerMenu.jsx';
 import { Icon } from '../components/Icon.jsx';
-import { Legend } from '../components/Legend.jsx';
+import { Legend, MapKey } from '../components/Legend.jsx';
 import { LightningPanel } from '../components/LightningPanel.jsx';
 import { Link } from '../components/Link.jsx';
 import { LocationPanel } from '../components/LocationPanel.jsx';
@@ -17,8 +17,10 @@ import { useUnreadBadge } from '../alert/useUnreadBadge.js';
 import { usePolled } from '../hooks/usePolled.js';
 import { useUserLocation } from '../hooks/useUserLocation.js';
 import { resolveSelection } from '../lib/series.js';
+import { locationIsFresh } from '../lib/userLocation.js';
 import { nearestIndex, stepIndexAt, toMs } from '../lib/time.js';
 import { readHash, writeHash } from '../lib/urlState.js';
+import { toggleWeatherLayer, weatherLayerSelection } from '../lib/weatherLayers.js';
 import { loadCatalogue, weatherApi } from '../services/weatherApi.js';
 import { useLanguage } from '../i18n/index.js';
 import { MAP } from '../i18n/map.js';
@@ -28,6 +30,7 @@ import './map-page.css';
 const MINUTE = 60_000;
 const RADAR_MAX_GAP = 15 * MINUTE;
 const SATELLITE_MAX_GAP = 15 * MINUTE;
+const NO_STORM_FRAMES = [];
 
 // Live mode scrubs observation frames (radar, else satellite); forecast mode scrubs BMD's 3-hour steps.
 function buildTimeline({ mode, overlays, radar, satellite, satelliteLayer, snapshot }) {
@@ -64,7 +67,8 @@ export default function MapPage() {
   const lightningStatusState = usePolled(weatherApi.lightningStatus, 5 * MINUTE);
   const lightningSummariesState = usePolled(weatherApi.lightningSummaries, 5 * MINUTE);
 
-  const [signLayer, setSignLayer] = useState(initial.layer ?? 'temp');
+  const [weatherLayers, setWeatherLayers] = useState(() => weatherLayerSelection(initial.layers ?? [initial.layer ?? 'temp'], initial.layer ?? 'temp'));
+  const { layers: signLayers, colorLayer: signLayer } = weatherLayers;
   const [overlays, setOverlays] = useState(initial.overlays ?? { radar: false, satellite: false, lightning: false, storms: false });
   const [satelliteLayer, setSatelliteLayer] = useState('ir');
   const [mode, setMode] = useState(initial.overlays?.radar || initial.overlays?.satellite ? 'live' : 'forecast');
@@ -72,6 +76,13 @@ export default function MapPage() {
   const [playing, setPlaying] = useState(false);
   const [selection, setSelection] = useState(null);
   const [hover, setHover] = useState(null);
+  const [inspectionReset, setInspectionReset] = useState(0);
+  const [inspectionRequest, setInspectionRequest] = useState(null);
+  const dismissInspection = useCallback(() => {
+    setHover(null);
+    setInspectionRequest(null);
+    setInspectionReset(value => value + 1);
+  }, []);
   const [flyRequest, setFlyRequest] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
@@ -79,6 +90,9 @@ export default function MapPage() {
   const [lightningSelected, setLightningSelected] = useState(null);
   const [lightningInfo, setLightningInfo] = useState(null);
   const [mobileView, setMobileView] = useState('weather');
+  const [fullscreen, setFullscreen] = useState(false);
+  const mapStageRef = useRef(null);
+  const fullscreenButtonRef = useRef(null);
   const [stormMode, setStormMode] = useState(initial.stormReplay ? 'demo' : 'live');
   const [stormIndex, setStormIndex] = useState(0);
   const [stormPlaying, setStormPlaying] = useState(false);
@@ -87,7 +101,7 @@ export default function MapPage() {
   const viewRef = useRef(initial.view);
   const locationIntentRef = useRef(true);
   const sidebarRef = useRef(null);
-  const location = useUserLocation(catalogue);
+  const location = useUserLocation();
   const unreadAlerts = useUnreadBadge();
 
   useEffect(() => {
@@ -160,7 +174,7 @@ export default function MapPage() {
   );
 
   // Storm movement: the newest live analysis, or one frame of the saved storm day.
-  const stormFrames = stormDemoState.data?.snapshots ?? [];
+  const stormFrames = stormDemoState.data?.snapshots ?? NO_STORM_FRAMES;
   useEffect(() => {
     if (!stormPlaying || stormFrames.length < 2) return undefined;
     const timer = setInterval(() => setStormIndex((index) => (index + 1) % stormFrames.length), 900);
@@ -177,6 +191,10 @@ export default function MapPage() {
     const live = stormsState.data?.live ?? null;
     return { visible: true, snapshot: live, image: live?.image?.url ? { url: live.image.url, bounds: live.image.bounds } : null };
   }, [overlays.storms, stormMode, stormFrames, stormIndex, stormDemoState.data, stormsState.data]);
+
+  useEffect(() => {
+    dismissInspection();
+  }, [dismissInspection, weatherLayers, stepIndex, overlays, stormMode, storms.snapshot, snapshot, lightning, satelliteSpec, radarItems]);
 
   // ---------- data status ----------
   const statuses = useMemo(() => {
@@ -214,29 +232,66 @@ export default function MapPage() {
   }, [dailyPcode, overlays.lightning]);
 
   useEffect(() => {
+    const onFullscreenChange = () => {
+      const active = document.fullscreenElement === mapStageRef.current;
+      setFullscreen(active);
+      if (!active) fullscreenButtonRef.current?.focus({ preventScroll: true });
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, []);
+
+  useEffect(() => {
     const onKey = (event) => {
-      if (event.key === 'Escape') { setStatusOpen(false); setMenuOpen(false); setHover(null); }
+      if (event.key === 'Escape') {
+        setStatusOpen(false);
+        setMenuOpen(false);
+        dismissInspection();
+        if (fullscreen && !document.fullscreenElement) {
+          setFullscreen(false);
+          fullscreenButtonRef.current?.focus({ preventScroll: true });
+        }
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [dismissInspection, fullscreen]);
 
   // ---------- URL hash ----------
   useEffect(() => {
-    writeHash({ view: viewRef.current, layer: signLayer, overlays });
-  }, [signLayer, overlays]);
+    writeHash({ view: viewRef.current, layer: signLayer, layers: signLayers, overlays });
+  }, [signLayer, signLayers, overlays]);
 
   const signLayerRef = useRef(signLayer);
+  const signLayersRef = useRef(signLayers);
   const overlaysRef = useRef(overlays);
   signLayerRef.current = signLayer;
+  signLayersRef.current = signLayers;
   overlaysRef.current = overlays;
 
   const onMoveEnd = useCallback((view) => {
     viewRef.current = view;
-    writeHash({ view, layer: signLayerRef.current, overlays: overlaysRef.current });
+    writeHash({ view, layer: signLayerRef.current, layers: signLayersRef.current, overlays: overlaysRef.current });
   }, []);
 
   // ---------- actions ----------
+  const toggleFullscreen = async () => {
+    if (fullscreen) {
+      if (document.fullscreenElement === mapStageRef.current) {
+        try { await document.exitFullscreen(); }
+        catch { return; } // Keep the exit control available if the browser refuses to exit.
+      }
+      setFullscreen(false);
+      fullscreenButtonRef.current?.focus({ preventScroll: true });
+      return;
+    }
+
+    setFullscreen(true);
+    dismissInspection();
+    try { await mapStageRef.current.requestFullscreen?.(); }
+    catch { /* Keep the viewport-sized map when native fullscreen is blocked or unsupported. */ }
+  };
+
   const toggleOverlay = (key) => {
     const next = { ...overlays, [key]: !overlays[key] };
     setOverlays(next);
@@ -248,8 +303,11 @@ export default function MapPage() {
     }
     if (key === 'lightning' && next.lightning) {
       setLightningPanelOpen(true);
-      setMenuOpen(false);
-      requestAnimationFrame(() => document.querySelector('.lightning-content')?.focus({ preventScroll: true }));
+      if (!menuOpen) requestAnimationFrame(() => document.querySelector('.lightning-content')?.focus({ preventScroll: true }));
+    }
+    if (key === 'storms' && next.storms) {
+      setLightningPanelOpen(false);
+      if (!menuOpen) requestAnimationFrame(() => document.getElementById('storm-movement-panel')?.focus({ preventScroll: true }));
     }
   };
 
@@ -258,6 +316,15 @@ export default function MapPage() {
     setSelectedTime(null);
     setPlaying(false);
     if (next === 'live' && !overlays.radar && !overlays.satellite) setOverlays({ ...overlays, radar: true });
+  };
+
+  const changeStormMode = (next) => {
+    setStormMode(next);
+    setStormPlaying(false);
+    setStormIndex(0);
+    setLightningPanelOpen(false);
+    setMenuOpen(false);
+    if (menuOpen) requestAnimationFrame(() => document.getElementById('storm-movement-panel')?.focus({ preventScroll: true }));
   };
 
   const pickResult = (item) => {
@@ -269,7 +336,7 @@ export default function MapPage() {
 
   const goToMyLocation = () => {
     locationIntentRef.current = true;
-    if (location.status === 'ready') {
+    if (locationIsFresh(location)) {
       setSelection(location.match.selection);
       setFlyRequest({ ...location.position, zoom: 10.2 });
       setSelectedTime(null);
@@ -289,7 +356,6 @@ export default function MapPage() {
       if (!picked) return;
       locationIntentRef.current = false;
       setSelection(picked);
-      setMobileView('weather');
     },
     onHover: (picked, point) => setHover(picked ? { picked, ...point } : null),
     onMoveEnd,
@@ -297,14 +363,15 @@ export default function MapPage() {
   }), [onMoveEnd]);
 
   const liveNote = mode === 'live' ? 'Live frames are not available right now.' : 'Forecast is not available right now.';
-  const showLightningPanel = overlays.lightning && lightningPanelOpen;
+  const showLightningPanel = overlays.lightning && lightningPanelOpen && !menuOpen;
+  const showStormPanel = overlays.storms && !showLightningPanel && !menuOpen;
   const bannerText = catalogueError
     || (snapshotState.error && !snapshot ? 'Cannot reach the weather service. Showing the map without data.' : '')
     || (snapshot && !snapshot.base && baseStatus === 'unavailable' ? 'No forecast data is available right now. Grey markers mean no data, not calm weather.' : '');
 
   return (
     <div className={`app weather-app mobile-view-${mobileView}`}>
-      <header className="topbar">
+      <header className="topbar" inert={fullscreen}>
         <Link to="/" className="brand" aria-label={tr('AkashSathi home')} title={tr('Back to the AkashSathi home page')}>
           <LogoMark size={34} />
           <div>
@@ -324,13 +391,13 @@ export default function MapPage() {
         <StatusPanel open={statusOpen} onToggle={() => setStatusOpen((open) => !open)} statuses={statuses} base={snapshot?.base} />
       </header>
 
-      <nav className="mobile-view-switch" aria-label={tr('Explorer view')}>
+      <nav className="mobile-view-switch" aria-label={tr('Explorer view')} inert={fullscreen}>
         <button type="button" aria-pressed={mobileView === 'weather'} onClick={() => setMobileView('weather')}><Icon name="cloud" size={18} /> {tr('Local weather')}</button>
         <button type="button" aria-pressed={mobileView === 'map'} onClick={() => setMobileView('map')}><Icon name="map" size={18} /> {tr('Explore map')}</button>
       </nav>
 
       <main className="map-workspace">
-        <aside className="weather-sidebar" aria-label={tr('Local weather')}>
+        <aside className="weather-sidebar" aria-label={tr('Local weather')} inert={fullscreen}>
           <div className="sidebar-heading"><span><Icon name="cloud" size={18} /> {tr('Local weather')}</span><small>{tr('Bangladesh · BST')}</small></div>
           <div className="sidebar-content" ref={sidebarRef}>
             {resolved && locationIntentRef.current && location.message && <p className="sidebar-location-message note-warning" role="status">{tr(location.message)}</p>}
@@ -354,12 +421,13 @@ export default function MapPage() {
           <div className="sidebar-footer"><span className={`dot dot-${baseStatus}`} aria-hidden="true" /><span>{baseStatus === 'ok' ? tr('{source} available', { source: tr(snapshot?.baseLabel ?? 'Weather forecast') }) : tr(baseStatus === 'stale' ? 'Forecast is stale' : snapshotState.loading ? 'Loading forecast…' : 'Forecast data unavailable')}</span><button type="button" onClick={() => setStatusOpen((open) => !open)}>{tr('Details')} <Icon name="arrow" size={14} /></button></div>
         </aside>
 
-        <section className={`map-stage${showLightningPanel ? ' has-lightning-panel' : menuOpen ? ' has-layer-menu' : ''}`} aria-label={tr('Bangladesh weather explorer')}>
+        <section ref={mapStageRef} className={`map-stage${fullscreen ? ' is-fullscreen' : ''}${showLightningPanel ? ' has-lightning-panel' : menuOpen ? ' has-layer-menu' : showStormPanel ? ' has-storm-panel' : ''}`} aria-label={tr('Bangladesh weather explorer')}>
           {catalogue ? (
             <MapView
               catalogue={catalogue}
               initialView={initial.view}
               signLayer={signLayer}
+              signLayers={signLayers}
               snapshot={snapshot}
               stepIndex={stepIndex}
               baseStatus={baseStatus}
@@ -371,6 +439,8 @@ export default function MapPage() {
               flyRequest={flyRequest}
               userPosition={location.match ? location.position : null}
               handlers={mapHandlers}
+              inspectionReset={inspectionReset}
+              inspectionRequest={inspectionRequest}
             />
           ) : <div className="splash" role="status">{tr(catalogueError || 'Preparing your weather map…')}</div>}
 
@@ -379,6 +449,7 @@ export default function MapPage() {
             <div className="map-actions">
               <button type="button" className="panel icon-button" aria-label={tr('Show my location and weather')} title={tr('My location')} onClick={goToMyLocation} disabled={!catalogue || locating}><Icon name="locate" size={21} /></button>
               <button type="button" className="panel icon-button" aria-label={tr('Show all of Bangladesh')} title={tr('Show Bangladesh')} onClick={() => { setFlyRequest({ fit: true }); setHover(null); }}><Icon name="map" size={21} /></button>
+              <button ref={fullscreenButtonRef} type="button" className="panel icon-button" aria-label={tr(fullscreen ? 'Exit fullscreen' : 'Enter fullscreen')} title={tr(fullscreen ? 'Exit fullscreen' : 'Enter fullscreen')} aria-pressed={fullscreen} onClick={toggleFullscreen}><Icon name={fullscreen ? 'minimize' : 'maximize'} size={21} /></button>
             </div>
           </div>
 
@@ -388,11 +459,16 @@ export default function MapPage() {
               open={menuOpen}
               onToggleOpen={() => setMenuOpen((open) => !open)}
               signLayer={signLayer}
-              onSignLayer={setSignLayer}
+              signLayers={signLayers}
+              onToggleSignLayer={id => setWeatherLayers(current => toggleWeatherLayer(current, id))}
+              onClearSignLayers={() => setWeatherLayers(weatherLayerSelection([]))}
+              onSignLayer={id => setWeatherLayers(current => weatherLayerSelection(current.layers, id))}
               overlays={overlays}
               onToggleOverlay={toggleOverlay}
               satelliteLayer={satelliteLayer}
               onSatelliteLayer={(layer) => { setSatelliteLayer(layer); setSelectedTime(null); }}
+              stormMode={stormMode}
+              onStormMode={changeStormMode}
               statuses={statuses}
             />
             {showLightningPanel && (
@@ -410,10 +486,10 @@ export default function MapPage() {
                 }}
               />
             )}
-            {overlays.storms && !showLightningPanel && (
+            {showStormPanel && (
               <StormPanel
                 mode={stormMode}
-                onMode={(next) => { setStormMode(next); setStormPlaying(false); setStormIndex(0); }}
+                onMode={changeStormMode}
                 live={stormsState.data}
                 liveError={stormsState.error}
                 demo={stormDemoState.data}
@@ -422,6 +498,10 @@ export default function MapPage() {
                 onDemoIndex={(index) => { setStormIndex(index); setStormPlaying(false); }}
                 playing={stormPlaying}
                 onPlay={() => setStormPlaying((value) => !value)}
+                onClose={() => {
+                  toggleOverlay('storms');
+                  requestAnimationFrame(() => document.getElementById('map-layers-toggle')?.focus());
+                }}
                 selectedPcode={resolved?.dailyPcode ?? null}
                 selectedName={resolved?.name ?? ''}
               />
@@ -435,7 +515,8 @@ export default function MapPage() {
             )}
           </div>
 
-          <Legend signLayer={signLayer} baseStatus={baseStatus} baseLabel={snapshot?.baseLabel} overlays={overlays} mode={mode} radarTime={radarItems[0]?.time} satelliteTime={satelliteSpec?.time} satelliteLayer={satelliteLayer} />
+          <Legend signLayer={signLayer} signLayers={signLayers} baseStatus={baseStatus} baseLabel={snapshot?.baseLabel} overlays={overlays} mode={mode} radarTime={radarItems[0]?.time} satelliteTime={satelliteSpec?.time} satelliteLayer={satelliteLayer} />
+          <MapKey signLayer={signLayer} signLayers={signLayers} overlays={overlays} storms={storms} lightning={lightning} onInspect={picked => setInspectionRequest({ picked })} />
           <TimeBar
             mode={mode}
             onMode={changeMode}
@@ -448,7 +529,7 @@ export default function MapPage() {
             onNow={() => { setSelectedTime(null); setPlaying(false); }}
             liveNote={tr(liveNote)}
           />
-          <Tooltip hover={hover} snapshot={snapshot} catalogue={catalogue} signLayer={signLayer} stepIndex={stepIndex} />
+          <Tooltip hover={hover} context={{ snapshot, catalogue, signLayer, signLayers, stepIndex, baseStatus, storms, stormMode, lightning, satelliteSpec, radarItems }} onDismiss={dismissInspection} />
         </section>
       </main>
     </div>

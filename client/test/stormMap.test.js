@@ -61,7 +61,7 @@ test('storm map: every warned upazila gets its expected arrival time at its loca
   }, locations);
   const [arrival] = kinds(features, 'arrival');
   assert.deepEqual(arrival.geometry.coordinates, [92.01, 21.45]);
-  assert.deepEqual(arrival.properties, { kind: 'arrival', soon: true, label: "Cox's Bazar Sadar 4:40pm" });
+  assert.deepEqual(arrival.properties, { id: '202224', kind: 'arrival', soon: true, label: "Cox's Bazar Sadar 4:40pm" });
   assert.equal(kinds(features, 'arrival').length, 1, 'a place the map does not know is skipped');
   assert.deepEqual(stormFeatures(null), []);
 });

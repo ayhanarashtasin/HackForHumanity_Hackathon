@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../components/Icon.jsx';
 import { Navbar } from '../components/Navbar.jsx';
+import { RouteMap } from '../components/RouteMap.jsx';
 import { RoutePlanner, WeatherSummary } from '../components/RoutePlanner.jsx';
 import { usePolled } from '../hooks/usePolled.js';
 import { useLanguage } from '../i18n/index.js';
@@ -9,8 +10,9 @@ import { containsPoint } from '../lib/locate.js';
 import { placesFor } from '../lib/neighbourhoods.js';
 import { areasAlongRoute, routeParent } from '../lib/routeAreas.js';
 import { regionWeather, routeLightning, routeRegions } from '../lib/routeHierarchy.js';
+import { refreshRouteWeather, routeForecastIndex, routeForecastStatus, routeMapPoint, stopWeather } from '../lib/routeWeather.js';
 import { resolveSelection } from '../lib/series.js';
-import { formatBst, formatDay, stepIndexAt, toMs } from '../lib/time.js';
+import { formatBst, formatClock, formatDay, toMs } from '../lib/time.js';
 import { loadCatalogue, weatherApi } from '../services/weatherApi.js';
 import '../landing.css';
 import './route-page.css';
@@ -76,14 +78,6 @@ const cardPlace = (card) => card.endpointPlace ?? card;
 const placeName = (item, lang, tr) => lang === 'bn' ? item.nameBn || tr(item.name) : item.name;
 const value = (amount, number, suffix = '', decimals = 0) => Number.isFinite(amount) ? `${number(amount.toFixed(decimals))}${suffix}` : '–';
 
-function cardWeather(parent, routeData, snapshot, catalogue, lang) {
-  const resolved = resolveSelection({ level: parent.level ?? 'polygon', id: parent.id }, snapshot, catalogue, lang);
-  const arrivalMs = routeData.places.checkedAt + routeData.result.durationMinutes * 60_000 * parent.progress;
-  const index = snapshot?.steps?.length ? stepIndexAt(snapshot.steps, arrivalMs) : -1;
-  const at = (key) => index >= 0 ? resolved?.series?.[key]?.[index] ?? null : null;
-  return { arrivalMs, temp: at('temp'), hi: at('hi'), rf: at('rf'), wg: at('wg'), ts: snapshot?.thunderSource ? at('ts') : null };
-}
-
 const THUNDER = ['None', 'Low', 'Moderate', 'High'];
 
 function WeatherValues({ weather, tr, number, regional = false }) {
@@ -124,42 +118,24 @@ function roleOf(index, total, tr) {
   return index === 0 ? tr('Start') : index === total - 1 ? tr('Destination') : tr('On the way');
 }
 
-function RouteRegion({ group, index, total, level, routeData, snapshot, catalogue, lightningState, lang, tr, number }) {
-  const arrivalMs = routeData.places.checkedAt + routeData.result.durationMinutes * 60_000 * group.progress;
-  const weather = regionWeather(group, level, snapshot, catalogue, arrivalMs);
-  const children = group.children.map((item) => placeName(item, lang, tr));
-  const visible = children.slice(0, 4);
+function RouteStop({ point, total, level, selected, onSelect, lightningState, lang, tr, number }) {
+  const { item, index, weather } = point;
+  const regional = level !== 'upazila';
+  const children = regional ? item.children : item.places.filter(place => place.id !== item.endpointPlace?.id);
   return (
-    <li className={`route-stop${index === 0 ? ' route-stop--start' : ''}${index === total - 1 ? ' route-stop--destination' : ''}`}>
-      <span className="route-stop-marker" aria-hidden="true">{number(index + 1)}</span>
-      <article className="route-stop-content">
-        <div className="route-stop-topline"><span>{roleOf(index, total, tr)} · {tr(level === 'division' ? 'Division' : 'District')}</span><time dateTime={new Date(arrivalMs).toISOString()}>{formatBst(arrivalMs)}</time></div>
-        <h3>{placeName(group, lang, tr)}</h3>
-        <p className="route-stop-caption">{tr(level === 'division' ? '{n} districts on this stretch' : '{n} upazilas or thanas on this stretch', { n: number(children.length) })}</p>
-        <p className="route-stop-places">{visible.join(' → ')}{children.length > visible.length && ` · ${tr('and {n} more', { n: number(children.length - visible.length) })}`}</p>
-        <p className="route-weather-label">{tr('Weather along this stretch')}</p>
-        <WeatherValues weather={weather} tr={tr} number={number} regional />
-        <LightningValues stops={group.stops} lightningState={lightningState} tr={tr} number={number} />
-      </article>
-    </li>
-  );
-}
-
-function RouteWeather({ parent, index, total, routeData, snapshot, catalogue, lightningState, lang, tr, number }) {
-  const weather = cardWeather(parent, routeData, snapshot, catalogue, lang);
-  const nearby = parent.places.filter((place) => place.id !== parent.endpointPlace?.id);
-  return (
-    <li className={`route-stop${index === 0 ? ' route-stop--start' : ''}${index === total - 1 ? ' route-stop--destination' : ''}`}>
-      <span className="route-stop-marker" aria-hidden="true">{number(index + 1)}</span>
-      <article className="route-stop-content">
-        <div className="route-stop-topline"><span>{roleOf(index, total, tr)} · {tr('Upazila / thana')}</span><time dateTime={new Date(weather.arrivalMs).toISOString()}>{formatBst(weather.arrivalMs)}</time></div>
-        <h3>{placeName(cardPlace(parent), lang, tr)}</h3>
-        {parent.endpointPlace && parent.endpointPlace.name !== parent.name && <p className="route-stop-caption">{tr('Forecast from {name}', { name: placeName(parent, lang, tr) })}</p>}
-        <p className="route-weather-label">{tr('Weather when you arrive')}</p>
-        <WeatherValues weather={weather} tr={tr} number={number} />
-        <LightningValues stops={[parent]} lightningState={lightningState} tr={tr} number={number} />
-        {nearby.length > 0 && <p className="route-stop-places">{tr('Nearby places')}: {nearby.map((place) => placeName(place, lang, tr)).join(', ')}</p>}
-      </article>
+    <li className={`route-stop${selected ? ' is-selected' : ''}`}>
+      <button type="button" className="route-stop-toggle" aria-expanded={selected} aria-controls={`route-stop-detail-${index}`} onClick={() => onSelect(selected ? null : index)}>
+        <span className="route-stop-marker" aria-hidden="true">{number(index + 1)}</span>
+        <span className="route-stop-title"><strong>{point.name}</strong><small>{roleOf(index, total, tr)} · {formatClock(weather.arrivalMs)}</small></span>
+        <span className="route-stop-temp">{value(weather.temp, number, '°', 0)}</span><Icon name="chevron" size={16} />
+      </button>
+      <div className="route-stop-content" id={`route-stop-detail-${index}`} hidden={!selected}>
+        <p className="route-weather-label">{tr(regional ? 'Weather along this stretch' : 'Weather when you arrive')}</p>
+        <p className="route-stop-caption">{formatBst(weather.arrivalMs)} · {tr(regional ? 'Regional summary, not a point forecast.' : 'Forecast from {name}', { name: placeName(item, lang, tr) })}</p>
+        <WeatherValues weather={weather} tr={tr} number={number} regional={regional} />
+        <LightningValues stops={regional ? item.stops : [item]} lightningState={lightningState} tr={tr} number={number} />
+        {children.length > 0 && <p className="route-stop-places">{children.slice(0, 6).map(place => placeName(place, lang, tr)).join(' → ')}{children.length > 6 && ` · ${tr('and {n} more', { n: number(children.length - 6) })}`}</p>}
+      </div>
     </li>
   );
 }
@@ -203,13 +179,14 @@ function durationText(minutes, tr) {
 function RouteSwitch({ shortest, alternative, showingAlternative, onToggle, tr, number }) {
   const shown = showingAlternative ? alternative : shortest;
   return (
-    <section className="route-options panel" aria-label={tr('Alternative route')}>
+    <section className="route-options" aria-label={tr('Alternative route')}>
       <header><strong>{tr(showingAlternative ? 'Alternative route' : 'Shortest route')}</strong><small>{number(shown.distanceKm.toFixed(1))} {tr('km')} · {durationText(shown.durationMinutes, tr)}</small></header>
       {alternative ? (
         <button type="button" className="route-alt-button" aria-pressed={showingAlternative} onClick={onToggle}>
           <Icon name="route" size={18} /><span>{tr(showingAlternative ? 'Back to shortest route' : 'Alternative route')}<small>{number((showingAlternative ? shortest : alternative).distanceKm.toFixed(1))} {tr('km')} · {durationText((showingAlternative ? shortest : alternative).durationMinutes, tr)}</small></span>
         </button>
       ) : <p className="route-options-note">{tr('Only one road route was found between these places.')}</p>}
+      <p className="route-shortest-note">{tr('Other roads may be shorter.')}</p>
     </section>
   );
 }
@@ -221,8 +198,11 @@ export default function RoutePage() {
   const [loadError, setLoadError] = useState('');
   const [search, setSearch] = useState(null);
   const [showingAlternative, setShowingAlternative] = useState(false);
-  const [level, setLevel] = useState('division');
+  const [level, setLevel] = useState('district');
+  const [selected, setSelected] = useState(0);
+  const [focusRequest, setFocusRequest] = useState(null);
   const resultRef = useRef(null);
+  const stopsRef = useRef(null);
   const alternative = useMemo(() => {
     const first = search?.result.alternatives?.[0];
     return first ? { ...first, start: search.result.start, end: search.result.end } : null;
@@ -230,14 +210,17 @@ export default function RoutePage() {
   const routeData = useMemo(() => search
     ? { ...search, result: showingAlternative && alternative ? alternative : search.result }
     : null, [search, alternative, showingAlternative]);
-  const snapshot = usePolled(weatherApi.snapshot, ROUTE_INTERVAL).data;
-  const daily = usePolled(weatherApi.daily, DAILY_INTERVAL).data;
+  const snapshotState = usePolled(weatherApi.snapshot, ROUTE_INTERVAL);
+  const snapshot = snapshotState.data;
+  const dailyState = usePolled(weatherApi.daily, DAILY_INTERVAL);
+  const daily = dailyState.data;
   const lightningState = usePolled(weatherApi.lightningSummaries, ROUTE_INTERVAL, { enabled: Boolean(routeData) });
 
   useEffect(() => {
     const controller = new AbortController();
-    Promise.all([loadCatalogue(controller.signal), fetchJson('/data/bd-upazila.geojson', controller.signal)])
-      .then(([areas, upazilas]) => { setCatalogue(areas); setBoundaries(upazilas); })
+    loadCatalogue(controller.signal).then(setCatalogue)
+      .catch((error) => { if (!controller.signal.aborted) setLoadError(error.message); });
+    fetchJson('/data/bd-upazila.geojson', controller.signal).then(setBoundaries)
       .catch((error) => { if (!controller.signal.aborted) setLoadError(error.message); });
     return () => controller.abort();
   }, []);
@@ -256,7 +239,27 @@ export default function RoutePage() {
   const regions = useMemo(() => catalogue && level !== 'upazila' ? routeRegions(stops, catalogue, level) : [], [stops, catalogue, level]);
   const shown = level === 'upazila' ? stops : regions;
   const outlook = routeData ? destinationOutlook(stops.at(-1), daily, snapshot, catalogue, lang) : null;
-  const onRoute = (result, places) => { setShowingAlternative(false); setLevel('division'); setSearch(result ? { result, places } : null); };
+  const points = useMemo(() => shown.map((item, index) => {
+    const arrivalMs = routeData.places.checkedAt + routeData.result.durationMinutes * 60_000 * item.progress;
+    const regionalSnapshot = routeForecastIndex(snapshot?.steps, arrivalMs) < 0 ? null : snapshot;
+    const weather = level === 'upazila' ? stopWeather(item, routeData, snapshot, catalogue, lang)
+      : { ...regionWeather(item, level, regionalSnapshot, catalogue, arrivalMs), arrivalMs };
+    return { item, index, regional: level !== 'upazila', name: placeName(level === 'upazila' ? cardPlace(item) : item, lang, tr), weather, temp: weather.temp, coordinates: routeMapPoint(item, index, shown.length, routeData.result.coordinates) };
+  }), [shown, level, routeData, snapshot, catalogue, lang, tr]);
+  const refreshedRoute = useMemo(() => refreshRouteWeather(routeData?.result, snapshot), [routeData, snapshot]);
+  const onRoute = (result, places) => { setShowingAlternative(false); setLevel('district'); setSelected(0); setFocusRequest(null); setSearch(result ? { result, places } : null); };
+  const toggleAlternative = () => { setShowingAlternative(value => !value); setSelected(0); setFocusRequest(null); };
+  const selectPoint = (index, fromMap = false) => {
+    setSelected(index);
+    if (index !== null && !fromMap) setFocusRequest({ index });
+    if (fromMap && stopsRef.current) {
+      const row = stopsRef.current.children[index];
+      if (row) stopsRef.current.scrollTo({ top: row.offsetTop - stopsRef.current.offsetTop, behavior: 'instant' });
+    }
+  };
+  const forecastWarning = snapshotState.error || routeForecastStatus(snapshot) !== 'ok';
+  const forecastSource = snapshot?.sources?.[snapshot.base === 'open-meteo' ? 'openMeteo' : 'bmd'];
+  const updatedAt = forecastSource?.dataTime ?? forecastSource?.fetchedAt;
 
   return (
     <div className="route-page" data-tone="light">
@@ -264,69 +267,78 @@ export default function RoutePage() {
       <main className="route-page-main">
         <header className="route-page-heading">
           <p className="eyebrow"><Icon name="route" size={16} /> {tr('AkashSathi route planner')}</p>
-          <h1>{tr('Plan your route')}</h1>
-          <p className="route-page-intro">{tr('See your journey from division to district to upazila, with weather along the way.')}</p>
+          <div className="route-heading-row"><div><h1>{tr('Plan your route')}</h1>
+            <p className="route-page-intro">{tr('From your first turn to your destination, see the road ahead and the weather along it.')}</p></div>
+            <div className={`route-update${forecastWarning ? ' has-warning' : ''}`}>
+              <span role="status"><Icon name={forecastWarning ? 'info' : 'refresh'} size={15} />{tr(snapshotState.loading ? 'Updating forecast…' : forecastWarning ? 'Forecast may be incomplete or out of date.' : 'Forecast refreshes every 5 min')}</span>
+              <button type="button" onClick={snapshotState.reload} disabled={snapshotState.loading} aria-label={tr('Refresh forecast')}><Icon name="refresh" size={16} /></button>
+              {updatedAt && Number.isFinite(toMs(updatedAt)) && <small>{tr('Forecast updated: {time}', { time: formatBst(toMs(updatedAt)) })}</small>}
+            </div>
+          </div>
         </header>
         <div className="route-layout">
           <aside className="route-controls" aria-label={tr('Plan a route')}>
             <RoutePlanner catalogue={catalogue} onRoute={onRoute} />
-            {search && <RouteSwitch shortest={search.result} alternative={alternative} showingAlternative={showingAlternative && Boolean(alternative)} onToggle={() => setShowingAlternative((value) => !value)} tr={tr} number={number} />}
+            {loadError && <p className="route-error" role="alert">{loadError}</p>}
+            {search && <RouteSwitch shortest={search.result} alternative={alternative} showingAlternative={showingAlternative && Boolean(alternative)} onToggle={toggleAlternative} tr={tr} number={number} />}
+            {refreshedRoute ? <details className="route-overview"><summary><Icon name="cloud" size={18} />{tr('Route weather summary')}<Icon name="chevron" size={16} /></summary><WeatherSummary route={refreshedRoute} /></details>
+              : <div className="route-planner-hint"><Icon name="layers" size={21} /><strong>{tr('A clearer view of the road ahead')}</strong><p>{tr('Explore your route on the map, then open a stop for its arrival forecast.')}</p><span>{tr('Road route')}<i />{tr('Arrival weather')}<i />{tr('3-day outlook')}</span></div>}
           </aside>
           <section className="route-result" ref={resultRef} aria-label={tr('Your journey')}>
+            <div className="route-map-heading"><div><p className="route-section-label">{tr('YOUR JOURNEY')}</p><h2><Icon name="map" size={19} />{tr('Your journey on the map')}</h2></div><span className="route-map-tag">{tr(routeData ? 'Road route' : 'Bangladesh')}</span></div>
             <div className="route-result-hero">
-              <p className="route-result-eyebrow"><Icon name="route" size={17} /> {tr('YOUR JOURNEY')}</p>
               {routeData ? (
                 <>
-                  <div className="route-ends">
-                    <div className="route-end"><span className="route-end-mark route-end-mark--start" aria-hidden="true">A</span><div><small>{tr('Start')}</small><strong>{placeName(routeData.places.start, lang, tr)}</strong></div></div>
-                    <span className="route-end-track" aria-hidden="true"><Icon name="arrow" size={20} /></span>
-                    <div className="route-end"><span className="route-end-mark" aria-hidden="true">B</span><div><small>{tr('Destination')}</small><strong>{placeName(routeData.places.end, lang, tr)}</strong></div></div>
-                  </div>
-                  <p className="route-result-stats"><span><Icon name="route" size={16} /> {number(routeData.result.distanceKm.toFixed(1))} {tr('km')}</span><span><Icon name="clock" size={16} /> {durationText(routeData.result.durationMinutes, tr)}</span><span>{tr(showingAlternative && alternative ? 'Alternative route' : 'Shortest route')}</span></p>
+                  <p className="route-ends"><strong>{placeName(routeData.places.start, lang, tr)}</strong><Icon name="arrow" size={17} /><strong>{placeName(routeData.places.end, lang, tr)}</strong></p>
+                  <p className="route-result-stats"><span><Icon name="route" size={15} />{number(routeData.result.distanceKm.toFixed(1))} {tr('km')}</span><span><Icon name="clock" size={15} />{durationText(routeData.result.durationMinutes, tr)}</span><span>{tr('Estimated arrival: {time}', { time: formatClock(routeData.places.checkedAt + routeData.result.durationMinutes * 60_000) })}</span></p>
                 </>
               ) : (
-                <div className="route-result-placeholder" role={loadError ? 'alert' : 'status'}>
-                  <span className="route-placeholder-line" aria-hidden="true"><i /><i /><i /></span>
-                  <h2>{tr('Your route, clearly laid out.')}</h2>
-                  <p>{loadError || tr('Choose a start and destination. Your division-by-division journey will appear here.')}</p>
-                </div>
+                <p className="route-map-intro">{tr('Choose two places to see your road route and weather.')}</p>
               )}
             </div>
-            {routeData && (
-              <div className="route-result-body">
-                <div className="route-level-heading">
-                  <div><p className="route-section-label">{tr('Explore the route')}</p><h2>{tr('Places along your way')}</h2></div>
-                  <span>{number(shown.length)} {tr(shown.length === 1 ? 'stop' : 'stops')}</span>
-                </div>
-                <div className="route-level-switch" role="group" aria-label={tr('Route detail level')}>
-                  {['division', 'district', 'upazila'].map((choice) => (
-                    <button key={choice} type="button" aria-pressed={level === choice} onClick={() => setLevel(choice)}>{tr(choice === 'upazila' ? 'Upazila / thana' : choice === 'district' ? 'District' : 'Division')}</button>
-                  ))}
-                </div>
-                <p className="route-level-note">{tr('Weather can change. Lightning checks are not live.')}</p>
-                {snapshot?.sources?.openMeteo?.status === 'stale' && <p className="route-level-note route-level-note--warning">{tr('The thunderstorm forecast is out of date.')}</p>}
-                {shown.length ? (
-                  <ol className="route-stop-list">
-                    {level === 'upazila'
-                      ? stops.map((parent, index) => <RouteWeather key={`${parent.id}-${index}`} parent={parent} index={index} total={stops.length} routeData={routeData} snapshot={snapshot} catalogue={catalogue} lightningState={lightningState} lang={lang} tr={tr} number={number} />)
-                      : regions.map((group, index) => <RouteRegion key={`${group.id}-${index}`} group={group} index={index} total={regions.length} level={level} routeData={routeData} snapshot={snapshot} catalogue={catalogue} lightningState={lightningState} lang={lang} tr={tr} number={number} />)}
-                  </ol>
-                ) : <p className="route-empty-state" role="status">{!boundaries && !loadError ? tr('Finding places along your route…') : tr('No area boundary matched this part of the route.')}</p>}
-                {stops.length > 0 && (
-                  <section className="route-arrival" aria-label={tr('Destination weather')}>
-                    <p className="route-section-label">{tr('At your destination')}</p>
-                    <h3>{placeName(routeData.places.end, lang, tr)}</h3>
-                    <p className="route-arrival-source">{tr('Estimated arrival: {time}', { time: formatBst(routeData.places.checkedAt + routeData.result.durationMinutes * 60_000) })} · {tr('Forecast from {name}', { name: placeName(stops.at(-1), lang, tr) })}</p>
-                    <WeatherValues weather={cardWeather(stops.at(-1), routeData, snapshot, catalogue, lang)} tr={tr} number={number} />
-                    <DestinationOutlook outlook={outlook} tr={tr} number={number} />
-                  </section>
-                )}
-                <WeatherSummary route={routeData.result} />
-                <p className="route-shortest-note">{tr('Other roads may be shorter.')}</p>
-              </div>
-            )}
+            <RouteMap route={routeData?.result} otherRoute={search && alternative ? (showingAlternative ? search.result : alternative) : null} points={points} selected={selected} onSelect={index => selectPoint(index, true)} onAlternative={toggleAlternative} focusRequest={focusRequest} />
+            {points[selected] && <div className="route-map-weather" aria-live="polite">
+              <div className="route-map-weather-place"><span className="route-section-label">{tr(level === 'upazila' ? 'Weather when you arrive' : 'Weather along this stretch')}</span><strong>{points[selected].name}</strong><small>{formatBst(points[selected].weather.arrivalMs)}</small></div>
+              <dl><div><dt><Icon name="thermometer" size={15} />{tr(level === 'upazila' ? 'Temperature' : 'Average temperature')}</dt><dd>{value(points[selected].weather.temp, number, tr('°C'), 1)}</dd></div><div><dt><Icon name="rain" size={15} />{tr(level === 'upazila' ? 'Rainfall' : 'Peak rain')}</dt><dd>{value(points[selected].weather.rf, number, ` ${tr('mm')}`, 1)}</dd></div><div><dt><Icon name="wind" size={15} />{tr(level === 'upazila' ? 'Wind' : 'Strongest wind')}</dt><dd>{value(points[selected].weather.wg, number, ` ${tr('km/h')}`)}</dd></div></dl>
+            </div>}
+            {routeData && snapshot?.base === 'bmd' && <p className="route-map-weather-note">{tr('BMD rainfall units have not been verified.')}</p>}
+            <p className="route-map-caption"><Icon name="info" size={15} />{tr(routeData ? 'Tap a stop for weather · Scroll or pinch to zoom' : 'Scroll or pinch to zoom · Drag to explore')}<span>{tr('Forecast, not live observations')}</span></p>
           </section>
         </div>
+        {routeData && (
+          <div className="route-result-body" aria-label={tr('Route weather')}>
+            <section className="route-journey-panel">
+              <div className="route-level-heading">
+                <div><p className="route-section-label">{tr('Explore the route')}</p><h2>{tr('Places along your way')}</h2></div>
+                <span>{number(shown.length)} {tr(shown.length === 1 ? 'stop' : 'stops')}</span>
+              </div>
+              <div className="route-level-switch" role="group" aria-label={tr('Route detail level')}>
+                {['division', 'district', 'upazila'].map((choice) => (
+                  <button key={choice} type="button" aria-pressed={level === choice} onClick={() => { setLevel(choice); setSelected(0); setFocusRequest(null); }}>{tr(choice === 'upazila' ? 'Upazila / thana' : choice === 'district' ? 'District' : 'Division')}</button>
+                ))}
+              </div>
+              <p className="route-level-note">{tr('Weather can change. Lightning checks are not live.')}</p>
+              {snapshot?.sources?.openMeteo?.status === 'stale' && <p className="route-level-note route-level-note--warning">{tr('The thunderstorm forecast is out of date.')}</p>}
+              {shown.length ? (
+                <ol className="route-stop-list" ref={stopsRef}>
+                  {points.map(point => <RouteStop key={`${point.item.id}-${point.index}`} point={point} total={points.length} level={level} selected={selected === point.index} onSelect={selectPoint} lightningState={lightningState} lang={lang} tr={tr} number={number} />)}
+                </ol>
+              ) : <p className="route-empty-state" role="status">{!boundaries && !loadError ? tr('Finding places along your route…') : tr('No area boundary matched this part of the route.')}</p>}
+            </section>
+            {stops.length > 0 && (
+              <section className="route-arrival" aria-label={tr('Destination weather')}>
+                <p className="route-section-label">{tr('At your destination')}</p>
+                <h3>{placeName(routeData.places.end, lang, tr)}</h3>
+                <p className="route-arrival-source">{tr('Estimated arrival: {time}', { time: formatBst(routeData.places.checkedAt + routeData.result.durationMinutes * 60_000) })} · {tr('Forecast from {name}', { name: placeName(stops.at(-1), lang, tr) })}</p>
+                <WeatherValues weather={stopWeather(stops.at(-1), routeData, snapshot, catalogue, lang)} tr={tr} number={number} />
+                <DestinationOutlook outlook={outlook} tr={tr} number={number} />
+                {outlook && dailyState.error && <p className="route-level-note">{tr('The latest daily forecast refresh failed. Saved outlook is shown.')}</p>}
+                {!outlook && <p className="route-level-note">{tr('The destination outlook is not available right now.')}</p>}
+                <p className="route-shortest-note">{tr('Model forecast, not station readings. Weather between sampled locations may differ. Route and ETA are estimates.')}</p>
+              </section>
+            )}
+          </div>
+        )}
       </main>
     </div>
   );

@@ -90,18 +90,27 @@
 .route-summary dd { margin-top: 4px; font-size: .78rem; font-weight: 650; overflow-wrap: anywhere; }
 .route-coverage, .route-disclaimer, .route-provider-note { margin-top: 10px; color: var(--map-muted); font-size: .6875rem; line-height: 1.55; }
 .route-disclaimer { padding-top: 9px; border-top: 1px solid var(--map-rule); }
-.map-context { display: flex; gap: 10px; align-items: center; padding: 10px 14px; min-height: 52px; max-width: calc(100% - 110px); }
+.map-context { display: flex; gap: 10px; align-items: center; padding: 10px 14px; min-height: 52px; max-width: calc(100% - 162px); }
 .map-context > svg { flex: none; }
 .map-context strong { display: block; font-size: .85rem; line-height: 1.3; }
 .map-context span { display: block; font-size: 0.6875rem; color: var(--map-muted); margin-top: 2px; }
-.map-actions { display: flex; gap: 8px; }
-.weather-app .right-stack { top: 82px; right: 16px; width: 214px; max-height: calc(100% - 250px); z-index: 5; }
-.weather-app .layer-menu { padding: 5px; }
-.weather-app .panel-title { min-height: 44px; font-size: .8rem; }
+.map-actions { display: flex; gap: 8px; flex: none; }
+.weather-app .right-stack { top: 82px; right: 16px; width: 214px; max-height: calc(100% - 250px); overflow: hidden; z-index: 5; }
+.weather-app .has-layer-menu .right-stack { z-index: 8; }
+.weather-app .layer-menu { display: flex; flex-direction: column; min-height: 0; overflow: hidden; padding: 5px; }
+.weather-app .layer-menu:not(.is-open), .weather-app .right-stack > .lightning-reopen { flex: none; }
+.weather-app #map-layer-options { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--sage) transparent; padding: 2px; }
+.weather-app .panel-title { flex: none; min-height: 44px; font-size: .8rem; }
 .layer-title { display: flex; align-items: center; gap: 8px; }
 .chevron-open { transform: rotate(180deg); display: flex; }
 .weather-app .menu-heading { font-size: 0.6875rem; padding-top: 12px; }
 .weather-app .menu-item { min-height: 44px; font-size: .82rem; }
+.layer-hint { padding: 5px 8px 9px; color: var(--map-muted); font-size: .6875rem; line-height: 1.5; }
+.layer-color-choice { display: grid; gap: 5px; padding: 8px; font-size: .75rem; font-weight: 600; }
+.layer-color-choice select { min-height: 44px; width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--map-rule); border-radius: 8px; background: var(--cream); color: var(--olive); font: inherit; }
+.weather-app .menu-item input, .weather-app .menu-item .swatch { flex-shrink: 0; }
+.legend-selected { margin-top: 8px; font-size: .7rem; line-height: 1.5; color: var(--map-muted); }
+.key-weather-scale { display: grid; gap: 6px; }
 .weather-app .sub-choice { padding-left: 10px; }
 .weather-app .chip { min-height: 44px; }
 .weather-app .legend { left: 16px; bottom: 164px; transform: none; width: 272px; min-width: 0; max-width: calc(100% - 32px); padding: 12px 14px; z-index: 3; }
@@ -110,6 +119,37 @@
 .weather-app .legend-details summary { min-height: 44px; padding: 13px 0; box-sizing: border-box; }
 .weather-app .banner { left: 16px; right: 16px; top: 144px; transform: none; width: auto; max-width: 440px; font-size: .78rem; text-align: left; z-index: 4; }
 .weather-app .tooltip { max-width: 240px; z-index: 10; }
+
+/* The symbol key stays available even when a side panel hides the weather legend. */
+.weather-app .map-stage .map-key { position: absolute; grid-area: 1 / 1 / 2 / 2; left: 12px; bottom: 12px; width: min(300px, calc(100% - 24px)); max-height: calc(100% - 90px); overflow-y: auto; z-index: 6; box-shadow: var(--shadow); border: 1px solid var(--map-rule); background: var(--cream); }
+.map-key summary { position: sticky; top: 0; z-index: 1; min-height: 44px; padding: 13px 14px; font-size: .76rem; font-weight: 650; cursor: pointer; background: var(--cream); }
+.map-key-content { display: grid; gap: 10px; padding: 0 14px 14px; font-size: .72rem; line-height: 1.55; }
+.map-key-content p { color: var(--map-muted); }
+.map-key-content ul { display: grid; gap: 7px; list-style: none; padding: 0; margin: 0; }
+.map-key-content li { display: flex; align-items: center; gap: 9px; }
+.map-key-content li i { width: 16px; height: 12px; flex: none; border: 1px solid var(--olive); border-radius: 3px; }
+.map-key-content .key-ring { border: 2px dashed #A34F19; border-radius: 50%; }
+.map-key-content .key-track { background: var(--olive); border: 0; position: relative; }
+.key-track::after { content: '→'; color: var(--cream); position: absolute; inset: -4px 0 0; text-align: center; font-size: 14px; }
+.map-key-content .key-arrival { background: #F2A03D; }
+.map-key-select { display: grid; gap: 5px; font-weight: 600; }
+.map-key-select select { width: 100%; min-height: 44px; border: 1px solid var(--map-rule); border-radius: 8px; padding: 8px; color: var(--olive); background: var(--cream); font: inherit; }
+
+/* One readable card for mouse, touch and keyboard. No mobile rule hides these details. */
+.weather-app .map-inspection { position: absolute; z-index: 11; display: flex; flex-direction: column; gap: 10px; width: min(300px, calc(100% - 16px)); padding: 14px; border: 1px solid var(--sage); border-radius: 14px; color: var(--olive); background: var(--cream); box-shadow: 0 6px 28px rgba(0, 0, 0, .26); font-size: .76rem; line-height: 1.5; overflow-y: auto; overflow-wrap: anywhere; overscroll-behavior: contain; }
+.map-inspection header { display: flex; align-items: center; gap: 9px; }
+.map-inspection header > div { flex: 1; min-width: 0; }
+.map-inspection header strong, .map-inspection header small { display: block; }
+.map-inspection header strong { font-size: .88rem; line-height: 1.4; }
+.map-inspection header small, .inspection-hint { color: var(--map-muted); font-size: .6875rem; }
+.inspection-swatch { width: 12px; height: 24px; border: 1px solid var(--map-rule); border-radius: 4px; flex: none; }
+.weather-app .map-inspection .icon-button { border: 0; background: transparent; margin: -8px -8px -8px 0; }
+.map-inspection dl { display: grid; gap: 7px; margin: 0; }
+.map-inspection dl > div { display: grid; grid-template-columns: minmax(75px, .8fr) minmax(0, 1.2fr); gap: 10px; }
+.map-inspection dt { color: var(--map-muted); font-size: .7rem; }
+.map-inspection dd { margin: 0; font-weight: 600; }
+.inspection-note, .inspection-also { padding-top: 9px; border-top: 1px solid var(--map-rule); font-size: .7rem; }
+.inspection-also { color: var(--map-muted); }
 
 /* An observation/forecast timeline with controls that stay visible. */
 .weather-app .timebar { left: 16px; right: 16px; bottom: 36px; display: grid; grid-template-columns: auto 44px 1fr auto; gap: 10px; padding: 12px 14px 26px; z-index: 4; }
@@ -253,7 +293,7 @@
   .location-access h2 { max-width: 300px; }
   .map-toolbar { top: 12px; left: 12px; right: 12px; gap: 8px; }
   .route-panel { width: min(340px, calc(100vw - 44px)); max-height: min(560px, calc(100dvh - 350px)); }
-  .map-context { padding: 9px 11px; min-height: 48px; max-width: calc(100% - 104px); }
+  .map-context { padding: 9px 11px; min-height: 48px; max-width: calc(100% - 152px); }
   .map-context strong { font-size: .78rem; }
   .map-context span { font-size: 0.6875rem; }
   .map-actions { gap: 6px; }
@@ -324,17 +364,18 @@ html:lang(bn) .weather-app .panel-header h2 { font-size: 1.5rem; }
 
 /* Reserve the timeline's natural height, including translated/wrapped dates, instead of guessing its clearance in pixels. */
 .weather-app .map-stage { display: grid; grid-template-rows: minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr); padding-bottom: 36px; }
+.weather-app .map-stage.is-fullscreen { display: grid; position: fixed; inset: 0; z-index: 100; width: 100%; height: 100dvh; border: 0; border-radius: 0; }
 .weather-app .map-stage .timebar { position: relative; grid-row: 2; grid-column: 1; inset: auto; margin: 12px 16px 0; }
 .weather-app .map-stage .right-stack,
 .weather-app .map-stage .right-stack.with-lightning { grid-area: 1 / 1 / 2 / 2; bottom: 12px; max-height: none; }
-.weather-app .map-stage .legend { grid-area: 1 / 1 / 2 / 2; bottom: 12px; }
+.weather-app .map-stage .legend { grid-area: 1 / 1 / 2 / 2; bottom: 68px; }
 @media (max-width: 760px) {
   .weather-app .map-stage { padding-bottom: 34px; }
   .weather-app .map-stage .timebar { margin-inline: 12px; }
 }
 @media (max-height: 600px) {
   /* Closeable panels get the small landscape canvas; closing them restores the timeline unchanged. */
-  .weather-app :is(.has-lightning-panel, .has-layer-menu) .timebar { display: none; }
+  .weather-app :is(.has-lightning-panel, .has-layer-menu, .has-storm-panel) .timebar { display: none; }
   .weather-app .map-stage .right-stack { top: 12px; z-index: 8; }
 }
 

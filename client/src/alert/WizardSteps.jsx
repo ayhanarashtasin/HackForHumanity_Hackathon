@@ -42,7 +42,7 @@ export function StepWhere({ answers, setAnswers, errors }) {
     <div className="alert-step-body">
       <h2 className="alert-step-title" id="alert-step-heading">{tr('where.title')}</h2>
       <p className="alert-help">{tr('where.help')}</p>
-      <GeoButton onFound={(pcode) => setAnswers((current) => ({ ...current, homeAreaPcode: pcode, locationMethod: 'gps_nearest' }))} />
+      <GeoButton value={answers.homeAreaPcode} onFound={(pcode) => setAnswers((current) => ({ ...current, homeAreaPcode: pcode, locationMethod: 'gps_nearest' }))} />
       <AreaPicker
         id={fieldDomId('homeAreaPcode')}
         label={tr('where.home')}

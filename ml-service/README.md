@@ -25,8 +25,8 @@ npm run ml          # only the ML service, on http://127.0.0.1:8001
 ```
 
 The first run creates `ml-service/.venv` and installs `requirements.txt`. In development the backend uses http://127.0.0.1:8001 unless
-`server/.env` sets `ML_SERVICE_URL` (empty turns the feature off; production needs it set explicitly). `npm run demo:rain` adds a
-demo alert to see the line.
+`server/.env` sets `ML_SERVICE_URL` (empty turns the feature off; production needs it set explicitly). Rain alerts continue without
+the confidence line if the service is unavailable.
 
 Manual equivalent (Windows paths; use `.venv/bin/python` on macOS and Linux):
 
@@ -43,7 +43,7 @@ python -m venv .venv
 
 ## Rebuild the models
 
-The data and model files are not in git. Rebuild them in order:
+The historical datasets are not in git; trained model bundles are committed. To rebuild them, run these commands from `ml-service/`:
 
 ```
 python scripts/fetch_history.py --budget 3500     # resumable; run again to continue (Open-Meteo free tier: ~10,000 calls/day)
@@ -97,7 +97,7 @@ How it works (`storm/tracker.py`):
    inside it are listed with their arrival times.
 
 The Node backend asks for the frame after the last one it analysed every 2 minutes (`STORM_MINUTES`; `GET /storms/snapshot?time=...`
-answers 404 until GIBS has published that frame), so a frame is analysed within minutes of reaching GIBS. It keeps each result for
+answers 404 until the selected source has published that frame), so a frame is analysed within minutes of publication. It keeps each result for
 30 days in MongoDB (`StormSnapshot`), which is the future test set. `GET /storms/demo` replays the saved storm day, **22 September 2026**,
 13:00–18:00 Bangladesh time (`storm/data/demo-2026-09-22/`, kept in git because GIBS deletes frames after about six weeks). The map
 opens it directly with `/map#o=storms&storm=replay`.

@@ -1,21 +1,31 @@
 # AkashSathi (আকাশসাথী)
 
 [![CI](https://github.com/ayhanarashtasin/HackForHumanity_Hackathon/actions/workflows/ci.yml/badge.svg)](https://github.com/ayhanarashtasin/HackForHumanity_Hackathon/actions/workflows/ci.yml)
+![Node.js](https://img.shields.io/badge/Node.js-22.12%2B-43853D?logo=node.js&logoColor=white)
+![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose-47A248?logo=mongodb&logoColor=white)
+![Status](https://img.shields.io/badge/Status-Prototype-DAA520)
 
 **Bangladesh-focused weather intelligence and occupation-aware alerts.**
 
 AkashSathi, meaning "sky companion," helps people understand how local weather may affect their work and daily activities. Developed for HackForHumanity, it combines an interactive weather map, English and Bangla guidance, an anonymous alert inbox, and optional messaging integrations for farmers, fishermen, construction workers, vendors, students, and rickshaw pullers.
 
-> **Project status: prototype.** AkashSathi is not an official warning service or a replacement for Bangladesh Meteorological Department (BMD) guidance. Alert thresholds are marked `prototype` and have not been expert-validated. Missing, stale, or unavailable data must never be interpreted as safe conditions.
+**8 divisions · 64 districts · 544 BMD forecast locations · বাংলা / English**
+
+The same forecast can mean protecting a farmer's harvest, postponing exposed rooftop work, or allowing extra time for a school commute. AkashSathi separates weather-hazard detection from occupation-specific advice so each alert can explain **what is expected, where it applies, why it matters, and what to do next**.
+
+> [!IMPORTANT]
+> **This is a prototype, not an official warning service.** AkashSathi does not replace Bangladesh Meteorological Department (BMD) guidance. Alert thresholds have not been expert-validated. Missing, stale, or unavailable data must never be interpreted as safe conditions.
 
 ## Table of contents
 
 - [Features](#features)
+- [Architecture](#architecture)
 - [Technology stack](#technology-stack)
 - [Getting started](#getting-started)
 - [Configuration](#configuration)
 - [Using the application](#using-the-application)
-- [Architecture](#architecture)
+- [ML and storm tracking](#ml-and-storm-tracking)
 - [Messaging integrations](#messaging-integrations)
 - [Data sources and coverage](#data-sources-and-coverage)
 - [API overview](#api-overview)
@@ -34,7 +44,8 @@ AkashSathi, meaning "sky companion," helps people understand how local weather m
 
 | Capability | Description |
 | --- | --- |
-| Interactive weather map | Temperature, computed heat index, rainfall, wind, and thunderstorm potential across 64 districts and 544 BMD forecast locations, with radar, satellite, and automatic route-weather summaries. |
+| Interactive weather map | Temperature, computed heat index, rainfall, wind, and thunderstorm potential, with selectable indicators, radar and satellite playback, location search, and fullscreen exploration. |
+| Route-weather planning | A dedicated road-route map with an alternative when available, arrival-time forecasts, division/district/upazila summaries, nearby lightning checks, and a destination outlook. |
 | Occupation-aware alerts | Scenario-based guidance using a subscriber's occupation, selected areas, activity, and work context. Cards include severity, evidence, source, validity, and recommended actions. |
 | Anonymous profiles | Browser-based registration without an account, name, email address, or phone number. Profiles support editing, pausing, deletion, and temporary activity changes. |
 | Optional external delivery | Telegram, WhatsApp, and SMS copies of inbox alerts, with verified connections, quiet hours, delivery limits, and retries. |
@@ -42,6 +53,140 @@ AkashSathi, meaning "sky companion," helps people understand how local weather m
 | Administrator dashboard | Alert previews, manual declarations, messages, withdrawals, severity holds, hazard switches, delivery health, and isolated demo audiences. |
 | Bilingual interface | Persistent বাংলা / English switching across public and admin screens, localized dates and numbers, and a self-hosted Bengali font with responsive text layouts. |
 | Cached forecasts and history | Background collection, persisted snapshots, per-source freshness indicators, and compact district-level forecast history. |
+| Experimental rain confidence | Two Random Forest classifiers add High / Medium / Low confidence labels to qualifying rain alerts without changing their severity or publication. |
+| Experimental storm tracking | Himawari-9 cloud-cell detection, motion estimates, 30/60/90-minute projections, area-arrival estimates, and prototype storm-approach warnings. |
+
+## Architecture
+
+AkashSathi is an **npm-workspace monorepo with a React client, a modular Express backend, MongoDB persistence, and an optional Python inference service**. Background jobs run inside the Node.js server process; there is no separate message broker or standalone worker application.
+
+The central design is **collect → normalize → cache/persist → evaluate → serve**. Opening a forecast page, polling an inbox, or requesting a Telegram weather report does not trigger upstream weather collection.
+
+### System overview
+
+GitHub renders the following Mermaid diagrams directly.
+
+```mermaid
+flowchart TB
+    subgraph Browser["Browser application"]
+        UI["React + Vite<br/>Landing · Map · Routes · Alerts · Admin"]
+        MAP["MapLibre GL JS"]
+        UI --> MAP
+    end
+
+    subgraph Backend["Node.js / Express backend"]
+        API["REST API<br/>Controllers + middleware"]
+        JOBS["Background collectors<br/>Forecasts · Imagery indexes · Storms"]
+        CACHE["In-memory forecast cache<br/>Normalized series + freshness"]
+        ENGINE["Alert cycle<br/>Provider refresh · Hazard detection · Scenarios"]
+        DELIVERY["Persistent delivery queue + worker"]
+        BOT["Telegram reports + morning digest"]
+    end
+
+    DB[("MongoDB")]
+    ML["Optional Python / FastAPI<br/>Rain confidence + OpenCV storm tracking"]
+    WEATHER["BMD forecasts + Open-Meteo"]
+    EXTRA["Optional Xweather + official BMD bulletins"]
+    HIMAWARI["JMA Himawari-9<br/>NOAA Open Data / NASA GIBS"]
+    TILES["OpenFreeMap + NASA GIBS tiles"]
+    OSRM["Public OSRM routing service"]
+    CHANNELS["Telegram · WhatsApp · SMS"]
+    TELEGRAM["Telegram chats"]
+
+    UI -->|"/api requests"| API
+    MAP -->|"Direct tile requests"| TILES
+    API -->|"Read forecasts"| CACHE
+    API <-->|"Profiles, inbox, administration"| DB
+    API -->|"On-demand road geometry"| OSRM
+    WEATHER --> JOBS
+    JOBS --> CACHE
+    JOBS -->|"Forecast and storm snapshots"| DB
+    DB -->|"Restore forecast snapshots on startup"| CACHE
+    EXTRA --> ENGINE
+    CACHE --> ENGINE
+    DB -->|"Subscribers, settings, cached evidence"| ENGINE
+    ENGINE -->|"Hazard events + notifications"| DB
+    ENGINE <-->|"Rain-confidence inference"| ML
+    HIMAWARI --> ML
+    ML -->|"Storm analyses"| JOBS
+    DB --> DELIVERY
+    DELIVERY --> CHANNELS
+    CACHE --> BOT
+    DB -->|"Saved areas + alert state"| BOT
+    BOT --> TELEGRAM
+```
+
+**Request-time exceptions:** road-route searches contact OSRM; radar images use an allowlisted, cached BMD proxy; storm replay and image endpoints can call the internal Python service. Satellite and basemap tiles load directly in the browser. These paths do not initiate new forecast or Xweather collection.
+
+### Component responsibilities
+
+| Component | Responsibility | Main entry points |
+| --- | --- | --- |
+| Browser client | Lazy-loaded screens, History API routing, English/Bangla UI, geolocation-to-area matching, map rendering, and API polling. | [`client/src/App.jsx`](client/src/App.jsx), [`client/src/pages/`](client/src/pages), [`client/src/map/WeatherMap.js`](client/src/map/WeatherMap.js) |
+| HTTP boundary | Route dispatch, input handling, cookie-based sessions, origin protection for subscriber/admin routes, rate limits, and error responses. | [`server/src/app.js`](server/src/app.js), [`server/src/routes/`](server/src/routes), [`server/src/middleware/`](server/src/middleware) |
+| Weather data layer | Provider adapters, time/unit normalization, computed heat index, district aggregation, fallback selection, and freshness metadata. | [`server/src/services/weatherStore.js`](server/src/services/weatherStore.js), [`bmdForecast.js`](server/src/services/bmdForecast.js), [`openMeteo.js`](server/src/services/openMeteo.js) |
+| Alert engine | Refresh optional inputs, detect occupation-neutral hazards, select recipients, apply occupation/activity scenarios, compose bilingual cards, and manage event lifecycles. | [`server/src/services/alerts/`](server/src/services/alerts), [`server/src/config/alertRules.js`](server/src/config/alertRules.js) |
+| Delivery and bot | Verified channel connections, queued alert copies, retry/backoff, quiet hours, delivery caps, Telegram reports, and daily forecasts. | [`server/src/services/delivery/`](server/src/services/delivery) |
+| Python service | Random Forest rain-confidence inference and Himawari cloud-cell tracking; called by Node, not directly by the browser. | [`ml-service/app.py`](ml-service/app.py), [`ml-service/storm/`](ml-service/storm) |
+| Scheduler | Start collectors and independent alert/delivery jobs after MongoDB connects; stop jobs during shutdown. | [`server/src/server.js`](server/src/server.js), [`server/src/jobs/scheduler.js`](server/src/jobs/scheduler.js) |
+
+### Alert-processing pipeline
+
+```mermaid
+flowchart LR
+    A["Cached forecasts<br/>Storms · Lightning · Bulletins"] --> B["Normalize +<br/>check freshness"]
+    B --> C["Detect hazard<br/>and maintain event"]
+    C --> D["Match area<br/>and recipients"]
+    D --> E["Apply occupation,<br/>activity and timing rules"]
+    E --> F["Compose EN/BN<br/>deduplicate + publish or hold"]
+    F --> G["Website inbox"]
+    F --> H["Optional delivery queue"]
+```
+
+Hazards include heavy rain, heat stress, strong wind, dry spells, lightning, marine weather, official notices, and satellite-derived storm approach. `HazardEvent` records the shared event; `Notification` records how it applies to a particular subscriber and scenario. Administrator declarations and free-text messages are explicitly distinguished from automatic detections.
+
+Key guarantees:
+
+- **Freshness before action:** stale data may annotate an existing alert, but cannot create or escalate one. Missing values are not converted into zero or a safe state.
+- **Explainable notifications:** cards retain source references, evidence, affected area, validity, rule version, and recommended actions.
+- **Database-backed deduplication:** unique indexes guard event keys, subscriber/event/scenario notifications, and notification/channel/stage deliveries.
+- **Independent delivery:** the inbox is the primary record. External channels copy stored alerts and re-check eligibility before sending; provider delivery is not exactly-once.
+- **Controlled administration:** automatic publication is the default; severity holds, per-hazard switches, confirmed sends, audit records, and isolated demo audiences are supported.
+
+### Persistence model
+
+| Model / group | Responsibility |
+| --- | --- |
+| `Subscriber` | Anonymous profile, occupation answers, saved areas, temporary activity/current area, preferences, consent, and verified channel state. |
+| `ForecastSnapshot` | Latest normalized BMD/Open-Meteo payloads; restored into memory on startup when weather jobs are enabled. |
+| `WeatherRun` | Compact district-level run history; TTL retention defaults to 60 days. |
+| `WeatherSnapshot` | Cached provider/product queries for optional forecast, maritime, lightning, and bulletin processing. |
+| `StormSnapshot` | Satellite-cell analyses retained for 30 days for later evaluation. |
+| `LightningCampaign`, `LightningSample` | Scheduled map-summary campaign, sampling status, and stored results. |
+| `HazardEvent` → `Notification` → `Delivery` | Shared hazard lifecycle → personal inbox card → external-channel delivery attempts. |
+| `MorningDigest` | Per-subscriber/day progress and outcomes, retained for 30 days without message text or chat IDs. |
+| `AdminSession`, `AdminAction` | Administrator sessions, send idempotency, and audit history. |
+| `EngineSettings`, `RuleSetting`, `JobState`, `Area` | Engine configuration, versioned rule metadata, task state/leases, and seeded area reference data. |
+
+Schemas and indexes live in [`server/src/models/`](server/src/models). MongoDB is required even when external delivery and ML are disabled.
+
+### Background schedules
+
+The schedules below reflect the default configuration. Available tuning options are defined in [`server/src/config/env.js`](server/src/config/env.js).
+
+| Task | Default cadence / behavior |
+| --- | --- |
+| BMD forecast | Probe every 30 minutes; fetch all locations only when the model run changes. |
+| Open-Meteo forecast | Every 180 minutes, aggregated into three-hour windows. |
+| Radar / satellite indexes | Every 10 / 30 minutes. |
+| Storm analysis | Check every 2 minutes for newly published ten-minute satellite frames. |
+| Alert engine | Every 2 minutes; optional Xweather forecast/maritime refreshes are due approximately every 3 / 6 hours. |
+| Official bulletins | Checked within alert cycles, at most every 30 minutes after a completed check. |
+| Lightning map campaign | 07:00, 15:00, and 23:00 Asia/Dhaka, with campaign and quota limits. |
+| External alert delivery | Every 30 seconds. |
+| Telegram morning digest | One-minute scheduler tick; default send time is 06:00 Asia/Dhaka. |
+
+Alert and delivery jobs use database leases to coordinate workers. Forecast caches and HTTP rate limits are process-local, so horizontal scaling requires additional coordination; this is not a stateless, independently scaled worker architecture.
 
 ## Technology stack
 
@@ -50,10 +195,12 @@ AkashSathi, meaning "sky companion," helps people understand how local weather m
 | Frontend | React 19, Vite 8, MapLibre GL JS 6, CSS |
 | Backend | Node.js 22.12+, Express 5 |
 | Database | MongoDB, Mongoose 9 |
+| Optional inference service | Python 3.12+, FastAPI, Uvicorn, scikit-learn, pandas, NumPy, Joblib, OpenCV |
+| Mapping and geography | MapLibre GL JS, GeoJSON, OpenFreeMap/OpenStreetMap, OSRM |
 | Messaging | Telegram Bot API, WhatsApp Business Cloud API, Twilio or a configurable HTTP SMS gateway |
-| Tooling | npm workspaces, Node.js test runner, concurrently, Mapshaper |
+| Tooling | npm workspaces, Node.js test runner, concurrently |
 
-The frontend uses a lightweight History API router. Map, alert, and administrator pages are loaded separately to avoid loading the map bundle on the landing page. Visual tokens and weather-color conventions are documented in [`docs/design.md`](docs/design.md).
+The frontend uses plain CSS and a lightweight History API router rather than a routing framework. Map, route, alert, and administrator pages are lazy-loaded. Visual tokens and weather-color conventions are documented in [`docs/design.md`](docs/design.md).
 
 ## Getting started
 
@@ -61,6 +208,7 @@ The frontend uses a lightweight History API router. Map, alert, and administrato
 
 - **Node.js 22.12 or later**, with npm.
 - **MongoDB**, either running locally or accessible through MongoDB Atlas.
+- **Python 3.12+** (stable release), optional for rain-confidence labels and satellite storm tracking. MongoDB 8 is used in CI.
 - Internet access for weather collection and map imagery. Provider credentials are optional for the core map and website inbox.
 
 ### 1. Install dependencies
@@ -116,9 +264,11 @@ npm run dev
 | --- | --- |
 | Landing page | <http://localhost:5173> |
 | Weather map | <http://localhost:5173/map> |
+| Route-weather planner | <http://localhost:5173/route> |
 | Alert registration and inbox | <http://localhost:5173/alert> |
 | Administrator dashboard | <http://localhost:5173/admin> — requires administrator setup |
 | API health and source freshness | <http://localhost:5000/api/health> |
+| Optional Python service health | <http://127.0.0.1:8001/health> |
 
 Vite proxies `/api` requests to the backend. Collection starts after the API connects to MongoDB; the first forecast may take time to arrive. Existing forecast snapshots are restored when weather jobs are enabled.
 
@@ -126,23 +276,17 @@ Vite proxies `/api` requests to the backend. Collection starts after the API con
 
 Generated boundaries and location catalogues are already committed. Geography builds are not required for normal setup.
 
-### 4. Rain forecast confidence (ML)
+### 4. Optional Python service
 
-Rain alerts end with one extra line from two Random Forest classifiers, for example `পূর্বাভাসের নির্ভরযোগ্যতা: উচ্চ।` / `Forecast confidence: High.` **`npm run dev` starts the ML service too**; it needs **Python 3.12 or later** (a stable release), and the trained models are committed. The first run creates `ml-service/.venv` and installs the Python packages, which takes a few minutes.
+`npm run dev` also attempts to start the Python service. The first run creates `ml-service/.venv` and installs the pinned packages in `requirements.txt`; the trained models are committed. If Python is missing or startup fails, the frontend and backend continue running without rain-confidence labels or new storm analyses.
 
-Without Python the website still starts; rain alerts are then sent without the line, and the `[ml]` output says why.
+To run just the Python service:
 
-To see the line without waiting for real rain: create a profile at <http://localhost:5173/alert> (for example a farmer at the harvest stage), run `npm run demo:rain` (or `npm run demo:rain -- --level 1`), and refresh the page. Demo alerts stay in the inbox and are never sent to Telegram, WhatsApp or SMS. `npm run demo:rain -- --remove` deletes them.
+```sh
+npm run ml
+```
 
-How the models were built and tested: [`ml-service/README.md`](ml-service/README.md).
-
-The same service powers the experimental **Storm movement** map layer: thunderstorm cells tracked on Himawari-9 satellite images, with
-their direction, speed, coldest cloud-top temperature and the upazilas they may reach in the next 90 minutes. It reads JMA's raw
-Himawari data from NOAA's open-data bucket, which arrives about 15 minutes after each scan (NASA GIBS images, used by the map's
-satellite layer, arrive 45-60 minutes after). A strong storm heading for a subscriber's area within the hour sends a prototype
-storm warning (STORM_APPROACH, rule PUBLIC-06, Telegram only for now, not held by quiet hours), and /thunderstorm in the bot starts
-with what the satellite shows now. Details: [docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md).
-To present it without live storms, open <http://localhost:5173/map#o=storms&storm=replay> (a replay of 22 September 2026).
+The server uses `ML_SERVICE_URL` to reach it. Development defaults to `http://127.0.0.1:8001`; an explicitly empty value disables integration. In production, set the URL explicitly. See [ML and storm tracking](#ml-and-storm-tracking) for behavior and limitations.
 
 ## Configuration
 
@@ -156,8 +300,11 @@ Server configuration is loaded from `server/.env`. The complete template is [`se
 | `CLIENT_ORIGIN` | `http://localhost:5173` | Frontend origin allowed by CORS and the origin guard. |
 | `PUBLIC_URL` | `http://localhost:5173` in the example | Website address used in external message links. |
 | `TRUST_PROXY` | `0` | Number of trusted reverse-proxy hops; match the deployment topology. |
-| `WEATHER_JOBS` | `on` | BMD, Open-Meteo, radar, and satellite collectors. Does not disable the alert engine, lightning campaign, or delivery. |
+| `WEATHER_JOBS` | `on` | BMD, Open-Meteo, radar, satellite, and storm collectors. Does not disable the alert engine, lightning campaign, or delivery. |
 | `WEATHER_HISTORY_DAYS` | `60` | District-summary retention; `0` disables recording new history. |
+| `ML_SERVICE_URL` | Local service in development; unset/off in production | Internal Python-service URL for rain-confidence inference and storm tracking; an empty value disables both. The supplied example explicitly sets the local URL. |
+| `ML_TIMEOUT_MS` | `3000` | Rain-confidence request timeout; alerts continue without a confidence label on failure. |
+| `STORM_MINUTES` | `2` | Interval for checking newly published satellite frames through the Python service. |
 | `LIGHTNING_ENABLED` | `on` | Scheduled Xweather map-summary campaign, when credentials are present. |
 | `ALERT_ENGINE` | `on` | Automatic hazard detection and notification publication. |
 | `ALERT_TICK_MINUTES` | `2` | Alert-engine cycle interval. |
@@ -184,6 +331,10 @@ DELIVERY=off
 
 This is useful for isolated API work, not an offline weather mode: map tiles still need connectivity, and forecast snapshots are not restored into memory when `WEATHER_JOBS=off`.
 
+**Client configuration:** the default API base is `/api`. If needed, copy [`client/.env.example`](client/.env.example) to `client/.env` and set `VITE_API_URL` or the development/preview `API_PROXY_TARGET`. `VITE_` variables are browser-visible; never put secrets there.
+
+**Python launcher configuration:** `ML_PORT` changes the service port and `STORM_SOURCE` selects `noaa` (default) or `gibs`. Set these in the shell/process environment before starting the launcher; it does not load `server/.env`. If the port changes, update the backend's `ML_SERVICE_URL` separately.
+
 ## Using the application
 
 ### Pages
@@ -192,6 +343,7 @@ This is useful for isolated API work, not an offline weather mode: map tiles sti
 | --- | --- |
 | `/` | Project introduction, division atlas, coverage information, occupation guidance, and attribution. |
 | `/map` | Weather layers, radar and satellite playback, forecast timeline, bilingual place search, and shareable map views. |
+| `/route` | Road-route search, an alternative when available, interactive route map, arrival-time weather, regional summaries, and destination outlook. |
 | `/alert` | Bilingual registration, inbox, profile controls, channel connections, source coverage, and official-document references. |
 | `/admin`, `/admin/login` | Protected administration and demo tools; not linked from public navigation. |
 
@@ -216,54 +368,50 @@ For a demonstration, use **Settings** to create a demo audience in a selected up
 
 ### Weather map
 
+- **Shared location:** on the map, route, and alert pages, a dismissible notice explains location use before the browser permission prompt. Choose **Use my location** to detect an area once and reuse it across these screens in this tab. Declining never blocks manual area selection. For an alert profile, only the temporary upazila code is sent; it expires after 15 minutes without updates and never replaces saved home/work areas or active Telegram following. Continuous browser following remains a separate opt-in on the alerts page.
 - **Weather layers:** temperature, heat index, rain, wind, and thunderstorm potential. District summaries appear at lower zoom levels; detailed locations appear as you zoom in.
 - **Radar:** Dhaka and Rangpur BMD radar, with 10-minute frames covering the last three hours.
 - **Satellite:** Himawari-9 infrared and visible imagery via NASA GIBS; imagery is delayed, not instantaneous.
 - **Timeline:** switch between imagery playback and three-hourly forecasts for approximately four days.
-- **Route weather:** choose a start and destination from the Bangladesh place list. The app selects the fastest driving route automatically, draws it on the map, and summarizes heat index, rain, wind, and thunderstorm potential along the journey. The route service receives the selected place coordinates; this is a fastest-road route, not a weather-optimized route.
+- **Route weather:** open `/route` and choose a start and destination, or explicitly use your location as the start. The server selects the shortest-distance route among the OSRM options returned, with one alternative when available; this is not a guarantee of the shortest possible road and is not weather-optimized. The page draws the road, estimates arrival-time weather, groups stops by division/district/upazila, and shows a three-day destination outlook when available. OSRM receives the selected coordinates, including precise device coordinates if you use your current location as the start.
 - **Telegram route report:** send `/route Savar to Chattogram` or `/route Savar থেকে Chattogram`. The bot returns estimated distance/time and weather at sampled route locations. Add the district when a place name is ambiguous.
 - **Search and sharing:** search in English or Bangla; the URL hash preserves the map view and selected layers. Legacy `/#view=...` links redirect to `/map`.
 - **Language:** search, controls, tooltips, and area details support Bangla. Map canvas labels remain English because the hosted glyphs and WebGL text shaping do not support Bengali reliably. Delivered messages and official quotations retain their original language; Bengali copy still needs fluent-human review.
 - **Data interpretation:** grey means no data. Forecasts are not station observations, thunderstorm potential is not a detected strike, and computed heat index is not an on-site WBGT measurement.
 - **Route provider:** road geometry comes from the public OSRM routing service. It can be unavailable and has no project-controlled uptime; route distances, ETAs, and sampled weather are estimates.
 
-## Architecture
+## ML and storm tracking
 
-**Collect in the background, persist, then serve cached data.** Forecast page views and Telegram weather commands do not trigger upstream weather requests.
+The optional FastAPI service has two distinct responsibilities. It does not replace the rule-based alert engine.
 
-```text
-BMD / Open-Meteo / Xweather / official bulletins
-                     |
-              Background jobs
-         fetch -> normalize -> validate
-                     |
-         MongoDB + in-memory forecast cache
-             |                    |
-        Express API          Alert engine
-             |                    |
-     React application       Notifications
-                                  |
-                           Delivery queue
-                                  |
-                       Telegram / WhatsApp / SMS
+### Rain forecast confidence
 
-Stored forecasts -> Telegram commands + morning-digest job
-```
+Two Random Forest classifiers assess qualifying **Open-Meteo-based rain alerts**:
 
-This separates provider availability and quota usage from visitor traffic. Last successful data is retained with explicit freshness states: `ok`, `stale`, `unavailable`, or `not-checked`.
+| Target | Applied to | Output |
+| --- | --- | --- |
+| `moderate` | Level 1 rain detections | High / Medium / Low confidence band. |
+| `heavy` | Level 2 and 3 rain detections | High / Medium / Low confidence band. |
 
-| Model | Responsibility |
-| --- | --- |
-| `ForecastSnapshot` | Latest normalized BMD and Open-Meteo payloads, restored on startup with weather jobs enabled. |
-| `WeatherRun` | Compact district summaries for trends and back-testing; TTL cleanup defaults to 60 days. |
-| `WeatherSnapshot` | Cached normalized provider queries for forecast, maritime, and lightning processing. |
-| `LightningCampaign`, `LightningSample` | Scheduled map lightning-summary campaign and results. |
-| `HazardEvent`, `Notification`, `Delivery` | Hazard lifecycle, subscriber inbox, and external delivery state. |
-| `MorningDigest` | Per-subscriber, per-day digest progress and outcomes, retained for 30 days without message text or chat IDs. |
+The Node engine batches eligible detections into `POST /predict` and adds one explanatory line, such as **“Forecast confidence: High.”** The result never creates, cancels, raises, or lowers an alert. A timeout or unavailable service leaves the underlying alert unchanged.
 
-History stores district summaries rather than every full-resolution forecast. For example: `GET /api/weather/history?district=3026&source=bmd&days=7`.
+Training uses historical Open-Meteo forecasts and ERA5 reanalysis rainfall, not ground-station measurements. The application displays bands, not percentage guarantees; the heavy-rain model's probability calibration is not validated. Model construction and evaluation are documented in [`ml-service/README.md`](ml-service/README.md), [`evaluation.md`](ml-service/reports/evaluation.md), and [`evaluation_moderate.md`](ml-service/reports/evaluation_moderate.md).
 
-**Imagery exceptions:** radar images are fetched on demand through an allowlisted, in-memory-cached BMD proxy because upstream images lack CORS headers. Satellite and basemap tiles load directly in the browser from NASA GIBS and OpenFreeMap; they are not stored in MongoDB.
+### Satellite storm movement
+
+1. Read Himawari-9 band 13 data from NOAA Open Data by default, or NASA GIBS imagery with `STORM_SOURCE=gibs`.
+2. Identify sufficiently large, cold cloud-top cells and estimate motion using OpenCV Farneback optical flow.
+3. Apply an assumed cloud-height parallax correction, then project cells 30, 60, and 90 minutes forward.
+4. Return motion, intensity, temperature where available, and potentially affected areas; retain analyses in MongoDB.
+5. Let the Node alert engine evaluate `STORM_APPROACH` / `PUBLIC-06` for qualifying cells approaching subscribers' areas within 60 minutes from now.
+
+NOAA frames typically arrive about 15 minutes after the scan; GIBS images typically arrive 45–60 minutes later. Storm warnings default to **Telegram only**, bypass quiet hours, and still respect the daily cap. Old imagery cannot create or advance a warning. Satellite cloud intensity is **not observed lightning**, and straight-line tracking does not predict storms forming overhead.
+
+For a local demonstration without waiting for a live storm, start the Python service and open:
+
+<http://localhost:5173/map#o=storms&storm=replay>
+
+This replays saved imagery from **22 September 2026**, not current conditions. The recorded NOAA tracking evaluation reports a **28.4 km median position error at 60 minutes on one saved day**; it is an experimental result, not an operational accuracy guarantee. See [`storm_validation_noaa.json`](ml-service/reports/storm_validation_noaa.json) and the [implementation status](docs/IMPLEMENTATION_STATUS.md).
 
 ## Messaging integrations
 
@@ -275,7 +423,7 @@ The website inbox is the primary alert record. Optional channels send short copi
 | WhatsApp | Consented Bangladeshi mobile number, verified by code | `WARNING` and above | 6 |
 | SMS | Consented Bangladeshi mobile number, verified by code | `WARNING` and above | 6 |
 
-Routine messages respect quiet hours and caps; **`CRITICAL` alerts bypass both**. Draft, demo, withdrawn, expired, stale-data, and superseded stages are excluded. By default, updates older than three hours are not delivered externally. Temporary failures retry with backoff, and blocked destinations are disconnected.
+Routine messages respect quiet hours and caps; **`CRITICAL` alerts bypass both**. Satellite storm-approach warnings also bypass quiet hours, but not the daily cap, and default to Telegram only. Draft, demo, withdrawn, expired, stale-data, and superseded stages are excluded. By default, updates older than three hours are not delivered externally. Temporary failures retry with backoff, and blocked destinations are disconnected.
 
 Unique delivery keys and worker leases prevent routine duplicate processing. They do **not** guarantee exactly-once provider delivery: a crash after a provider accepts a message but before the database records success can result in a duplicate.
 
@@ -309,6 +457,7 @@ Weather commands are available with or without a connected profile and read stor
 | `/thunderstorm [place]` | Forecast thunderstorm potential and any modeled thunderstorm or hail conditions. |
 | `/lightning [place]` | Latest stored lightning checks and their age, not continuous strike monitoring. |
 | `/forecast [place]` | Multi-day temperature, rainfall, wind, and thunderstorm outlook. |
+| `/route start to destination` | OSRM road route, estimated distance/time, and cached weather sampled along the journey; Bangla `থেকে` is also supported. |
 | `/alerts` | Active inbox alerts for the connected profile. |
 | `/status` | Source freshness and the alert engine's latest run. |
 
@@ -371,6 +520,7 @@ Use an appropriately registered sender ID. English SMS content is ASCII and limi
 | Xweather | Hourly forecasts, maritime conditions, WBGT, and lightning products | Optional server-side credentials; quota-controlled background requests. |
 | OCHA/HDX COD-AB | Administrative boundaries | 495 upazila polygons, 12 city corporations, 64 districts, and 8 divisions in generated data; CC BY-IGO attribution. |
 | OpenFreeMap / OpenStreetMap | Basemap | Preserve map attribution and applicable usage terms. |
+| OSRM public routing service | Road geometry, route candidates, estimated distance, and travel time | On-demand requests disclose selected coordinates; availability and route quality are outside the project's control. |
 
 District forecasts are derived from upazila values, not separately published BMD district forecasts. Some city thanas use markers rather than their own polygons; some newer administrative areas use a nearby forecast location. The map flags these approximations, but equivalent alert coverage labeling remains a known gap. Map-rendered place labels are English; search, tooltips, and panels support Bangla.
 
@@ -387,21 +537,25 @@ Each sample covers a five-minute interval. It is **not** continuous monitoring o
 
 ## API overview
 
-The local API base is `http://localhost:5000/api`. Most JSON endpoints return `{ "data": ... }`; application errors use `{ "message": "..." }`. `/health` returns top-level health fields, and radar image endpoints return image data.
+The local API base is `http://localhost:5000/api`. Most JSON endpoints return `{ "data": ... }`; application errors include a `message` field and may include validation details. `/health` returns top-level health fields, and imagery endpoints return image data.
 
 | Method | Endpoint | Purpose / access |
 | --- | --- | --- |
 | `GET` | `/api/health` | Database health and source freshness; `200` when connected, `503` otherwise. A healthy database does not imply fresh weather data. |
 | `GET` | `/api/weather/snapshot`, `/api/weather/daily` | Cached forecasts and BMD daily outlook. |
 | `GET` | `/api/weather/history?district=3026&source=bmd&days=7` | District run summaries; sources: `bmd`, `openMeteo`; lookback: 1–60 days. |
+| `POST` | `/api/weather/route` | Road-route geometry, an alternative when available, and cached weather at sampled arrival times. |
 | `GET` | `/api/radar/frames`, `/api/radar/image/:site/:file` | Radar frame index and proxied images. |
 | `GET` | `/api/satellite/frames` | Available satellite times and tile URL template. |
 | `GET` | `/api/lightning/status`, `/api/lightning/summaries`, `/api/lightning/upazila/:pcode` | Map-campaign status and results. |
+| `GET` | `/api/storms`, `/api/storms/image/:name` | Latest live storm analysis, area-arrival estimates, and the analysed frame image. |
+| `GET` | `/api/storms/demo`, `/api/storms/demo/image/:name` | Historical storm replay and saved frame images; requires the Python service. |
 | `GET` | `/api/alerts/schema`, `/api/alerts/status` | Registration schema and monitoring status. |
 | `POST` | `/api/alerts/subscribe` | Create an anonymous browser profile. |
 | `GET` | `/api/alerts/session` | Current session, including `profile: null` for a new visitor. |
 | `GET`, `PUT`, `DELETE` | `/api/alerts/me` | Read, edit, or delete the current profile; subscriber cookie required. |
 | `PUT` | `/api/alerts/me/activity`, `/api/alerts/me/status` | Temporary activity and pause/resume controls; subscriber cookie required. |
+| `PUT` | `/api/alerts/me/current-area` | Set or clear a short-lived current area without replacing saved areas; subscriber cookie required. |
 | `GET` | `/api/alerts/me/coverage`, `/api/alerts/inbox` | Personal coverage and inbox; subscriber cookie required. |
 | `POST` | `/api/alerts/inbox/:id/read`, `/api/alerts/inbox/read-all` | Mark notifications read; subscriber cookie required. |
 | `GET` | `/api/alerts/me/channels` | Channel availability and masked connection state; subscriber cookie required. |
@@ -412,20 +566,35 @@ The local API base is `http://localhost:5000/api`. Most JSON endpoints return `{
 | `GET` | `/api/admin/session` | Administrator session state: `closed`, `signed-out`, or `signed-in`. |
 | Various | `/api/admin/*` | Login plus protected overview, previews, sends, withdrawals, rules, settings, and demo tools. |
 
-See [`server/src/routes/`](server/src/routes) and [`server/src/controllers/`](server/src/controllers) for request handling. Browser state-changing requests are origin-checked and must use JSON when a body is present.
+For example, the route endpoint accepts:
+
+```json
+{
+  "start": { "name": "Savar", "lat": 23.8583, "lon": 90.2667 },
+  "end": { "name": "Chattogram", "lat": 22.3569, "lon": 91.7832 }
+}
+```
+
+Send JSON bodies with `Content-Type: application/json`. Subscriber and administrator endpoints use cookies; state-changing requests under those route groups are origin-checked. The Telegram webhook uses its own configured secret header instead.
+
+The Python service is an internal API, with `GET /health`, `POST /predict`, and `/storms/*` endpoints. It should not be exposed publicly without additional access controls. See [`server/src/routes/`](server/src/routes), [`server/src/controllers/`](server/src/controllers), and [`ml-service/app.py`](ml-service/app.py) for the implemented contracts.
 
 ## Project structure
 
 ```text
 .
 ├── client/
-│   ├── public/data/          Generated boundaries and location catalogue
+│   ├── public/
+│   │   ├── data/             Committed GeoJSON boundaries and location catalogue
+│   │   └── fonts/            Self-hosted Bengali font and its license
 │   ├── src/
-│   │   ├── pages/            Landing, map, alert, and administrator pages
+│   │   ├── pages/            Landing, map, route, alert, and administrator pages
 │   │   ├── map/              MapLibre layers, imagery, and interactions
 │   │   ├── alert/            Registration, inbox, profiles, and channels
 │   │   ├── admin/            Administrator dashboard views
 │   │   ├── components/       Shared UI components
+│   │   ├── hooks/            Polling and shared location subscriptions
+│   │   ├── i18n/             English/Bangla translations and formatting
 │   │   ├── lib/              Routing, scales, time, and UI utilities
 │   │   └── services/         API clients
 │   └── test/                 Client tests
@@ -437,14 +606,26 @@ See [`server/src/routes/`](server/src/routes) and [`server/src/controllers/`](se
 │   │   ├── routes/           API route definitions
 │   │   ├── middleware/       Authentication, origin checks, and limits
 │   │   ├── models/           Mongoose schemas and indexes
-│   │   ├── jobs/             Weather, alert, delivery, and digest scheduling
+│   │   ├── jobs/             Weather, storm, lightning, alert, delivery, digest jobs
 │   │   └── services/
 │   │       ├── alerts/       Hazards, scenarios, notifications, and admin
-│   │       └── delivery/     Queue, linking, adapters, bot reports, digest
+│   │       ├── delivery/     Queue, linking, adapters, bot reports, digest
+│   │       └── *.js          Provider adapters, caching, geography, route weather
 │   ├── test/                 Unit and MongoDB-backed integration tests
 │   └── .env.example          Server configuration template
-├── scripts/                  Geography generators and database-test preload
+├── ml-service/
+│   ├── app.py                Internal FastAPI inference and storm endpoints
+│   ├── requirements.txt      Pinned Python dependencies
+│   ├── models/               Committed trained Random Forest model bundles
+│   ├── scripts/              Historical-data, dataset, and training utilities
+│   ├── storm/                Imagery decoding, optical flow, tracking, validation
+│   │   └── data/             Saved satellite frames for the historical replay
+│   ├── reports/              Rain-model evaluation and storm-validation reports
+│   └── tests/                Python storm/imagery tests
+├── scripts/
+│   └── ml-service.mjs        Cross-platform Python environment and service launcher
 ├── docs/                     Design, plans, provider notes, and project status
+├── .github/workflows/ci.yml   Node tests, MongoDB integration tests, frontend build
 ├── package.json              Workspace scripts
 └── package-lock.json         Reproducible dependency lockfile
 ```
@@ -455,64 +636,100 @@ Run these commands from the repository root.
 
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` | Start the backend watcher, frontend development server and rain confidence ML service together (ML needs Python 3.12+; the rest runs without it). |
+| `npm run dev` | Start the backend watcher, frontend development server, and optional rain-confidence/storm-tracking service together (Python 3.12+ for the latter). |
 | `npm run dev:server` | Start only the backend watcher. |
 | `npm run dev:client` | Start only the frontend development server. |
-| `npm run ml` | Start only the rain confidence ML service on port 8001; sets up `ml-service/.venv` on first run. |
-| `npm run demo:rain` | Add a demo rain alert with the confidence line to the newest local profile (`-- --level 1`, `-- --remove`). |
+| `npm run ml` | Start the rain-confidence and storm-tracking service on port 8001; sets up `ml-service/.venv` on first run. |
 | `npm run build` | Build the frontend into `client/dist`. |
 | `npm run preview` | Preview the frontend build on port 4173 with an `/api` proxy; start the backend separately. |
 | `npm start` | Start the API without a watcher; does not serve the frontend. |
 | `npm test` | Run client and server tests; database cases require `TEST_MONGODB_URI`. |
-| `npm run test:db` | Run the full server suite with a MongoDB test connection. |
-| `npm run build:geo` | Regenerate boundaries, location catalogues, and lightning coverage. |
-| `npm run build:outline` | Regenerate the landing-page Bangladesh silhouette. |
+| `npm run test --workspace client` | Run frontend logic tests and any explicitly enabled browser checks. |
+| `npm run test --workspace server` | Run the backend suite; set `TEST_MONGODB_URI` to include MongoDB-backed cases. |
 
-### Geography
+### Committed geography
 
-`npm run build:geo` downloads and caches HDX sources in the ignored `scripts/.cache/` directory, simplifies boundaries, joins BMD location codes, resolves unmatched areas, and verifies the lightning circle cover. Use `npm run build:geo -- --refresh` to refresh downloaded sources. Review and commit intentional generated-data changes in `client/public/data/` and `server/data/`.
+Generated geography and the landing-page outline are already committed. Normal development does not need to regenerate them. Review intentional data changes in `client/public/data/` and `server/data/` together so frontend and backend area codes remain consistent.
 
 ## Testing
 
 ```sh
 npm test
-npm run test:db
 npm run build
 ```
 
 - Tests use the built-in Node.js test runner. `npm test` runs both workspaces; MongoDB-backed cases are skipped unless `TEST_MONGODB_URI` is set, even if the application database is running.
-- `npm run test:db` runs server tests and defaults `TEST_MONGODB_URI` to the configured `MONGODB_URI`. It also preloads `DNS_SERVERS` for Atlas connections. Client tests remain part of `npm test`.
 - Each database-backed test file creates and removes its own randomly named `mern_test_*` database. Use a dedicated test MongoDB deployment or user with permission to create and drop those databases; never point tests at a production deployment.
 - Provider responses are mocked; tests do not spend Xweather quota or send real Telegram, WhatsApp, or SMS messages.
+
+### MongoDB-backed integration tests
+
+Point the test runner at a **dedicated test deployment**, not the application database:
+
+**macOS / Linux / Git Bash**
+
+```sh
+TEST_MONGODB_URI=mongodb://127.0.0.1:27017/akashsathi_test npm run test --workspace server
+```
+
+**Windows PowerShell**
+
+```powershell
+$env:TEST_MONGODB_URI = 'mongodb://127.0.0.1:27017/akashsathi_test'
+npm run test --workspace server
+Remove-Item Env:TEST_MONGODB_URI
+```
+
+### Python tests
+
+After `npm run ml` has installed the service dependencies, stop it if needed and run from `ml-service/`:
+
+```sh
+# macOS / Linux
+.venv/bin/python -m unittest discover -s tests
+```
+
+```powershell
+# Windows PowerShell
+.\.venv\Scripts\python.exe -m unittest discover -s tests
+```
+
+### Optional browser checks
+
+The client also includes browser checks for fullscreen behavior, route maps, weather layers, and indicator interactions. They are skipped unless `UI_BASE_URL` points to a running Vite development server and `PLAYWRIGHT_MODULE` resolves to an available Playwright installation. `PLAYWRIGHT_EXECUTABLE_PATH` can select an installed Chromium-compatible browser. Playwright is not a declared project dependency; with those variables configured, run `npm run test --workspace client`.
 
 For verification history and remaining gaps, see [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md). Automated tests do not replace live-provider, accessibility, language, or expert threshold validation.
 
 ### Continuous integration
 
-The [GitHub Actions workflow](.github/workflows/ci.yml) runs on pushes to `main`, pull requests, and manual dispatch. It installs locked dependencies, runs both workspace test suites against an isolated MongoDB 8 service, and builds the frontend using Node.js 22. No weather or messaging credentials are required. Actions are pinned to commit SHAs, and workflow permissions are read-only.
+The [GitHub Actions workflow](.github/workflows/ci.yml) runs on pushes to `main`, pull requests, and manual dispatch. It installs locked dependencies, runs both workspace test suites against an isolated MongoDB 8 service, and builds the frontend using Node.js 22. No weather or messaging credentials are required. Actions are pinned to commit SHAs, and workflow permissions are read-only. Python tests and optional browser checks are not enabled by this workflow.
 
 ## Deployment
 
 The frontend and API are separate deployment artifacts. The Express application does **not** serve `client/dist`, and `vite preview` is for local inspection, not production hosting.
 
 1. Install locked dependencies with `npm ci` and build the frontend with `npm run build`.
-2. Host `client/dist` on a static host or web server. Configure SPA fallback to `index.html` for `/map`, `/alert`, `/admin`, and `/admin/login`.
+2. Host `client/dist` on a static host or web server. Configure SPA fallback to `index.html` for `/map`, `/route`, `/alert`, `/admin`, and `/admin/login`.
 3. Run the backend with `npm start` under a process manager or managed Node.js service with persistent MongoDB access.
-4. Prefer one public origin, routing `/api/*` to Express. Frontend requests use relative `/api` paths; serving the API on a different origin requires additional proxy or client configuration.
+4. Prefer one public origin, routing `/api/*` to Express. Frontend requests default to relative `/api` paths; a separate API origin requires `VITE_API_URL` at build time, the correct allowed origin, and a compatible credentialed-cookie setup.
 5. Set `NODE_ENV=production`, `CLIENT_ORIGIN`, `PUBLIC_URL`, a strong `ADMIN_PASSCODE`, and the correct `TRUST_PROXY` value. Keep `ADMIN_AUTH=on` and terminate public traffic with HTTPS.
 6. Keep a backend worker running for collection, alerts, and delivery. Monitor `/api/health`, source freshness, logs, provider quota, and delivery failures; arrange database backups.
-7. Validate live messaging integrations, data licensing, and the limitations below before any public rollout.
+7. If using ML or storm tracking, run the Python service as a separate long-lived process, set `ML_SERVICE_URL` explicitly, and keep it on loopback or a private network. `npm start` does not launch it. Preserve the repository layout or include `server/data/locations.json` where the storm tracker expects it.
+8. Validate live messaging integrations, data licensing, and the limitations below before any public rollout.
 
 The backend port defaults to 5000. If changing it locally, update the Vite proxy using `API_PROXY_TARGET` in the client environment, for example `API_PROXY_TARGET=http://127.0.0.1:5001`.
+
+GitHub renders this README and its architecture diagrams without running the application. **GitHub Pages alone cannot host the complete system**: weather collection, profiles, alerts, delivery, and inference require the backend services and MongoDB.
 
 ## Security and privacy
 
 - **Secrets:** `server/.env` is ignored by Git. Example placeholders are treated as unconfigured credentials. Never expose provider secrets in frontend code, screenshots, issues, or logs; rotate any exposed credential.
 - **Anonymous profiles:** subscriber tokens use HttpOnly cookies and SHA-256 hashes at rest. Profiles store selected area codes rather than exact user coordinates; no name or email is required.
+- **Location boundaries:** map and alert matching happen locally; a fresh device position may be retained in this tab's `sessionStorage` and reused for up to 15 minutes. Only an area code is stored in the alert profile. Choosing current location as a route start deliberately sends precise coordinates through the API to OSRM. Telegram-shared coordinates are processed to an area code, not stored as raw profile coordinates.
 - **Request protection:** origin checks, JSON body restrictions, signup rate limits, a honeypot, subscriber caps, and administrator login limits reduce misuse. Rate-limit state is process-local; horizontal deployments need an additional shared or edge-level strategy.
 - **Administrator access:** the dashboard uses a shared passcode, not a full multi-user authorization system. Use a long random passcode and appropriate network restrictions.
 - **Channel ownership:** Telegram links are one-time and expire after 15 minutes. WhatsApp and SMS require explicit consent and a six-digit verification code, with expiry, attempt limits, and request throttling.
-- **Phone storage:** only verified Bangladeshi mobile numbers are accepted, encrypted with AES-256-GCM, and masked in the interface. Changing `CHANNEL_SECRET` makes stored numbers unreadable and requires users to verify again.
+- **Phone storage:** Bangladeshi mobile numbers are validated, encrypted with AES-256-GCM during verification and after connection, and masked in the interface. Only verified numbers can receive alert copies. Changing `CHANNEL_SECRET` makes stored numbers unreadable and requires users to verify again.
 - **Message privacy:** external content excludes occupations, profile answers, and selection reasons. Telegram uses a stored chat ID; removing a profile also removes its delivery records.
 
 ## Known limitations
@@ -527,6 +744,8 @@ The backend port defaults to 5000. If changing it locally, update the Vite proxy
 - Messaging adapters have mocked-provider coverage, not documented live-account validation. Daily digests have no independent subscriber opt-out, and external sends are not exactly-once.
 - The shared Xweather budget ledger and administrator budget projections remain incomplete. Monitor actual provider usage rather than assuming complete cross-job accounting.
 - MapLibre produces a large production chunk, and software-rendered WebGL may be slow without GPU acceleration.
+- Rain-confidence labels are experimental and provider-specific; storm-motion estimates are based on delayed imagery, a fixed cloud-height assumption, and straight-line projections. They need broader seasonal and live validation.
+- Public OSRM availability is not guaranteed, arrival weather is sampled, and selecting the shortest returned option does not prove it is the shortest or safest possible journey.
 
 See [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md) for the detailed implementation gaps and invariants to preserve.
 
@@ -540,9 +759,12 @@ See [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md) for the det
 | Frontend cannot reach the API | Start the backend and check the Vite `/api` proxy target or production reverse-proxy routing. |
 | Vite port is already in use | Ports 5173 and 4173 are strict; stop the conflicting process or explicitly adjust the Vite configuration and allowed origin. |
 | Administrator dashboard is disabled | Replace the `ADMIN_PASSCODE` placeholder with a value of at least 8 characters, then restart the backend. |
-| Database tests are skipped | Run `npm run test:db`, or explicitly set `TEST_MONGODB_URI` before `npm test`. |
+| Database tests are skipped | Set `TEST_MONGODB_URI` and use the direct workspace test command in [Testing](#testing). |
 | Messages are not delivered | Confirm `DELIVERY=on`, valid channel credentials, verified connections, severity settings, quiet hours, alert validity, and provider responses. |
 | Morning forecast is missing | Check Telegram connection, active profile, saved area, current forecast, digest settings, quiet hours, and the send window. |
+| Rain confidence or storms are unavailable | Check `[ml]` startup output, Python 3.12+, service `/health`, model files, `ML_SERVICE_URL`, and access to NOAA/GIBS. The main application continues without the service. |
+| Python install fails on long Windows paths | Use a shorter checkout path or enable Windows long-path support; then recreate only the service virtual environment and rerun `npm run ml`. |
+| Route search fails | Confirm connectivity to the public OSRM service and choose distinct locations within the supported Bangladesh region. Weather can remain unavailable even when a road route is found. |
 
 ## Documentation
 
@@ -553,10 +775,13 @@ See [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md) for the det
 | [`docs/AkashSathi_Occupation_Based_Scenario_Catalogue.md`](docs/AkashSathi_Occupation_Based_Scenario_Catalogue.md) | Occupation scenarios and cross-cutting alert requirements. |
 | [`docs/BMD_WEATHER_API.md`](docs/BMD_WEATHER_API.md) | Verified BMD endpoint behavior and normalization notes. |
 | [`docs/design.md`](docs/design.md) | Visual identity, design tokens, severity colors, and weather ramps. |
+| [`ml-service/README.md`](ml-service/README.md) | Python-service setup, model training, confidence bands, storm tracking, and evaluation context. |
+| [`ml-service/reports/`](ml-service/reports) | Recorded rain-model evaluations and historical storm-tracking validation. |
+| [`docs/project-story.html`](docs/project-story.html) | Standalone presentation and video-narration draft; open locally in a browser. Not included in the website build. |
 
 ## Contributing
 
-Keep changes focused and consistent with the existing workspace structure. Include tests for behavioral changes, update affected documentation, and run `npm test`, `npm run test:db` with a dedicated test database, and `npm run build` before proposing changes.
+Keep changes focused and consistent with the existing workspace structure. Include tests for behavioral changes, update affected documentation, and run `npm test`, the MongoDB-backed tests described above, and `npm run build` before proposing changes. Changes to the Python service should also pass its `unittest` suite.
 
 Preserve the project's core guarantees: no provider fetches from forecast page views, no stale-data escalation, no all-clear wording on expiry or withdrawal, no profile answers in external messages, and no external delivery to demo audiences. Do not change safety thresholds without documenting their source and validation status.
 
@@ -572,3 +797,5 @@ No project `LICENSE` file is currently included. Do not assume an open-source li
 - Supplementary forecasts: Open-Meteo, with CC BY 4.0 attribution and applicable service terms.
 - Administrative boundaries: OCHA/HDX COD-AB, CC BY-IGO.
 - Basemap: OpenFreeMap, © OpenMapTiles, and © OpenStreetMap contributors.
+- Road routing: OSRM, using OpenStreetMap data.
+- Bengali font: Noto Sans Bengali, distributed under the SIL Open Font License; see [`client/public/fonts/OFL.txt`](client/public/fonts/OFL.txt).

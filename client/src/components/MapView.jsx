@@ -9,7 +9,7 @@ const NO_ALTERNATIVES = [];
 
 // Thin React wrapper: owns the WeatherMap instance and pushes state into it. All map logic lives in map/WeatherMap.js.
 export function MapView({
-  catalogue, initialView, signLayer, snapshot, stepIndex, baseStatus, radarItems, satelliteSpec, lightning, storms, route, routeAlternatives = NO_ALTERNATIVES, routeDetails = null, selection, flyRequest, userPosition, handlers, maxZoom,
+  catalogue, initialView, signLayer, signLayers, snapshot, stepIndex, baseStatus, radarItems, satelliteSpec, lightning, storms, route, routeAlternatives = NO_ALTERNATIVES, routeDetails = null, selection, flyRequest, userPosition, handlers, maxZoom, inspectionReset, inspectionRequest,
 }) {
   const { tr, lang } = useLanguage(MAP);
   const containerRef = useRef(null);
@@ -27,7 +27,7 @@ export function MapView({
       handlers: {
         onReady: () => setReady(true),
         onSelect: (selected) => handlersRef.current.onSelect(selected),
-        onHover: (picked, point) => handlersRef.current.onHover(picked, point),
+        onHover: (picked, point) => handlersRef.current.onHover?.(picked, point),
         onMoveEnd: (view) => handlersRef.current.onMoveEnd(view),
         onLightningSelect: (id) => handlersRef.current.onLightningSelect(id),
         onRouteHover: (id, point) => handlersRef.current.onRouteHover?.(id, point),
@@ -52,9 +52,12 @@ export function MapView({
 
   useEffect(() => { mapRef.current?.setLanguage(lang); }, [lang, ready]);
 
+  useEffect(() => { if (ready) mapRef.current.clearInspection(); }, [inspectionReset, ready]);
+  useEffect(() => { if (ready && inspectionRequest) mapRef.current.inspectTarget(inspectionRequest.picked); }, [inspectionRequest, ready]);
+
   useEffect(() => {
-    if (ready) mapRef.current.setSigns({ layerId: signLayer, snapshot, stepIndex, status: baseStatus });
-  }, [ready, signLayer, snapshot, stepIndex, baseStatus]);
+    if (ready) mapRef.current.setSigns({ layerId: signLayer, layerIds: signLayers, snapshot, stepIndex, status: baseStatus });
+  }, [ready, signLayer, signLayers, snapshot, stepIndex, baseStatus]);
 
   useEffect(() => {
     if (ready) mapRef.current.setRadar(radarItems);

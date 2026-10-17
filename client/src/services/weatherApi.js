@@ -21,6 +21,6 @@ export const weatherApi = {
 
 export async function loadCatalogue(signal) {
   const response = await fetch('/data/locations.json', { signal });
-  if (!response.ok) throw new Error('The location catalogue is missing. Run "npm run build:geo".');
+  if (!response.ok) throw new Error('The location catalogue is missing. Restore client/public/data/locations.json from the repository.');
   return response.json();
 }

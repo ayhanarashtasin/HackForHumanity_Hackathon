@@ -98,6 +98,16 @@ html[data-page='alert'] .splash, html[data-page='route'] .splash, html[data-page
   backdrop-filter: blur(6px);
 }
 .muted { color: var(--olive-soft); }
+.location-notice { position: fixed; right: 20px; bottom: 20px; z-index: 60; width: min(420px, calc(100vw - 32px)); max-height: calc(100dvh - 120px); overflow: auto; padding: 18px; font-size: 0.85rem; }
+.location-notice-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.location-notice-heading h2 { font-size: 1rem; }
+.location-notice > p { line-height: 1.6; }
+.location-notice-status { margin-top: 10px; font-weight: 600; }
+.location-notice-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.location-notice-actions button { min-height: 44px; }
+.location-notice .location-notice-primary { background: var(--olive); color: var(--cream); }
+.location-notice .location-notice-primary:hover:not(:disabled) { background: var(--olive-soft); }
+@media (max-width: 600px) { .location-notice { right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); } }
 small { font-size: 0.78rem; }
 .bn { font-size: 1.05rem; }
 

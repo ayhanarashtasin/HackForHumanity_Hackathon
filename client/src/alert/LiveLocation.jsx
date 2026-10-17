@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { areaLabel, pcodeFromSelection } from '../lib/alertForm.js';
-import { locateUpazila } from '../lib/locate.js';
+import { areaLabel } from '../lib/alertForm.js';
+import { pauseLocationAlerts, rememberUserPosition, resolveUserPosition } from '../lib/userLocation.js';
+import { useUserLocation } from '../hooks/useUserLocation.js';
 import { alertApi } from '../services/alertApi.js';
+import { stopLocationArea, syncLocationArea, updateLocationArea } from './locationSync.js';
 import { useAlert } from './context.js';
 
 const HEARTBEAT_MS = 5 * 60_000;
 
-// Only an area code leaves this device. A permission grant alone never enables server-side following.
-export function LiveLocation({ profile, onProfile, onUpdated }) {
+// Entry capture shares an area once; continuous following still needs this separate opt-in.
+export function LiveLocation({ profile, onProfile }) {
   const { tr, lang, catalogue, index } = useAlert();
+  const location = useUserLocation();
   const [enabled, setEnabled] = useState(false);
   const [area, setArea] = useState(null);
   const [updatedAt, setUpdatedAt] = useState(null);
@@ -19,7 +22,7 @@ export function LiveLocation({ profile, onProfile, onUpdated }) {
   const lastSentAt = useRef(0);
   const pending = useRef(false);
   const queued = useRef(null);
-  const boundaries = useRef(null);
+  const following = useRef(false);
   const locate = useRef(null);
 
   useEffect(() => {
@@ -31,6 +34,7 @@ export function LiveLocation({ profile, onProfile, onUpdated }) {
   useEffect(() => {
     if (!enabled) return undefined;
     let active = true;
+    following.current = true;
     if (!window.isSecureContext || !navigator.geolocation || !catalogue) {
       setError('live.unsupported');
       setEnabled(false);
@@ -38,14 +42,13 @@ export function LiveLocation({ profile, onProfile, onUpdated }) {
     }
 
     const update = async (pcode) => {
-      if (!active) return;
+      if (!active || !following.current) return;
       if (pending.current) { queued.current = pcode; return; }
       pending.current = true;
       setBusy(true);
       try {
-        const data = await alertApi.setCurrentArea(pcode);
-        if (!active) return;
-        const changed = last.current !== pcode;
+        const data = await updateLocationArea(pcode);
+        if (!active || !following.current) return;
         last.current = pcode;
         lastSentAt.current = Date.now();
         setClock(Date.now());
@@ -53,7 +56,6 @@ export function LiveLocation({ profile, onProfile, onUpdated }) {
         setUpdatedAt(new Date());
         setError('');
         onProfile(data.profile);
-        if (changed) onUpdated();
       } catch (problem) {
         if (active && problem.status === 409) {
           setEnabled(false);
@@ -65,7 +67,7 @@ export function LiveLocation({ profile, onProfile, onUpdated }) {
       } finally {
         pending.current = false;
         if (active) setBusy(false);
-        if (active && queued.current) {
+        if (active && following.current && queued.current) {
           const next = queued.current;
           queued.current = null;
           if (next !== last.current) update(next);
@@ -73,19 +75,15 @@ export function LiveLocation({ profile, onProfile, onUpdated }) {
       }
     };
 
-    const found = async ({ coords }) => {
-      if (!active) return;
+    const found = async ({ coords, timestamp }) => {
+      if (!active || !following.current) return;
       if (coords.accuracy > 10_000) { setError('live.inaccurate'); setBusy(false); return; }
       try {
-        if (!boundaries.current) {
-          const response = await fetch('/data/bd-upazila.geojson');
-          if (!response.ok) throw new Error('boundaries');
-          boundaries.current = await response.json();
-        }
-        if (!active) return;
-        const match = locateUpazila({ lon: coords.longitude, lat: coords.latitude }, boundaries.current, catalogue);
-        const pcode = pcodeFromSelection(match?.selection, catalogue);
+        const resolved = await resolveUserPosition(coords);
+        if (!active || !following.current) return;
+        const { pcode } = resolved;
         if (!pcode) { setError('live.outside'); setBusy(false); return; }
+        rememberUserPosition(resolved, Number.isFinite(timestamp) ? timestamp : Date.now());
         if (last.current !== pcode || Date.now() - lastSentAt.current >= HEARTBEAT_MS) await update(pcode);
         else setBusy(false);
       } catch {
@@ -107,25 +105,29 @@ export function LiveLocation({ profile, onProfile, onUpdated }) {
     document.addEventListener('visibilitychange', onVisible);
     return () => {
       active = false;
+      following.current = false;
+      queued.current = null;
       locate.current = null;
       navigator.geolocation.clearWatch(watch);
       clearInterval(heartbeat);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [enabled, catalogue, onProfile, onUpdated]);
+  }, [enabled, catalogue, onProfile]);
 
   const stop = async () => {
+    following.current = false;
+    queued.current = null;
+    pauseLocationAlerts();
     setEnabled(false);
     setBusy(true);
     try {
-      const data = await alertApi.setCurrentArea(null);
+      const data = await stopLocationArea();
       last.current = null;
       lastSentAt.current = 0;
       queued.current = null;
       setArea(null);
       setUpdatedAt(null);
       onProfile(data.profile);
-      onUpdated();
       setError('');
     } catch (problem) {
       if (problem.status === 409) {
@@ -151,11 +153,13 @@ export function LiveLocation({ profile, onProfile, onUpdated }) {
       {area && <p role="status">{tr(fresh ? 'live.area' : 'live.expired', { name: areaLabel(index, area, lang) })} {updatedAt?.toLocaleTimeString(lang === 'bn' ? 'bn-BD' : 'en-GB', { hour: '2-digit', minute: '2-digit' })}</p>}
       {enabled && !area && <p role="status">{tr('live.waiting')}</p>}
       {error && <p className="alert-field-error" role="alert">{tr(error)}</p>}
+      {!error && location.alertStatus === 'error' && <p className="alert-field-error" role="status">{tr('live.saveError')}</p>}
       <div className="alert-profile-actions">
         {enabled
           ? <><button type="button" className="alert-button alert-button--ghost" onClick={() => locate.current?.()} disabled={busy}>{tr('live.refresh')}</button>
-              <button type="button" className="alert-button alert-button--ghost" onClick={stop} disabled={busy}>{tr('live.stop')}</button></>
+              <button type="button" className="alert-button alert-button--ghost" onClick={stop}>{tr('live.stop')}</button></>
           : <><button type="button" className="alert-button alert-button--ghost" onClick={() => { setError(''); setEnabled(true); }} disabled={busy || !catalogue || telegramActive}>{tr('live.start')}</button>
+              {location.alertStatus === 'error' && <button type="button" className="alert-button alert-button--ghost" onClick={() => syncLocationArea(profile).then((data) => { if (data) onProfile(data.profile); }).catch(() => {})}>{tr('live.retry')}</button>}
               {freshStored && !telegramActive && <button type="button" className="alert-button alert-button--ghost" onClick={stop} disabled={busy}>{tr('live.stop')}</button>}</>}
       </div>
     </section>

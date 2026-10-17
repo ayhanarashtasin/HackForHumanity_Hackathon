@@ -1,11 +1,11 @@
 import fs from 'node:fs';
 
-// Static catalogue produced once by `npm run build:geo` (BMD locations joined with HDX boundaries).
+// Committed static catalogue: BMD locations joined with HDX boundaries.
 let catalogue;
 try {
   catalogue = JSON.parse(fs.readFileSync(new URL('../../data/locations.json', import.meta.url), 'utf8'));
 } catch (error) {
-  throw new Error(`server/data/locations.json is missing or invalid. Run "npm run build:geo" first. (${error.message})`);
+  throw new Error(`server/data/locations.json is missing or invalid. Restore it from the repository. (${error.message})`);
 }
 
 export const locations = catalogue.locations;

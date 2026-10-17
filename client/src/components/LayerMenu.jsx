@@ -11,14 +11,14 @@ function StatusDot({ status }) {
 }
 
 export function LayerMenu({
-  open, onToggleOpen, signLayer, onSignLayer, overlays, onToggleOverlay, satelliteLayer, onSatelliteLayer, statuses,
+  open, onToggleOpen, signLayer, signLayers, onToggleSignLayer, onClearSignLayers, onSignLayer, overlays, onToggleOverlay, satelliteLayer, onSatelliteLayer, stormMode, onStormMode, statuses,
 }) {
   const { tr } = useLanguage(MAP);
   const baseStatus = statuses?.bmd?.status === 'ok' || !statuses?.openMeteo ? statuses?.bmd?.status : statuses?.openMeteo?.status;
 
   return (
-    <nav className="layer-menu panel" aria-label={tr('Map layers')}>
-      <button type="button" className="panel-title" onClick={onToggleOpen} aria-expanded={open} aria-controls="map-layer-options">
+    <nav className={`layer-menu panel${open ? ' is-open' : ''}`} aria-label={tr('Map layers')}>
+      <button id="map-layers-toggle" type="button" className="panel-title" onClick={onToggleOpen} aria-expanded={open} aria-controls="map-layer-options">
         <span className="layer-title"><Icon name="layers" size={19} /> {tr('Map layers')}</span>
         <span className={open ? 'chevron-open' : ''}><Icon name="chevron" size={17} /></span>
       </button>
@@ -26,22 +26,29 @@ export function LayerMenu({
       {open && (
         <div id="map-layer-options">
           <h2 className="menu-heading">{tr('Weather by district & upazila')}</h2>
-          <div role="radiogroup" aria-label={tr('Weather sign')} className="menu-group">
+          <p id="weather-layer-hint" className="layer-hint">{tr('Select multiple layers, or choose None to hide weather layers.')}</p>
+          <div role="group" aria-label={tr('Weather layers')} aria-describedby="weather-layer-hint" className="menu-group">
+            <button type="button" className={`menu-item${!signLayers.length ? ' active' : ''}`} aria-pressed={!signLayers.length} onClick={onClearSignLayers}>
+              <Icon name="close" size={16} /><span className="menu-label">{tr('None')}</span>
+            </button>
             {SIGN_ORDER.map((id) => (
-              <button
+              <label
                 key={id}
-                type="button"
-                role="radio"
-                aria-checked={signLayer === id}
-                className={`menu-item${signLayer === id ? ' active' : ''}`}
-                onClick={() => onSignLayer(id)}
+                className={`menu-item${signLayers.includes(id) ? ' active' : ''}`}
               >
+                <input type="checkbox" checked={signLayers.includes(id)} onChange={() => onToggleSignLayer(id)} />
                 <span className="swatch" style={{ background: colorAt(SIGN_LAYERS[id].scale, SWATCH_VALUE[id]) }} aria-hidden="true" />
                 <span className="menu-label">{tr(SIGN_LAYERS[id].label)}</span>
-                {signLayer === id && <StatusDot status={id === 'thunder' ? statuses?.openMeteo?.status : baseStatus} />}
-              </button>
+                {signLayers.includes(id) && <StatusDot status={id === 'thunder' ? statuses?.openMeteo?.status : baseStatus} />}
+              </label>
             ))}
           </div>
+          {signLayers.length > 0 && <><div className="layer-color-choice"><label htmlFor="weather-color-layer">{tr('Map colors')}</label>
+            <select id="weather-color-layer" value={signLayer} onChange={event => onSignLayer(event.target.value)}>
+              {signLayers.map(id => <option key={id} value={id}>{tr(SIGN_LAYERS[id].label)}</option>)}
+            </select>
+          </div>
+          <p className="layer-hint">{tr('One layer colors the areas; all selected layers show symbols and hover values.')}</p></>}
 
           <h2 className="menu-heading">{tr('Overlays')}</h2>
           <div className="menu-group">
@@ -77,8 +84,15 @@ export function LayerMenu({
             </label>
             <label className={`menu-item${overlays.storms ? ' active' : ''}`}>
               <input type="checkbox" checked={Boolean(overlays.storms)} onChange={() => onToggleOverlay('storms')} />
-              <span className="menu-label">{tr('Storm movement')} <small className="menu-tag">{tr('Experimental')}</small></span>
+              <span className="menu-label">{tr('Storm movement')}</span>
             </label>
+            {overlays.storms && (
+              <div className="sub-choice storm-layer-mode" role="group" aria-label={tr('Storm data')}>
+                {[['live', 'Live'], ['demo', 'Historical simulation']].map(([key, label]) => (
+                  <button key={key} type="button" aria-pressed={stormMode === key} className={stormMode === key ? 'chip active' : 'chip'} onClick={() => onStormMode(key)}>{tr(label)}</button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
