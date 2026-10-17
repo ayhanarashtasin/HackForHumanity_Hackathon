@@ -5,6 +5,7 @@ coverage/
 playwright-report/
 test-results/
 blob-report/
+.vercel/
 
 # Python environments, bytecode and test output (keep models and evaluation reports)
 .venv/

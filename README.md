@@ -721,6 +721,29 @@ The backend port defaults to 5000. If changing it locally, update the Vite proxy
 
 GitHub renders this README and its architecture diagrams without running the application. **GitHub Pages alone cannot host the complete system**: weather collection, profiles, alerts, delivery, and inference require the backend services and MongoDB.
 
+### Vercel frontend + Render backend
+
+The root [`vercel.json`](vercel.json) deploys **only the React frontend**. It proxies `/api/*` to `https://akashsathi.onrender.com/api/*`, preserving the API prefix, and rewrites `/map`, `/route`, `/alert`, and `/admin/*` to `index.html`. These page-specific rewrites leave `/data`, `/fonts`, and built assets untouched; update them if adding a new frontend route. It also disables Vercel's external-rewrite caching for API responses. This configuration does not use Vercel Services or service bindings: the Node backend and any Python service remain hosted separately on Render.
+
+1. Import the repository into Vercel, or update the existing project's settings. Keep **Root Directory at the repository root**, not `client`, and use **Node.js 22.x**. Do not accept the auto-detected three-service configuration.
+2. The committed configuration selects Vite, installs with `npm ci --include=dev`, builds with `npm run build`, and publishes `client/dist`. Remove conflicting dashboard overrides or make them match these values.
+3. Set the Vercel environment variable `VITE_API_URL=/api` for the deployment environment, then deploy. Do not use the Render hostname as the browser API URL: the same-origin proxy is needed for the existing admin and subscriber cookies. No `API_PROXY_TARGET` is needed on Vercel; that variable only configures the local Vite proxy.
+4. Set `CLIENT_ORIGIN` and `PUBLIC_URL` on Render to the exact Vercel **production origin** (for example, `https://your-project.vercel.app`, with no trailing slash), and redeploy the backend. Keep `NODE_ENV=production`, `ADMIN_AUTH=on`, and a strong `ADMIN_PASSCODE`. Preview domains are not automatically allowed by the origin guard; do not weaken it with a wildcard.
+5. Keep the Render backend's root directory at the repository root, its build command at `npm ci --omit=dev`, and its start command at `npm start`. Use `/api/health` as its health-check path. Set `TRUST_PROXY` to match the actual reverse-proxy chain and verify client-IP/rate-limit behavior through Vercel rather than blindly increasing the hop count.
+6. If Python is deployed, configure `ML_SERVICE_URL` **on Render**, using the private Python address where available. Do not add it or any credentials to frontend `VITE_*` variables. No Python process is started by the Vercel frontend build or by `npm start`.
+
+To check the Vercel routing locally without linking a cloud project, run `vercel dev -L` from the repository root. The configured development command starts only the client; API requests go to the Render backend rather than starting local collection or messaging jobs. This does not test production-origin authorization or production cookies; verify those on the final HTTPS deployment.
+
+After deployment, check:
+
+- `https://akashsathi.onrender.com/api/health` responds with JSON and a connected database.
+- `<your-vercel-origin>/api/health` returns the same API response, not frontend HTML.
+- Direct visits and refreshes on `/map`, `/route`, `/alert`, and `/admin/login` work, and static map data/fonts still load.
+- An alert profile and an admin login survive a page refresh; cookies remain `HttpOnly` and `Secure` in production.
+- Weather source timestamps continue updating and configured messaging jobs run on Render.
+
+Render Free services sleep after idle periods, which stops the in-process collectors, alert engine, and delivery jobs until the service wakes. Use always-on compute when uninterrupted collection and scheduled alerts are required. Changing frontend build-time environment variables requires a new Vercel deployment. If the Render hostname changes, update the API rewrite in `vercel.json` and redeploy the frontend.
+
 ## Security and privacy
 
 - **Secrets:** `server/.env` is ignored by Git. Example placeholders are treated as unconfigured credentials. Never expose provider secrets in frontend code, screenshots, issues, or logs; rotate any exposed credential.
