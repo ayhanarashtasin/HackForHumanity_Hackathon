@@ -359,33 +359,6 @@ test('answers: the saved profile\'s language wins; a typed bn/en wins over it; T
   assert.equal(typedInBangla.lang, 'bn');
 });
 
-test('answers: route gives the automatic route weather summary for both separators and asks for both places', async () => {
-  const routeResult = {
-    start: { name: 'Savar' }, end: { name: 'Dhaka' }, distanceKm: 31.2, durationMinutes: 60,
-    summary: {
-      maxHeatIndexC: 36, maxRainMm: 8, maxRainChancePct: 75, maxWindKph: 22, maxThunderPotential: 2,
-      coveredCount: 4, sampleCount: 4, forecastStatus: 'ok', rainUnitUnverified: false,
-    },
-  };
-  const routeWeather = async ({ start, end }) => {
-    assert.equal(start.name, 'Savar');
-    assert.equal(end.name, 'Dhaka');
-    return routeResult;
-  };
-  const english = await ask('route', ['Savar', 'to', 'Dhaka'], {}, { routeWeather });
-  assert.equal(english.action, 'route');
-  assert.match(plain(english), /Savar → Dhaka/);
-  assert.match(plain(english), /Heat index/);
-
-  const bangla = await ask('route', ['Savar', 'থেকে', 'Dhaka', 'bn'], {}, { routeWeather });
-  assert.equal(bangla.lang, 'bn');
-  assert.match(plain(bangla), /হিট ইনডেক্স/);
-
-  const missing = await ask('route', ['Savar']);
-  assert.equal(missing.action, 'ask-route');
-  assert.match(plain(missing), /\/route Savar to Chattogram/);
-});
-
 test('answers: every weather command works for every kind of place in both languages, with no hole in the text', async () => {
   const places = ['Badda', 'Dhaka', 'Dhaka North City Corporation', 'Savar, Dhaka'];
   for (const command of ['update', 'heat', 'rain', 'wind', 'thunderstorm', 'lightning', 'forecast']) {

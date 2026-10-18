@@ -47,23 +47,28 @@ function seen(updateId) {
 // One chat may send only so many weather requests in ten minutes (TELEGRAM_COMMAND_LIMIT); /start, /stop and /help are never limited.
 const limiter = createRateLimiter();
 
-// The question the bot just asked a chat ("Which place?" after /thunderstorm), kept in memory for a few minutes so a plain place name or
-// a shared location answers that command. Only the command name is kept, nothing about the person.
+// The question the bot just asked a chat ("Which place?" after /thunderstorm, "Where do you start?" after /route Bandarban), kept in memory
+// for a few minutes so a plain place name or a shared location answers that command. Only the command name and, for /route, the id of the
+// end already chosen are kept: nothing about the person, never coordinates.
 const ASKED_FOR_MS = 5 * 60_000;
-const ASKING = new Set(['ask-place', 'ambiguous', 'not-found']);
+const ASKING = new Set(['ask-place', 'ambiguous', 'not-found', 'ask-route', 'ask-route-start', 'ask-route-end', 'route-ambiguous', 'route-not-found', 'route-unclear']);
 const asked = new Map();
 
-function rememberQuestion(chatId, command, nowMs) {
+function rememberQuestion(chatId, command, nowMs, extra = {}) {
   asked.delete(chatId);
-  asked.set(chatId, { command, at: nowMs });
+  asked.set(chatId, { command, at: nowMs, routeTo: extra.routeTo ?? null, routeFrom: extra.routeFrom ?? null });
   if (asked.size > 5000) asked.delete(asked.keys().next().value);
 }
 
+// -> { command, routeTo, routeFrom } or null.
 function takeQuestion(chatId, nowMs) {
   const entry = asked.get(chatId);
   asked.delete(chatId);
-  return entry && nowMs - entry.at <= ASKED_FOR_MS ? entry.command : null;
+  return entry && nowMs - entry.at <= ASKED_FOR_MS ? entry : null;
 }
+
+// The ids a /route question has already settled, as answerCommand takes them.
+const pendingRoute = (question) => ({ routeToId: question?.routeTo ?? null, routeFromId: question?.routeFrom ?? null });
 
 export function resetBotForTests() {
   recent.clear();
@@ -93,19 +98,25 @@ async function replyPlain(channels, chatId, text) {
   }
 }
 
+// A /route search may ask the road service three times (one road and two detours), so it counts three against the chat's limit.
+const ROUTE_WEIGHT = 3;
+
 // Runs one weather command and sends its replies. Returns the action for the caller (and the tests).
 async function runWeatherCommand(channels, chatId, request, { now, deps }) {
   const languageCode = request.languageCode ?? null;
-  const verdict = limiter.hit(chatId, now.getTime());
+  const route = request.command === 'route';
+  const verdict = limiter.hit(chatId, now.getTime(), route ? ROUTE_WEIGHT : 1);
   if (!verdict.allowed) {
     if (verdict.announce) await replyPlain(channels, chatId, renderBusy(resolveLanguage({ languageCode })));
     return { handled: true, action: 'rate-limited' };
   }
+  // A road search takes a few seconds: show "typing…" meanwhile. Best effort.
+  if (route) channels.telegram.sendChatAction?.(chatId)?.catch?.(() => {});
   try {
     const result = await answerCommand({
       ...request, chatId, nowMs: now.getTime(), deps,
     });
-    if (ASKING.has(result.action)) rememberQuestion(chatId, request.command, now.getTime());
+    if (ASKING.has(result.action)) rememberQuestion(chatId, request.command, now.getTime(), result.remember);
     else asked.delete(chatId);
     for (const message of result.messages) await sendReport(channels, chatId, message);
     return { handled: true, action: result.action };
@@ -116,8 +127,10 @@ async function runWeatherCommand(channels, chatId, request, { now, deps }) {
   }
 }
 
-// A pressed inline button: "r:<command>:<place id>:<language>". Anything that does not parse is ignored, never trusted.
+// A pressed inline button: "r:<command>:<place id>:<language>", or a route's "t:<from id>:<to id>:<departure>:<language>" (routeText.js).
+// Anything that does not parse is ignored, never trusted; route ids are looked up again (an unknown one gets "this button has expired").
 const BUTTON_DATA = /^r:([a-z]+):([0-9A-Za-z]{1,24}):(bn|en)$/;
+const ROUTE_BUTTON = /^t:([0-9A-Za-z]{1,24}):([0-9A-Za-z]{1,24}):(0|3|m):(bn|en)$/;
 
 async function handleButton(update, { channels, now, deps }) {
   const query = update.callback_query;
@@ -129,6 +142,12 @@ async function handleButton(update, { channels, now, deps }) {
     await channels.telegram.answerCallbackQuery?.(query.id);
   } catch {
     // Only the spinner on the button; the reply is what matters.
+  }
+  const trip = ROUTE_BUTTON.exec(query.data);
+  if (trip) {
+    return runWeatherCommand(channels, String(chat.id), {
+      command: 'route', routeIds: { from: trip[1], to: trip[2] }, departure: trip[3], langOverride: trip[4], languageCode: query.from?.language_code,
+    }, { now, deps });
   }
   const match = BUTTON_DATA.exec(query.data);
   if (!match || !REPORT_COMMANDS.has(match[1]) || !placeById(match[2])) return { handled: true, action: 'ignored' };
@@ -190,7 +209,14 @@ export async function handleTelegramUpdate(update, { channels = sharedChannels()
       }
     }
     // A location sent in answer to "Which place?" answers that command (/thunderstorm, /rain...); otherwise it gets the general report.
-    const command = takeQuestion(chatId, now.getTime()) ?? 'update';
+    // In answer to /route's "Where do you start?" it is the start: the exact point goes to the road search once and is not kept.
+    const question = takeQuestion(chatId, now.getTime());
+    if (question?.command === 'route') {
+      return runWeatherCommand(channels, chatId, {
+        command: 'route', routeFromPoint: { lat: point.latitude, lon: point.longitude }, routeToId: question.routeTo, languageCode: message.from?.language_code,
+      }, { now, deps });
+    }
+    const command = question?.command ?? 'update';
     return runWeatherCommand(channels, chatId, { command, placeId: place.id, sharedPlace: live ? 'live' : 'once', languageCode: message.from?.language_code }, { now, deps });
   }
   if (update.edited_message) return { handled: true, action: 'ignored' };
@@ -243,9 +269,13 @@ export async function handleTelegramUpdate(update, { channels = sharedChannels()
   const name = canonicalCommand(command);
   if (name) return runWeatherCommand(channels, chatId, { command: name, rest, languageCode: message.from?.language_code }, { now, deps });
 
-  // A plain message right after the bot asked "Which place?" is the place.
+  // A plain message right after the bot asked "Which place?" is the place (for /route: the missing end, or a whole trip).
   const question = first.startsWith('/') ? null : takeQuestion(chatId, now.getTime());
-  if (question) return runWeatherCommand(channels, chatId, { command: question, rest: [first, ...rest], languageCode: message.from?.language_code }, { now, deps });
+  if (question) {
+    return runWeatherCommand(channels, chatId, {
+      command: question.command, rest: [first, ...rest], ...pendingRoute(question), languageCode: message.from?.language_code,
+    }, { now, deps });
+  }
 
   await reply(renderHelp(await deps.telegramLanguage(chatId)));
   return { handled: true, action: 'help' };

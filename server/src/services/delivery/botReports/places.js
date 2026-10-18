@@ -67,21 +67,32 @@ export function placeById(id) {
   return byId.get(String(id)) ?? null;
 }
 
+// Every place above, for indexes built on top of this one (routePlaces.js).
+export function allPlaces() {
+  ensure();
+  return index;
+}
+
 let boundaries = null;
+
+// The forecast place for a point inside a boundary polygon: its nearest BMD location (the first one when the polygon is approximated).
+export function placeInPolygon(pid, lat, lon) {
+  const polygon = polygons[pid];
+  if (!polygon?.src?.length) return null;
+  const members = polygon.src.map((code) => locationByPcode.get(code)).filter(Boolean);
+  if (!members.length) return null;
+  const nearest = polygon.approx || !Number.isFinite(lat) || !Number.isFinite(lon) ? members[0] : members.reduce((best, item) => (
+    haversineKm(lat, lon, item.lat, item.lon) < haversineKm(lat, lon, best.lat, best.lon) ? item : best
+  ));
+  return placeById(nearest.pcode);
+}
 
 // The same boundary generated for the browser is also packaged with the API; no GPS fix is saved or sent to a forecast provider.
 export function placeForPoint(lat, lon) {
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
   boundaries ??= JSON.parse(fs.readFileSync(new URL('../../../../data/bd-upazila.geojson', import.meta.url), 'utf8'));
   const feature = boundaries.features.find((item) => containsPoint(item.geometry, lon, lat));
-  const polygon = polygons[feature?.properties?.pid];
-  if (!polygon?.src?.length) return null;
-  const members = polygon.src.map((code) => locationByPcode.get(code)).filter(Boolean);
-  if (!members.length) return null;
-  const nearest = polygon.approx ? members[0] : members.reduce((best, item) => (
-    haversineKm(lat, lon, item.lat, item.lon) < haversineKm(lat, lon, best.lat, best.lon) ? item : best
-  ));
-  return placeById(nearest.pcode);
+  return feature ? placeInPolygon(feature.properties?.pid, lat, lon) : null;
 }
 
 export function parentOf(place) {

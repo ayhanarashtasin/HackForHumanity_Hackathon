@@ -20,8 +20,8 @@ const MAX_TIMELINE_LINES = 4;
 export const COMMAND_NAMES = ['update', 'heat', 'rain', 'wind', 'thunderstorm', 'lightning', 'forecast', 'route', 'alerts', 'status'];
 
 export const esc = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const bold = (value) => `<b>${esc(value)}</b>`;
-const italic = (value) => `<i>${esc(value)}</i>`;
+export const bold = (value) => `<b>${esc(value)}</b>`;
+export const italic = (value) => `<i>${esc(value)}</i>`;
 
 export function fit(text) {
   if (text.length <= MAX_LENGTH) return text;
@@ -62,7 +62,7 @@ export function makeText(lang, nowMs) {
 }
 
 // ---------- vocabulary ----------
-const CONDITION = {
+export const CONDITION = {
   en: {
     0: 'Clear sky', 1: 'Mostly clear', 2: 'Partly cloudy', 3: 'Overcast', 45: 'Fog', 48: 'Rime fog', 51: 'Light drizzle', 53: 'Drizzle', 55: 'Heavy drizzle',
     56: 'Freezing drizzle', 57: 'Freezing drizzle', 61: 'Light rain', 63: 'Rain', 65: 'Heavy rain', 66: 'Freezing rain', 67: 'Freezing rain',
@@ -76,7 +76,7 @@ const CONDITION = {
   },
 };
 
-function conditionEmoji(code) {
+export function conditionEmoji(code) {
   if (code === null || code === undefined) return '🌡';
   if (code >= 95) return '⛈';
   if (code >= 80 && code <= 82) return '🌦';
@@ -123,12 +123,12 @@ const COMPASS_NAMES = {
   bn: ['উত্তর', 'উত্তর-পূর্ব', 'পূর্ব', 'দক্ষিণ-পূর্ব', 'দক্ষিণ', 'দক্ষিণ-পশ্চিম', 'পশ্চিম', 'উত্তর-পশ্চিম'],
 };
 const SEVERITY_NAMES = { en: { ADVISORY: 'Advisory', WARNING: 'Warning', CRITICAL: 'Critical' }, bn: { ADVISORY: 'পরামর্শ', WARNING: 'সতর্কতা', CRITICAL: 'জরুরি' } };
-const KIND_NAMES = {
+export const KIND_NAMES = {
   en: { district: 'District', thana: 'City thana', upazila: 'Upazila', 'city-corporation': 'City corporation' },
   bn: { district: 'জেলা', thana: 'সিটি থানা', upazila: 'উপজেলা', 'city-corporation': 'সিটি কর্পোরেশন' },
 };
 
-const nameOf = (place, L) => (L === 'bn' ? place.nameBn || place.name : place.name);
+export const nameOf = (place, L) => (L === 'bn' ? place.nameBn || place.name : place.name);
 
 function placeTitle(place, T) {
   const parent = parentOf(place);
@@ -154,7 +154,7 @@ function placeNote(place, T) {
 }
 
 // ---------- shared lines ----------
-function freshnessNote(T, info) {
+export function freshnessNote(T, info) {
   const fresh = freshnessOf(info);
   if (fresh.status === 'ok') return null;
   if (fresh.status === 'stale') {
@@ -184,8 +184,8 @@ function unavailable(f, place, T, what) {
   ].join('\n'));
 }
 
-const heatName = (level, T) => HEAT_NAMES[T.L][level];
-const thunderName = (level, T) => (Number.isFinite(level) ? THUNDER_NAMES[T.L][Math.min(Math.max(level, 0), 3)] : '–');
+export const heatName = (level, T) => HEAT_NAMES[T.L][level];
+export const thunderName = (level, T) => (Number.isFinite(level) ? THUNDER_NAMES[T.L][Math.min(Math.max(level, 0), 3)] : '–');
 const windFrom = (degrees, T) => {
   const i = compassIndex(degrees);
   if (i === null) return '';
@@ -568,7 +568,7 @@ const COMMAND_HELP = {
     ['thunderstorm', 'storms on the satellite now, and the outlook'],
     ['lightning', 'lightning that was recorded'],
     ['forecast', 'the days ahead'],
-    ['route', 'weather between two places'],
+    ['route', 'weather along a road trip'],
     ['alerts', 'your active alerts'],
     ['status', 'how fresh the data is'],
   ],
@@ -582,7 +582,7 @@ const COMMAND_HELP = {
     ['thunderstorm', 'স্যাটেলাইটে এখনকার ঝড় ও পূর্বাভাস'],
     ['lightning', 'রেকর্ড হওয়া বজ্রপাত'],
     ['forecast', 'আগামী দিনগুলো'],
-    ['route', 'দুই জায়গার মাঝের আবহাওয়া'],
+    ['route', 'যাত্রাপথের আবহাওয়া'],
     ['alerts', 'আপনার সক্রিয় সতর্কবার্তা'],
     ['status', 'তথ্য কতটা নতুন'],
   ],
@@ -602,8 +602,8 @@ export function renderHelp(lang, { webUrl = env.channels.publicUrl } = {}) {
       list,
       '',
       T.s(
-        'Example: /heat Badda\n/route Savar to Chattogram\nNo place name → recent shared area, else saved areas. /update can request a one-time location. /follow requires sharing live location.\nLanguage: add bn or en.',
-        'উদাহরণ: /heat বাড্ডা\n/route Savar থেকে Chattogram\nএলাকার নাম না দিলে → সাম্প্রতিক অবস্থান, না থাকলে সংরক্ষিত এলাকা। /update একবারের অবস্থান চাইতে পারে। /follow-এর জন্য লাইভ অবস্থান শেয়ার করুন।\nভাষা: শেষে bn বা en লিখুন।',
+        'Example: /heat Badda\n/route Dhaka Bandarban · /route here Sylhet\nNo place name → recent shared area, else saved areas. /update can request a one-time location. /follow requires sharing live location.\nLanguage: add bn or en.',
+        'উদাহরণ: /heat বাড্ডা\n/route ঢাকা বান্দরবান · /route here Sylhet\nএলাকার নাম না দিলে → সাম্প্রতিক অবস্থান, না থাকলে সংরক্ষিত এলাকা। /update একবারের অবস্থান চাইতে পারে। /follow-এর জন্য লাইভ অবস্থান শেয়ার করুন।\nভাষা: শেষে bn বা en লিখুন।',
       ),
       '',
       T.s(
@@ -629,45 +629,6 @@ export function renderNotFound(lang, query) {
     `I could not find a place called "${esc(query)}".\nTry an upazila, thana or district, e.g. Badda or Savar, Dhaka.`,
     `"${esc(query)}" নামে কোনো জায়গা পাইনি।\nউপজেলা, থানা বা জেলার নাম দিন, যেমন বাড্ডা বা Savar, Dhaka।`,
   );
-}
-
-export function renderRoutePrompt(lang) {
-  const T = makeText(lang, 0);
-  return T.s('Add both places, for example: /route Savar to Chattogram', 'দুই জায়গার নাম দিন, যেমন: /route Savar থেকে Chattogram');
-}
-
-export function renderRoutePlaceError(lang, query, matches = []) {
-  const T = makeText(lang, 0);
-  const suggestions = matches.map((place) => {
-    const parent = parentOf(place);
-    const parentName = parent ? (T.L === 'bn' ? parent.nameBn || parent.name : parent.name) : '';
-    return parentName ? `${nameOf(place, T.L)}, ${parentName}` : nameOf(place, T.L);
-  });
-  if (suggestions.length) {
-    return T.s(`More than one place matches "${esc(query)}". Add its district: ${suggestions.join('; ')}`, `"${esc(query)}" একাধিক জায়গার সঙ্গে মেলে। জেলার নাম যোগ করুন: ${suggestions.join('; ')}`);
-  }
-  return T.s(`I could not find "${esc(query)}". Use an upazila, thana or district name.`, `"${esc(query)}" খুঁজে পাইনি। উপজেলা, থানা বা জেলার নাম দিন।`);
-}
-
-export function renderRoute(route, { lang, nowMs }) {
-  const T = makeText(lang, nowMs);
-  const { summary } = route;
-  const duration = route.durationMinutes < 60
-    ? T.s(`${T.n(route.durationMinutes)} min`, `${T.n(route.durationMinutes)} মিনিট`)
-    : T.s(`${T.n(Math.floor(route.durationMinutes / 60))} h ${T.n(route.durationMinutes % 60)} min`, `${T.n(Math.floor(route.durationMinutes / 60))} ঘণ্টা ${T.n(route.durationMinutes % 60)} মিনিট`);
-  const lines = [
-    bold(T.s('Fastest road route · weather summary', 'দ্রুততম সড়কপথ · আবহাওয়ার সারাংশ')),
-    `${esc(route.start.name)} → ${esc(route.end.name)} · ${T.n(route.distanceKm, 1)} km · ${duration}`,
-    `${T.s('Heat index', 'হিট ইনডেক্স')}: ${T.c(summary.maxHeatIndexC)}`,
-    `${T.s('Rain', 'বৃষ্টি')}: ${T.mm(summary.maxRainMm)} · ${T.s('chance', 'সম্ভাবনা')} ${T.pct(summary.maxRainChancePct)}`,
-    `${T.s('Strongest wind', 'সর্বোচ্চ বাতাস')}: ${T.kph(summary.maxWindKph)}`,
-    `${T.s('Thunderstorm potential', 'বজ্রঝড়ের সম্ভাবনা')}: ${T.n(summary.maxThunderPotential)}/3`,
-    T.s(`Forecast coverage: ${T.n(summary.coveredCount)} of ${T.n(summary.sampleCount)} route samples.`, `পূর্বাভাসের আওতা: পথে ${T.n(summary.sampleCount)}টি নমুনার ${T.n(summary.coveredCount)}টি।`),
-  ];
-  if (summary.rainUnitUnverified) lines.push(`⚠ ${T.s('BMD rain units have not been verified.', 'BMD-এর বৃষ্টির একক যাচাই করা হয়নি।')}`);
-  if (summary.forecastStatus !== 'ok') lines.push(`⚠ ${T.s('Some route forecast data is stale or unavailable.', 'পথের কিছু পূর্বাভাস পুরনো বা পাওয়া যাচ্ছে না।')}`);
-  lines.push(italic(T.s('Model forecast, not station readings. Conditions between sampled locations may differ.', 'এটি মডেলের পূর্বাভাস, স্টেশনের সরাসরি মাপ নয়। নমুনার মাঝের আবহাওয়া ভিন্ন হতে পারে।')));
-  return fit(lines.join('\n'));
 }
 
 // "Mohammadpur, Dhaka (thana)": a candidate place with its district and kind, for the list and its buttons.

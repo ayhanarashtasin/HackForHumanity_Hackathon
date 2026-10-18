@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 import { env } from '../../../config/env.js';
+import { HazardEvent } from '../../../models/HazardEvent.js';
 import { JobState } from '../../../models/JobState.js';
+import { geocodePlace } from '../../geocode.js';
 import { listInbox } from '../../alerts/inbox.js';
 import { circlesCovering } from '../../alerts/lightningGate.js';
 import { effectiveLightningStatus, loadSnapshots } from '../../alerts/snapshots.js';
@@ -82,6 +84,21 @@ export async function stormFor(place, { nowMs = Date.now() } = {}) {
   return { status, observedAtMs: snapshot.observedAtMs, hit };
 }
 
+// Active hazards (what the alert engine detected or an administrator declared) on the upazilas and districts a road passes, in force at
+// some point of the trip. Only the hazard, the area and its end time are shown: never who was alerted or why. Demo events are left out.
+export async function routeHazards({
+  pcodes = [], districtCodes = [], fromMs, untilMs,
+}) {
+  if (!dbReady()) throw new Error('database not ready');
+  return HazardEvent.find({
+    lifecycle: 'active',
+    isDemo: { $ne: true },
+    validUntil: { $gt: new Date(fromMs) },
+    validFrom: { $lt: new Date(untilMs) },
+    $or: [{ 'coverage.upazilaPcodes': { $in: pcodes } }, { 'coverage.districtPcodes': { $in: districtCodes } }],
+  }, { hazardType: 1, coverage: 1, validUntil: 1 }).sort({ validUntil: 1 }).limit(30).lean();
+}
+
 export async function alertsFor(subscriber, nowMs = Date.now()) {
   if (!dbReady()) throw new Error('database not ready');
   return listInbox(subscriber._id, { view: 'active', now: new Date(nowMs) });
@@ -100,6 +117,9 @@ export async function engineStatus() {
 export const defaultDeps = {
   loadForecast,
   routeWeather: buildRouteWeather,
+  routeHazards,
+  stormSnapshot: latestStormSnapshot,
+  geocode: (query) => geocodePlace(query),
   subscriberForChat,
   telegramLanguage,
   beginTelegramFollow,

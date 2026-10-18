@@ -84,6 +84,9 @@ export function createTelegramChannel({ config = env.channels.telegram, fetchImp
     // Stops the spinner on a pressed inline button. Best effort: the reply message is what matters.
     answerCallbackQuery: (callbackQueryId) => call('answerCallbackQuery', { callback_query_id: String(callbackQueryId) }),
 
+    // "typing…" in the chat for a few seconds while a slow reply (a road route) is prepared. Best effort.
+    sendChatAction: (chatId, action = 'typing') => call('sendChatAction', { chat_id: String(chatId), action }, { timeoutMs: 5_000 }),
+
     // The "/" menu. `languageCode` makes a list for people whose Telegram is set to that language; without it, the default list.
     setCommands: (commands, languageCode = null) => call('setMyCommands', { commands, ...(languageCode ? { language_code: languageCode } : {}) }),
   };

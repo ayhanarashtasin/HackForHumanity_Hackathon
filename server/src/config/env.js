@@ -80,6 +80,15 @@ export const env = {
     historyDays: numberFromEnv('WEATHER_HISTORY_DAYS', 60, { min: 0, max: 365, integer: true }),
   },
 
+  // The Telegram /route place search. A name the bot's own lists do not know (a village, a bazar, a landmark) is looked up with
+  // OpenStreetMap's Nominatim, limited to Bangladesh: the typed name is sent to that service. ROUTE_GEOCODER=off keeps every search local.
+  routing: {
+    geocoder: (process.env.ROUTE_GEOCODER || 'osm').trim().toLowerCase() === 'off' ? 'off' : 'osm',
+    geocoderUrl: (process.env.ROUTE_GEOCODER_URL || 'https://nominatim.openstreetmap.org').replace(/\/$/, ''),
+    // Nominatim's usage policy asks for a contact address on heavier use; it is sent as the `email` parameter when set.
+    geocoderEmail: (process.env.ROUTE_GEOCODER_EMAIL || '').trim(),
+  },
+
   // Credentials stay server-side. Never log or return these values.
   xweather: {
     clientId: credentialFromEnv('XWEATHER_CLIENT_ID', 'your_client_id'),

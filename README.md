@@ -116,7 +116,7 @@ flowchart TB
     BOT --> TELEGRAM
 ```
 
-**Request-time exceptions:** road-route searches contact OSRM; radar images use an allowlisted, cached BMD proxy; storm replay and image endpoints can call the internal Python service. Satellite and basemap tiles load directly in the browser. These paths do not initiate new forecast or Xweather collection.
+**Request-time exceptions:** road-route searches contact OSRM, and a Telegram `/route` place name that the bot's own lists do not know is looked up with OpenStreetMap Nominatim (`ROUTE_GEOCODER=off` disables it); radar images use an allowlisted, cached BMD proxy; storm replay and image endpoints can call the internal Python service. Satellite and basemap tiles load directly in the browser. These paths do not initiate new forecast or Xweather collection.
 
 ### Component responsibilities
 
@@ -374,7 +374,7 @@ For a demonstration, use **Settings** to create a demo audience in a selected up
 - **Satellite:** Himawari-9 infrared and visible imagery via NASA GIBS; imagery is delayed, not instantaneous.
 - **Timeline:** switch between imagery playback and three-hourly forecasts for approximately four days.
 - **Route weather:** open `/route` and choose a start and destination, or explicitly use your location as the start. The server selects the shortest-distance route among the OSRM options returned, with one alternative when available; this is not a guarantee of the shortest possible road and is not weather-optimized. The page draws the road, estimates arrival-time weather, groups stops by division/district/upazila, and shows a three-day destination outlook when available. OSRM receives the selected coordinates, including precise device coordinates if you use your current location as the start.
-- **Telegram route report:** send `/route Savar to Chattogram` or `/route Savar থেকে Chattogram`. The bot returns estimated distance/time and weather at sampled route locations. Add the district when a place name is ambiguous.
+- **Telegram route report:** send `/route Dhaka Bandarban` (`to` and `থেকে` are optional), `/route here Sylhet` to start from a one-time location share, or `/route Bandarban` and answer "Where do you start?". Places can be divisions, districts (routed to the district town, such as Motijheel for Dhaka), upazilas, thanas, city corporations, unions, paurashavas, city wards, the route page's neighbourhoods, and common old spellings (Chittagong, Comilla, Jessore). Unknown names go to OpenStreetMap Nominatim, then to "did you mean" suggestions; ambiguous names get buttons. The reply lists the worst weather on the way and when, each district (or upazila on short trips) at the time you pass it, the destination after arrival, recent lightning checks, satellite storm cells meeting the road, active alerts on the road, and the other road when OSRM has one. Buttons plan the way back, a departure in three hours, or tomorrow at 07:00. Unions, neighbourhoods and map points use their upazila's forecast; a missing forecast is shown as ⚪, never as calm.
 - **Search and sharing:** search in English or Bangla; the URL hash preserves the map view and selected layers. Legacy `/#view=...` links redirect to `/map`.
 - **Language:** search, controls, tooltips, and area details support Bangla. Map canvas labels remain English because the hosted glyphs and WebGL text shaping do not support Bengali reliably. Delivered messages and official quotations retain their original language; Bengali copy still needs fluent-human review.
 - **Data interpretation:** grey means no data. Forecasts are not station observations, thunderstorm potential is not a detected strike, and computed heat index is not an on-site WBGT measurement.
@@ -457,7 +457,7 @@ Weather commands are available with or without a connected profile and read stor
 | `/thunderstorm [place]` | Forecast thunderstorm potential and any modeled thunderstorm or hail conditions. |
 | `/lightning [place]` | Latest stored lightning checks and their age, not continuous strike monitoring. |
 | `/forecast [place]` | Multi-day temperature, rainfall, wind, and thunderstorm outlook. |
-| `/route start to destination` | OSRM road route, estimated distance/time, and cached weather sampled along the journey; Bangla `থেকে` is also supported. |
+| `/route start destination` | A road trip with its weather: the worst hazards and when, stops at passing time, destination outlook, lightning, storm cells and active alerts on the road, and buttons for the way back or a later departure. `to`/`থেকে` are optional; `/route here <place>` starts from a shared location. Aliases: `/trip`, `/travel`. |
 | `/alerts` | Active inbox alerts for the connected profile. |
 | `/status` | Source freshness and the alert engine's latest run. |
 
@@ -520,7 +520,8 @@ Use an appropriately registered sender ID. English SMS content is ASCII and limi
 | Xweather | Hourly forecasts, maritime conditions, WBGT, and lightning products | Optional server-side credentials; quota-controlled background requests. |
 | OCHA/HDX COD-AB | Administrative boundaries | 495 upazila polygons, 12 city corporations, 64 districts, and 8 divisions in generated data; CC BY-IGO attribution. |
 | OpenFreeMap / OpenStreetMap | Basemap | Preserve map attribution and applicable usage terms. |
-| OSRM public routing service | Road geometry, route candidates, estimated distance, and travel time | On-demand requests disclose selected coordinates; availability and route quality are outside the project's control. |
+| OSRM public routing service | Road geometry, route candidates, estimated distance, and travel time | On-demand requests disclose selected coordinates; availability and route quality are outside the project's control. Queued to about one request per second; a road search is reused for 30 minutes. |
+| OpenStreetMap Nominatim | Telegram `/route` names that are not in the bot's own place lists | Only the typed name is sent, at most one request per second, cached for a day, limited to Bangladesh; ODbL attribution in the reply; `ROUTE_GEOCODER=off` disables it. |
 
 District forecasts are derived from upazila values, not separately published BMD district forecasts. Some city thanas use markers rather than their own polygons; some newer administrative areas use a nearby forecast location. The map flags these approximations, but equivalent alert coverage labeling remains a known gap. Map-rendered place labels are English; search, tooltips, and panels support Bangla.
 

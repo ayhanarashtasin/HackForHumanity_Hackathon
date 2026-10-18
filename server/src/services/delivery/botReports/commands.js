@@ -3,26 +3,20 @@ import { allStatuses } from '../../weatherStore.js';
 import { defaultDeps } from './data.js';
 import { findPlaces, placeById, placesForAreas } from './places.js';
 import { forecastFor } from './readings.js';
+import { answerRoute } from './routeCommand.js';
 import {
   COMMAND_NAMES, buttonsFor, candidateButtons, renderAlerts, renderAmbiguous, renderAskPlace, renderForecast, renderHeat, renderLightning, renderNotFound, renderRain,
-  renderRoute, renderRoutePlaceError, renderRoutePrompt, renderStatus, renderThunderstorm, renderUpdate, renderWind,
+  renderStatus, renderThunderstorm, renderUpdate, renderWind,
 } from './text.js';
 
 // The bot's weather commands: parse the message, find the person's language and place, read the stored forecast, word the reply.
 // A command never calls a weather provider, never stores anything about the person and never puts profile answers (work, crop, shift)
-// into a reply: only the fresh current area (if any), else the saved areas, chooses where to look.
-export const REPORT_COMMANDS = new Set(['update', 'heat', 'rain', 'wind', 'thunderstorm', 'lightning', 'forecast', 'route']);
+// into a reply: only the fresh current area (if any), else the saved areas, chooses where to look. /route (routeCommand.js) is the one
+// exception to "never calls out": it asks the road-route service and, for a name the bot does not know, the OpenStreetMap place search.
+// Commands whose report buttons carry one place ("r:<command>:<place id>:<language>"); /route has buttons of its own.
+export const REPORT_COMMANDS = new Set(['update', 'heat', 'rain', 'wind', 'thunderstorm', 'lightning', 'forecast']);
 export const ALL_COMMANDS = new Set(COMMAND_NAMES);
-const ALIASES = new Map([['weather', 'update'], ['thunder', 'thunderstorm'], ['storm', 'thunderstorm'], ['days', 'forecast']]);
-
-function splitRouteQuery(query) {
-  const match = String(query).match(/\s+(?:to|theke|থেকে|->|→)\s+/i);
-  if (!match) return null;
-  const index = match.index;
-  const start = query.slice(0, index).trim();
-  const end = query.slice(index + match[0].length).trim();
-  return start && end ? { start, end } : null;
-}
+const ALIASES = new Map([['weather', 'update'], ['thunder', 'thunderstorm'], ['storm', 'thunderstorm'], ['days', 'forecast'], ['trip', 'route'], ['travel', 'route']]);
 
 // "/heat@AkshSathiBot" -> "heat"; aliases are folded in; anything that is not a weather command gives null.
 export function canonicalCommand(word) {
@@ -56,15 +50,16 @@ export function createRateLimiter({ max = () => env.channels.telegram.commandLim
   const entries = new Map();
   const limit = () => (typeof max === 'function' ? max() : max);
   return {
-    // -> { allowed, announce }: announce is true once per window, so the "slow down" reply is not itself a flood.
-    hit(key, nowMs = Date.now()) {
+    // -> { allowed, announce }: announce is true once per window, so the "slow down" reply is not itself a flood. A request may weigh
+    // more than one (a /route search asks the road service up to three times).
+    hit(key, nowMs = Date.now(), weight = 1) {
       let entry = entries.get(key);
       if (!entry || nowMs - entry.start >= windowMs) {
         entry = { start: nowMs, count: 0, warned: false };
         entries.set(key, entry);
         if (entries.size > 5000) for (const [other, value] of entries) if (nowMs - value.start >= windowMs) entries.delete(other);
       }
-      entry.count += 1;
+      entry.count += weight;
       if (entry.count <= limit()) return { allowed: true, announce: false };
       const announce = !entry.warned;
       entry.warned = true;
@@ -88,9 +83,12 @@ function pickRenderer(command) {
   }
 }
 
-// -> { messages: [{ text, buttons? }], action, lang }. `placeId` (from a button) replaces the typed place.
+// -> { messages: [{ text, buttons? }], action, lang, remember? }. `placeId` (from a button) replaces the typed place. The route* fields
+// are /route's: a pressed route button (routeIds, departure), a shared location as the start (routeFromPoint) and the end the bot already
+// knows while it waits for the other one (routeToId, routeFromId).
 export async function answerCommand({
   command, rest = [], placeId = null, langOverride = null, chatId, languageCode = null, sharedPlace = false, nowMs = Date.now(), deps = defaultDeps,
+  routeIds = null, departure = '0', routeFromPoint = null, routeToId = null, routeFromId = null,
 }) {
   const subscriber = await deps.subscriberForChat(chatId, new Date(nowMs));
   const parsed = parseArgs(rest);
@@ -108,21 +106,9 @@ export async function answerCommand({
   }
 
   if (command === 'route') {
-    const routeQuery = splitRouteQuery(parsed.query);
-    if (!routeQuery) return { messages: [{ text: renderRoutePrompt(lang) }], action: 'ask-route', lang };
-    const from = findPlaces(routeQuery.start);
-    if (from.matches.length !== 1) return { messages: [{ text: renderRoutePlaceError(lang, routeQuery.start, from.matches) }], action: from.matches.length ? 'ambiguous-start' : 'not-found-start', lang };
-    const to = findPlaces(routeQuery.end);
-    if (to.matches.length !== 1) return { messages: [{ text: renderRoutePlaceError(lang, routeQuery.end, to.matches) }], action: to.matches.length ? 'ambiguous-end' : 'not-found-end', lang };
-    try {
-      const route = await deps.routeWeather({ start: from.matches[0], end: to.matches[0], nowMs });
-      return { messages: [{ text: renderRoute(route, { lang, nowMs }) }], action: 'route', lang };
-    } catch (error) {
-      const text = /No road route|Route service/.test(error?.message)
-        ? error.message
-        : renderRoutePrompt(lang);
-      return { messages: [{ text }], action: 'route-error', lang };
-    }
+    return answerRoute({
+      query: parsed.query, routeIds, departure, routeFromPoint, routeToId, routeFromId, lang, nowMs, deps,
+    });
   }
 
   let places;

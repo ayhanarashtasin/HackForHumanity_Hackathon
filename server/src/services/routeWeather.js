@@ -76,15 +76,39 @@ const SAME_ROAD_KM = 0.2;
 const MAX_SHARED = 0.8; // an alternative must leave the other routes for at least a fifth of its length
 const VIA_OFFSET = 0.25; // via points sit this fraction of the straight-line distance to each side of the midpoint
 
+// Errors carry a code, so callers word them in their own language: ROUTE_POINTS, ROUTE_SAME, ROUTE_NO_ROAD, ROUTE_SERVICE.
+const routeError = (code, message) => Object.assign(new Error(message), { code });
+const serviceError = () => routeError('ROUTE_SERVICE', 'Route service is unavailable. Please try again.');
+
+// The public OSRM server allows about one request per second. Requests through the real network wait their turn; injected ones (tests) do not.
+const OSRM_GAP_MS = 1000;
+let nextOsrmSlotMs = 0;
+async function waitTurn(fetchImpl) {
+  if (fetchImpl !== globalThis.fetch) return;
+  const now = Date.now();
+  const wait = Math.max(0, nextOsrmSlotMs - now);
+  nextOsrmSlotMs = Math.max(now, nextOsrmSlotMs) + OSRM_GAP_MS;
+  if (wait) await new Promise((resolve) => { setTimeout(resolve, wait); });
+}
+
+// -> { routes, waypoints }. OSRM answers "no road" (NoRoute, NoSegment) with an error status too: that is a result, not an outage.
 async function requestRoutes(points, fetchImpl, { alternatives }) {
   const coordinates = points.map((point) => `${point.lon},${point.lat}`).join(';');
   const url = `${ROUTING_SERVICE_URL}/${coordinates}?overview=full&geometries=geojson&steps=false${alternatives ? '&alternatives=3' : ''}`;
-  const response = await fetchImpl(url, { signal: AbortSignal.timeout(12_000) });
-  if (!response.ok) throw new Error('Route service is unavailable. Please try again.');
-  const payload = await response.json();
-  return payload.code === 'Ok' ? (payload.routes ?? []).filter((candidate) => (
+  await waitTurn(fetchImpl);
+  let response;
+  try {
+    response = await fetchImpl(url, { signal: AbortSignal.timeout(12_000) });
+  } catch {
+    throw serviceError();
+  }
+  const payload = await response.json().catch(() => null);
+  if (['NoRoute', 'NoSegment'].includes(payload?.code)) return { routes: [], waypoints: [] };
+  if (!response.ok || !payload) throw serviceError();
+  const routes = payload.code === 'Ok' ? (payload.routes ?? []).filter((candidate) => (
     candidate?.geometry?.coordinates?.length && Number.isFinite(candidate.distance) && Number.isFinite(candidate.duration)
   )) : [];
+  return { routes, waypoints: Array.isArray(payload.waypoints) ? payload.waypoints : [] };
 }
 
 // Points every `stepKm` along a line, so long straight highway segments are compared along their whole length.
@@ -119,25 +143,46 @@ function viaPoints(start, end) {
     .filter(validPoint);
 }
 
-async function fetchRoadRoutes(start, end, fetchImpl) {
-  // Shortest first; the rest are offered as alternatives.
-  const direct = (await requestRoutes([start, end], fetchImpl, { alternatives: true }))
-    .sort((a, b) => a.distance - b.distance || a.duration - b.duration);
-  if (!direct.length) throw new Error('No road route was found between those locations.');
+// The roads between two points change far more slowly than the weather on them, so a search is reused for half an hour (the weather is
+// sampled again every time). One cache per fetch implementation keeps injected test fetches apart from the real one.
+const ROAD_CACHE_MS = 30 * 60_000;
+const ROAD_CACHE_SIZE = 200;
+const roadCaches = new WeakMap();
+const roadKey = (start, end) => [start.lat, start.lon, end.lat, end.lon].map((value) => value.toFixed(5)).join(',');
+
+// -> { routes (shortest first; the rest are offered as alternatives), snap: { startKm, endKm } }: how far each point is from the road OSRM
+// starts or ends on, so a reply can say "the road ends about 7 km from Thanchi".
+async function fetchRoadRoutes(start, end, fetchImpl, nowMs = Date.now()) {
+  if (!roadCaches.has(fetchImpl)) roadCaches.set(fetchImpl, new Map());
+  const cache = roadCaches.get(fetchImpl);
+  const key = roadKey(start, end);
+  const cached = cache.get(key);
+  if (cached && nowMs - cached.at < ROAD_CACHE_MS) return cached.value;
+
+  const { routes, waypoints } = await requestRoutes([start, end], fetchImpl, { alternatives: true });
+  const direct = routes.sort((a, b) => a.distance - b.distance || a.duration - b.duration);
+  if (!direct.length) throw routeError('ROUTE_NO_ROAD', 'No road route was found between those locations.');
   const kept = direct.slice(0, MAX_ROUTES);
-  if (kept.length >= MAX_ROUTES) return kept;
 
   // A failed or empty via request only means fewer alternatives; the search itself has already succeeded.
-  const viaRoutes = (await Promise.all(viaPoints(start, end).map((via) => (
-    requestRoutes([start, via, end], fetchImpl, { alternatives: false }).catch(() => [])
-  )))).flat().sort((a, b) => a.distance - b.distance);
-  for (const candidate of viaRoutes) {
-    if (kept.length >= MAX_ROUTES) break;
-    if (candidate.distance > kept[0].distance * MAX_DETOUR) continue;
-    if (kept.some((route) => sharedFraction(candidate, route) >= MAX_SHARED)) continue;
-    kept.push(candidate);
+  if (kept.length < MAX_ROUTES) {
+    const viaRoutes = (await Promise.all(viaPoints(start, end).map((via) => (
+      requestRoutes([start, via, end], fetchImpl, { alternatives: false }).then((result) => result.routes).catch(() => [])
+    )))).flat().sort((a, b) => a.distance - b.distance);
+    for (const candidate of viaRoutes) {
+      if (kept.length >= MAX_ROUTES) break;
+      if (candidate.distance > kept[0].distance * MAX_DETOUR) continue;
+      if (kept.some((route) => sharedFraction(candidate, route) >= MAX_SHARED)) continue;
+      kept.push(candidate);
+    }
   }
-  return kept;
+
+  const snapKm = (waypoint) => (Number.isFinite(waypoint?.distance) ? Math.round(waypoint.distance / 100) / 10 : null);
+  const value = { routes: kept, snap: { startKm: snapKm(waypoints[0]), endKm: snapKm(waypoints.at(-1)) } };
+  cache.delete(key);
+  cache.set(key, { at: nowMs, value });
+  if (cache.size > ROAD_CACHE_SIZE) cache.delete(cache.keys().next().value);
+  return value;
 }
 
 // One road route with weather sampled along it at the expected time of passing.
@@ -172,6 +217,7 @@ function routeOption(route, { nowMs, forecast, locationList }) {
       rainChancePct: at(local.cols?.pop, index),
       windKph: at(local.cols?.wg, index),
       thunderPotential: at(local.thunder?.values, index),
+      weatherCode: at(local.cols?.wmo, index),
     };
   });
   const available = samples.filter((sample) => sample.place && sample.temperatureC !== null);
@@ -199,10 +245,11 @@ function routeOption(route, { nowMs, forecast, locationList }) {
 export async function buildRouteWeather({
   start, end, nowMs = Date.now(), fetchImpl = fetch, forecast = loadForecast({ now: nowMs }), locationList = locations,
 }) {
-  if (!validPoint(start) || !validPoint(end)) throw new Error('Choose two locations in Bangladesh.');
-  if (start.lat === end.lat && start.lon === end.lon) throw new Error('Start and end locations must be different.');
+  if (!validPoint(start) || !validPoint(end)) throw routeError('ROUTE_POINTS', 'Choose two locations in Bangladesh.');
+  if (start.lat === end.lat && start.lon === end.lon) throw routeError('ROUTE_SAME', 'Start and end locations must be different.');
 
-  const routes = await fetchRoadRoutes(start, end, fetchImpl);
+  // `nowMs` is the departure time: every sample is forecast for when the trip passes it.
+  const { routes, snap } = await fetchRoadRoutes(start, end, fetchImpl);
   const [shortest, ...others] = routes.map((route) => routeOption(route, { nowMs, forecast, locationList }));
 
   // The shortest route stays at the top level (as before); the other OSRM candidates follow in `alternatives`, shortest first.
@@ -212,6 +259,7 @@ export async function buildRouteWeather({
     ...shortest,
     routeCandidates: routes.length,
     routeChoice: 'shortest-distance-among-osrm-options',
+    snap,
     alternatives: others,
   };
 }

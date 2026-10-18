@@ -11,6 +11,9 @@ try {
 export const locations = catalogue.locations;
 export const districts = catalogue.districts;
 export const polygons = catalogue.polygons;
+export const divisions = catalogue.divisions ?? [];
+// Unions, paurashavas and city wards (geoBoundaries ADM4) with a point each: places a route can start or end at. No forecast of their own.
+export const areas = catalogue.areas ?? [];
 export const pcodes = locations.map((location) => location.pcode);
 export const locationByPcode = new Map(locations.map((location) => [location.pcode, location]));
 
