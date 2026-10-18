@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AkashSathi — Extreme Heat Architecture</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    width: 2700px;
+    height: 1900px;
+    background-color: #f3f5ee;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #1a3328;
+    padding: 60px 75px 50px 75px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+  }
+
+  /* Header */
+  .header {
+    margin-bottom: 30px;
+  }
+  .eyebrow {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 2.5px;
+    color: #2b4c3b;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .title {
+    font-size: 54px;
+    font-weight: 800;
+    color: #173325;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+    line-height: 1.1;
+  }
+  .subtitle {
+    font-size: 21px;
+    color: #4a6353;
+    font-weight: 500;
+    margin-bottom: 18px;
+  }
+  .badges-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .badge {
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: #ffffff;
+  }
+  .badge-yellow { background-color: #e59324; }
+  .badge-orange { background-color: #db5c24; }
+  .badge-slate  { background-color: #3b735c; }
+  .badge-note {
+    font-size: 15px;
+    color: #556e5f;
+    font-weight: 500;
+    margin-left: 8px;
+  }
+
+  /* Columns Grid Header */
+  .col-headers {
+    display: grid;
+    grid-template-columns: 330px 480px 380px 450px 730px;
+    gap: 30px;
+    margin-bottom: 14px;
+    padding-left: 4px;
+  }
+  .col-header {
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    color: #3e5c4a;
+    text-transform: uppercase;
+  }
+
+  /* Main Architecture Flow Grid */
+  .grid-container {
+    display: grid;
+    grid-template-columns: 330px 480px 380px 450px 730px;
+    grid-template-rows: repeat(3, auto);
+    gap: 22px 30px;
+    flex-grow: 1;
+    position: relative;
+  }
+
+  /* Card Styles */
+  .card {
+    border-radius: 14px;
+    padding: 22px 24px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+  .card-tint {
+    background-color: #e5ece2;
+    border: 1px solid #d4dfd0;
+  }
+  .card-white {
+    background-color: #ffffff;
+    border: 1px solid #d9e3d6;
+    box-shadow: 0 3px 10px rgba(23, 51, 37, 0.03);
+  }
+  .card-h-row1 { height: 280px; }
+  .card-h-row2 { height: 260px; }
+  .card-h-row3 { height: 260px; }
+
+  .card-title {
+    font-size: 20px;
+    font-weight: 800;
+    color: #173325;
+    margin-bottom: 10px;
+    line-height: 1.25;
+  }
+  .card-subtitle {
+    font-size: 14.5px;
+    font-weight: 600;
+    color: #2e5240;
+    margin-bottom: 8px;
+  }
+  .card-desc {
+    font-size: 14px;
+    line-height: 1.45;
+    color: #4a6353;
+    font-weight: 500;
+  }
+  .card-desc p { margin-bottom: 5px; }
+  .card-desc strong { color: #173325; font-weight: 700; }
+
+  .pill-tag {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 11.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+  }
+  .pill-warning { background-color: #db5c24; color: #ffffff; }
+  .pill-advisory { background-color: #e59324; color: #ffffff; }
+  .pill-evidence { background-color: #3b735c; color: #ffffff; }
+
+  /* Arrows */
+  .card::after {
+    content: "→";
+    position: absolute;
+    right: -23px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 24px;
+    color: #8fa595;
+    font-weight: 700;
+  }
+  .no-arrow::after { display: none; }
+
+  /* Inter-row Divider Notice */
+  .row-notice {
+    grid-column: 2 / 5;
+    font-size: 14px;
+    font-weight: 700;
+    color: #2b4c3b;
+    padding: 2px 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .row-notice::before {
+    content: "•";
+    color: #db5c24;
+    font-size: 18px;
+  }
+
+  /* Multi-level UX Panel in Col 5 */
+  .ux-panel {
+    grid-column: 5;
+    grid-row: 1 / 3;
+    background-color: #e6eee3;
+    border: 1px solid #d4dfd0;
+    border-radius: 14px;
+    padding: 24px 26px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .ux-title {
+    font-size: 21px;
+    font-weight: 800;
+    color: #173325;
+    margin-bottom: 2px;
+  }
+  .ux-sub {
+    font-size: 13.5px;
+    color: #4a6353;
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+  .ux-sub-card {
+    background-color: #ffffff;
+    border-radius: 8px;
+    border: 1px solid #dbe4d8;
+    padding: 12px 16px;
+    font-size: 13.5px;
+    color: #334d3f;
+    line-height: 1.4;
+  }
+  .ux-sub-card strong { color: #173325; font-weight: 700; }
+  .ux-arrow-down {
+    text-align: center;
+    color: #8fa595;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+    margin: -4px 0;
+  }
+
+  /* Col 5 Bottom Card */
+  .col5-bottom {
+    grid-column: 5;
+    grid-row: 3;
+  }
+
+  /* Footer Monitoring Limits */
+  .footer-bar {
+    background-color: #162a1f;
+    border-radius: 10px;
+    padding: 18px 24px;
+    margin-top: 24px;
+  }
+  .footer-title {
+    color: #6ee7b7;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 1.8px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .footer-text {
+    color: #a4bcaf;
+    font-size: 13.5px;
+    line-height: 1.45;
+    font-weight: 500;
+  }
+  .meta-footer {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 12px;
+    font-size: 12.5px;
+    color: #6b8274;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+  <!-- Top Header Section -->
+  <div class="header">
+    <div class="eyebrow">AkashSathi / Implemented System Architecture</div>
+    <div class="title">Extreme Heat / Heat Stress</div>
+    <div class="subtitle">From provider WBGT and NWS heat index estimation to ACGIH workload thresholds, personalised alerts and map layers.</div>
+    <div class="badges-row">
+      <span class="badge badge-yellow">Advisory (Light/Moderate)</span>
+      <span class="badge badge-orange">Warning (Heavy/Acute)</span>
+      <span class="badge badge-slate">Air Temp Evidence</span>
+      <span class="badge-note">Arrows show data flow. Engine evaluates 24-hour forward lookahead windows. Heat alerts never produce CRITICAL.</span>
+    </div>
+  </div>
+
+  <!-- Columns Grid Header -->
+  <div class="col-headers">
+    <div class="col-header">01 Data Sources</div>
+    <div class="col-header">02 Background Collection</div>
+    <div class="col-header">03 Cache + MongoDB</div>
+    <div class="col-header">04 Rules / Read Services</div>
+    <div class="col-header">05 User Experience</div>
+  </div>
+
+  <!-- Main Architecture Grid -->
+  <div class="grid-container">
+
+    <!-- ROW 1: PRIMARY WBGT -->
+    <!-- Col 1 -->
+    <div class="card card-tint card-h-row1">
+      <div class="card-title">Xweather forecast (Primary)</div>
+      <div class="card-desc">
+        <p>Direct provider <strong>WBGT</strong> (Wet-Bulb Globe Temp).</p>
+        <p>Integrates air temp, solar radiation, humidity and wind.</p>
+        <p>Upazila-level grid; 3-hour update cadence.</p>
+      </div>
+    </div>
+
+    <!-- Col 2 -->
+    <div class="card card-white card-h-row1">
+      <div class="card-title">WBGT collectors & selection</div>
+      <div class="card-desc">
+        <p>Pulls hourly series for 495 upazilas (24 h horizon).</p>
+        <p>Priority 1 in <strong>choosePrimary()</strong>: provider WBGT chosen when available.</p>
+        <p>Evaluates continuous peak windows & duration.</p>
+      </div>
+    </div>
+
+    <!-- Col 3 -->
+    <div class="card card-tint card-h-row1">
+      <div class="card-title">Forecast cache</div>
+      <div class="card-desc">
+        <p><strong>ForecastsSnapshot</strong> + in-memory store.</p>
+        <p>Stores hourly WBGT values, peak metric and valid range.</p>
+        <p>Source indicator: <strong>wbgt</strong> with freshness timestamp.</p>
+      </div>
+    </div>
+
+    <!-- Col 4 -->
+    <div class="card card-white card-h-row1">
+      <div class="pill-tag pill-advisory">Advisory &ge; 23&deg;C &middot; Warning &ge; 28&deg;C</div>
+      <div class="card-title">WBGT hazard detection</div>
+      <div class="card-desc">
+        <p>Evaluates peak WBGT against hazard bands:</p>
+        <p>&bull; Level 1: &ge; 23&deg;C (Heavy-work advisory)</p>
+        <p>&bull; Level 2: &ge; 28&deg;C (ACGIH moderate screening)</p>
+        <p>&bull; Level 3: &ge; 31&deg;C (Light-work screening limit)</p>
+      </div>
+    </div>
+
+    <!-- Col 5: Main Personalized Pipeline (Spans Row 1 & Row 2) -->
+    <div class="ux-panel no-arrow">
+      <div>
+        <div class="ux-title">Personalised alert pipeline</div>
+        <div class="ux-sub">Shared HazardEvent (HEAT_STRESS), then subscriber occupation cards.</div>
+      </div>
+
+      <div class="ux-sub-card">
+        <strong>1. ACGIH Workload Classification:</strong><br>
+        Classifies subscriber into <strong>light</strong>, <strong>moderate</strong>, or <strong>heavy</strong>.<br>
+        Dynamic bump (+1 class) for PPE burden, no shelter access, or &gt;8 h outdoor exposure. Sensitive health profiles start at moderate.
+      </div>
+
+      <div class="ux-arrow-down">&darr;</div>
+
+      <div class="ux-sub-card">
+        <strong>2. Scenario Evaluation & Decision:</strong><br>
+        Maps peak metric against ACGIH/NIOSH lines.<br>
+        Yields <strong>ADVISORY</strong> or <strong>WARNING</strong> (Heat never produces CRITICAL).<br>
+        Timing guard: evaluates 6 h before work shift; never sends before 06:00 local.
+      </div>
+
+      <div class="ux-arrow-down">&darr;</div>
+
+      <div class="ux-sub-card">
+        <strong>3. Website Inbox & Multi-Channel Delivery:</strong><br>
+        Tailored actionable advice (rest in shade, water intake, shift timing).<br>
+        Delivery worker dispatches every 30s to <strong>Telegram</strong>, <strong>WhatsApp</strong> and <strong>SMS</strong> (clean plain text without extraneous links).
+      </div>
+    </div>
+
+    <!-- ROW DIVIDER NOTICE -->
+    <div class="row-notice">
+      Provider WBGT takes priority; Open-Meteo Heat Index serves as automated fallback if WBGT is absent.
+    </div>
+
+    <!-- ROW 2: FALLBACK HEAT INDEX -->
+    <!-- Col 1 -->
+    <div class="card card-tint card-h-row2">
+      <div class="card-title">Open-Meteo + BMD base forecast</div>
+      <div class="card-desc">
+        <p>Hourly 2m temperature and relative humidity.</p>
+        <p>Derived <strong>Heat Index</strong> (Rothfusz equation).</p>
+        <p>Aligned to 3-hour windows on national grid.</p>
+      </div>
+    </div>
+
+    <!-- Col 2 -->
+    <div class="card card-white card-h-row2">
+      <div class="card-title">Heat Index fallback ingestion</div>
+      <div class="card-desc">
+        <p>Automatic fallback when WBGT is unavailable.</p>
+        <p>Calculates NWS apparent temperature categories.</p>
+        <p>Refreshes every 3 hours across all districts.</p>
+      </div>
+    </div>
+
+    <!-- Col 3 -->
+    <div class="card card-tint card-h-row2">
+      <div class="card-title">Heat Index snapshot</div>
+      <div class="card-desc">
+        <p>Stores computed <strong>heatIndexC</strong> series.</p>
+        <p>Identifies peak hour, duration and trend.</p>
+        <p>Indicator labeled as <strong>heat_index</strong>.</p>
+      </div>
+    </div>
+
+    <!-- Col 4 -->
+    <div class="card card-white card-h-row2">
+      <div class="pill-tag pill-advisory">Caution &ge; 27&deg;C &middot; Danger &ge; 39&deg;C</div>
+      <div class="card-title">Heat Index detection rule</div>
+      <div class="card-desc">
+        <p>Fallback bands when WBGT is missing:</p>
+        <p>&bull; Level 1: &ge; 27&deg;C (NWS Caution)</p>
+        <p>&bull; Level 2: &ge; 32&deg;C (Extreme Caution)</p>
+        <p>&bull; Level 3: &ge; 39&deg;C (NWS Danger)</p>
+      </div>
+    </div>
+
+    <!-- ROW 3: BMD GROUND EVIDENCE & MAP/BOT -->
+    <!-- Col 1 -->
+    <div class="card card-tint card-h-row3">
+      <div class="card-title">BMD heatwave bulletins</div>
+      <div class="card-desc">
+        <p>Official station surface observations.</p>
+        <p>Synoptic bulletins & PDF alerts from BMD.</p>
+        <p>Maximum dry-bulb air temperature (Tmax).</p>
+      </div>
+    </div>
+
+    <!-- Col 2 -->
+    <div class="card card-white card-h-row3">
+      <div class="card-title">Official evidence parser</div>
+      <div class="card-desc">
+        <p>Extracts official heatwave signal text.</p>
+        <p>Classifies BMD thresholds: Mild (36-37.9&deg;C), Moderate (38-39.9&deg;C), Severe (40-41.9&deg;C), Very Severe (&ge;42&deg;C).</p>
+        <p>Stored as supporting evidence, not primary rule.</p>
+      </div>
+    </div>
+
+    <!-- Col 3 -->
+    <div class="card card-tint card-h-row3">
+      <div class="card-title">Evidence & weather cache</div>
+      <div class="card-desc">
+        <p><strong>WeatherSnapshot</strong> + official notices.</p>
+        <p>Quotes official BMD signal verbatim.</p>
+        <p>Original PDF link retained for audit trail.</p>
+      </div>
+    </div>
+
+    <!-- Col 4 -->
+    <div class="card card-white card-h-row3">
+      <div class="pill-tag pill-evidence">GET /api/weather/snapshot</div>
+      <div class="card-title">Cached heat query API</div>
+      <div class="card-desc">
+        <p>Serves shared snapshot with freshness.</p>
+        <p>Provides upazila-level heat stress indicators, air temp, and active heatwave class.</p>
+      </div>
+    </div>
+
+    <!-- Col 5: Weather Map & Bot Reports -->
+    <div class="card card-tint card-h-row3 no-arrow col5-bottom">
+      <div class="card-title">Map visualization & Telegram bot</div>
+      <div class="card-desc">
+        <p><strong>Interactive Weather Map:</strong> React + MapLibre choropleth layers for Heat Index & WBGT with NWS caution/danger color ramp.</p>
+        <p><strong>Telegram Bot (/heat [place]):</strong> On-demand report answering current heat index, peak WBGT, time of peak, and protective advice.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bottom Monitoring Limits Footer Bar -->
+  <div class="footer-bar">
+    <div class="footer-title">Monitoring Limits & Operational Principles</div>
+    <div class="footer-text">
+      WBGT values are provider model estimates (integrating solar radiation, humidity, wind and sun angle), not on-site physical black-globe thermometer readings. Air temperature alone underestimates physiological strain in Bangladesh's high humidity. Worker alerts are dispatched up to 6 hours before work windows and never between 22:00 and 06:00 local time. Expiry is not an all-clear. ACGIH thresholds protect acclimatized populations; sensitive health profiles trigger lower thresholds.
+    </div>
+  </div>
+
+  <div class="meta-footer">
+    <div>Current implementation: Node / Express + MongoDB | React / MapLibre | Xweather + Open-Meteo + BMD | 18 Oct 2026</div>
+    <div>AkashSathi Architecture Series &middot; Extreme Heat System</div>
+  </div>
+
+</body>
+</html>
