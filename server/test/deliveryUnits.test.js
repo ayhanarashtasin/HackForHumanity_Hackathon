@@ -97,14 +97,17 @@ test('a channel message carries what a person needs and none of their profile (C
     }
     assert.match(text, /CRITICAL/);
     assert.match(text, /Badda/);
-    assert.match(text, /https:\/\/akashsathi\.example\/alert/);
   }
+  assert.equal(renderMessage('telegram', sent, { nowMs: NOW, siteUrl: 'https://akashsathi.example' }).text.includes('/alert'), false);
+  assert.match(renderMessage('sms', sent, { nowMs: NOW, siteUrl: 'https://akashsathi.example' }).text, /https:\/\/akashsathi\.example\/alert/);
 });
 
 test('Telegram text states the validity and who sent it, and quotes an official notice in its own words', () => {
   const { text } = renderMessage('telegram', notification(), { nowMs: NOW, siteUrl: 'https://x.example' });
   assert.match(text, /Valid until today 12:00 \(Bangladesh time\)/);
   assert.match(text, /Automatic alert \(prototype rules\)/);
+  assert.equal(text.includes('/alert'), false);
+  assert.equal(text.includes('Details:'), false);
 
   const official = renderMessage('telegram', notification({
     severity: 'WARNING',

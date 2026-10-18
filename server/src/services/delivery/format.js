@@ -3,7 +3,7 @@ import { SENDER_LABELS, confidenceLine, localizeDigits, whenText } from '../aler
 
 // A short copy of a stored notification for a messaging channel. Built from the notification alone: no occupation, no "why you
 // received this", no profile answers (catalogue CTX-03: a shared or glanced-at phone must not reveal personal information).
-// What stays is what a person needs: how serious, what, where and until when, who said it, and where to read more.
+// What stays is what a person needs: how serious, what, where and until when, and who said it.
 const SEVERITY_LABEL = {
   ADVISORY: { en: 'Advisory', bn: 'পরামর্শ' },
   WARNING: { en: 'Warning', bn: 'সতর্কতা' },
@@ -15,7 +15,6 @@ const OFFICIAL_LABEL = { en: 'Official BMD notice (quoted)', bn: 'বিএম�
 const TEXT = {
   en: {
     validUntil: (when) => `Valid until ${when} (Bangladesh time).`,
-    details: (url) => `Details: ${url}`,
     official: (quote) => `Official BMD wording (quoted): "${quote}"`,
     original: (url) => `Original: ${url}`,
     reference: (url) => `Reference: ${url}`,
@@ -23,7 +22,6 @@ const TEXT = {
   },
   bn: {
     validUntil: (when) => `${when} পর্যন্ত বলবৎ (বাংলাদেশ সময়)।`,
-    details: (url) => `বিস্তারিত: ${url}`,
     official: (quote) => `বিএমডির মূল বক্তব্য (উদ্ধৃত): "${quote}"`,
     original: (url) => `মূল নথি: ${url}`,
     reference: (url) => `সূত্র: ${url}`,
@@ -75,7 +73,6 @@ export function renderMessage(channel, notification, { nowMs = Date.now(), siteU
   if (official?.signalText) lines.push(words.official(String(official.signalText).slice(0, 300)));
   if (documentUrl && /^https?:\/\//i.test(documentUrl)) lines.push(words.original(documentUrl));
   else if (referenceUrl && /^https?:\/\//i.test(referenceUrl)) lines.push(words.reference(referenceUrl));
-  lines.push(words.details(link));
   const full = clip(lines.join('\n'), TELEGRAM_MAX);
 
   // SMS: one short line. The first recommended action is the most useful sentence; drop it before cutting the title.

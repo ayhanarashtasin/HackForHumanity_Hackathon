@@ -527,7 +527,6 @@ export function renderAlerts({ lang, nowMs, linked, items = [], webUrl = env.cha
       lines.push(`${bold(label)} · ${esc(item.title)}`, `${T.s('Until', 'মেয়াদ')}: ${esc(T.when(+new Date(item.validUntil)))}`, '');
     }
     if (items.length > 5) lines.push(T.s(`…and ${T.n(items.length - 5)} more in the app.`, `…এবং অ্যাপে আরও ${T.n(items.length - 5)}টি।`));
-    lines.push(`${T.s('Details', 'বিস্তারিত')}: ${esc(webUrl)}/alert`);
   }
   return fit(lines.join('\n'));
 }
