@@ -36,7 +36,7 @@ export function normaliseShelters(rows) {
   const shelters = [];
   for (const row of Array.isArray(rows) ? rows : []) {
     if (!/^flood$/i.test(String(row?.shelter_type_id ?? '').trim())) continue;
-    if (row?.status && !/useable|usable/i.test(String(row.status))) continue;
+    if (row?.status && !/^(?:useable|usable)$/i.test(String(row.status).trim())) continue;
     const lat = finite(row.lat);
     const lon = finite(row.lon);
     // A handful of rows use 0,0 or swapped coordinates; Bangladesh is roughly 20-27 N, 87-93.5 E.
@@ -79,6 +79,14 @@ export function nearestShelters(shelters, lat, lon, limit = env.flood.maxShelter
       ...shelter,
       mapsUrl: `https://www.google.com/maps/dir/?api=1&destination=${shelter.lat},${shelter.lon}`,
     }));
+}
+
+// ponytail: DDM has no building-type field; identify school names until a structured building type is available.
+export function nearestSchoolShelters(shelters, lat, lon) {
+  const schools = (Array.isArray(shelters) ? shelters : []).filter(shelter => (
+    /\bschools?\b|স্কুল|(?:^|\s|\()বিদ্যাল(?:য়|য়)/iu.test(String(shelter.name ?? '').normalize('NFC'))
+  ));
+  return nearestShelters(schools, lat, lon, 3);
 }
 
 async function fetchShelterHtml({ fetchImpl = fetch, timeoutMs = 20_000 } = {}) {

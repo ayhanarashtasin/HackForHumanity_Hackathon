@@ -3,7 +3,9 @@ import { env } from '../../../config/env.js';
 import { HazardEvent } from '../../../models/HazardEvent.js';
 import { JobState } from '../../../models/JobState.js';
 import { geocodePlace } from '../../geocode.js';
-import { compactRoute, hospitalsAlongRoute } from '../../hospitals.js';
+import { compactRoute, hospitalsAlongRoute, nearestHospitals } from '../../hospitals.js';
+import { loadFloodSnapshot, nearestGauges } from '../../alerts/floodSense.js';
+import { loadShelterSnapshot, nearestSchoolShelters, nearestShelters, shelterSnapshotStatus } from '../../alerts/floodShelters.js';
 import { listInbox } from '../../alerts/inbox.js';
 import { circlesCovering } from '../../alerts/lightningGate.js';
 import { effectiveLightningStatus, loadSnapshots } from '../../alerts/snapshots.js';
@@ -107,6 +109,79 @@ export async function hospitalsFor(coordinates) {
   return hospitalsAlongRoute(compactRoute(coordinates));
 }
 
+// Top 3 nearest hospitals for a place (or coordinates) with phone numbers.
+export async function nearestHospitalsForPlace(place, { limit = 3 } = {}) {
+  const lat = place?.lat;
+  const lon = place?.lon;
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return [];
+  try {
+    return nearestHospitals(lat, lon, limit);
+  } catch {
+    return [];
+  }
+}
+
+// School shelter lookup is independent of FFWC and forecast availability. It reads only the stored DDM list.
+export async function schoolSheltersFor(place, { nowMs = Date.now() } = {}) {
+  const unavailable = { status: 'UNAVAILABLE', fetchedAt: null, shelters: [] };
+  if (!env.flood.sheltersEnabled) return { ...unavailable, disabled: true };
+  if (!dbReady() || !Number.isFinite(place?.lat) || !Number.isFinite(place?.lon)) return unavailable;
+  const snapshot = await loadShelterSnapshot();
+  if (!Array.isArray(snapshot?.data?.shelters)) return unavailable;
+  return {
+    status: shelterSnapshotStatus(snapshot, nowMs),
+    fetchedAt: snapshot.fetchedAt ?? null,
+    shelters: nearestSchoolShelters(snapshot.data.shelters, place.lat, place.lon),
+  };
+}
+
+export async function floodFor(place, { nowMs = Date.now() } = {}) {
+  if (!dbReady()) return { status: 'UNAVAILABLE', error: true };
+  let floodSnapshot;
+  try {
+    floodSnapshot = await loadFloodSnapshot(nowMs);
+  } catch {
+    return { status: 'UNAVAILABLE', error: true };
+  }
+  const { data, status } = floodSnapshot ?? {};
+  let reading = null;
+  let nearest = [];
+  const lat = place?.lat;
+  const lon = place?.lon;
+
+  if (data?.readings?.length) {
+    const pcode = representativePcode(place) || place?.id;
+    if (pcode) {
+      reading = data.readings.find((r) => r.area?.upazilaPcode === pcode || r.area?.districtPcode === pcode) ?? null;
+    }
+  }
+  if (data && Number.isFinite(lat) && Number.isFinite(lon)) {
+    nearest = nearestGauges(data, lat, lon, 3);
+  }
+  if (!reading && nearest.length) {
+    reading = nearest[0];
+  }
+
+  let shelters = [];
+  if (env.flood.sheltersEnabled && Number.isFinite(lat) && Number.isFinite(lon)) {
+    try {
+      const shelterSnapshot = await loadShelterSnapshot();
+      shelters = nearestShelters(shelterSnapshot?.data?.shelters ?? [], lat, lon, env.flood.maxShelters || 3);
+    } catch {
+      shelters = [];
+    }
+  }
+
+  return {
+    status,
+    data,
+    reading,
+    nearestGauges: nearest,
+    shelters,
+    dataTime: data?.issuedAt ? +new Date(data.issuedAt) : null,
+  };
+}
+
 export async function alertsFor(subscriber, nowMs = Date.now()) {
   if (!dbReady()) throw new Error('database not ready');
   return listInbox(subscriber._id, { view: 'active', now: new Date(nowMs) });
@@ -136,7 +211,10 @@ export const defaultDeps = {
   stopTelegramFollow,
   lightningFor,
   stormFor,
+  floodFor,
+  schoolSheltersFor,
   hospitalsFor,
+  nearestHospitalsForPlace,
   alertsFor,
   engineStatus,
 };

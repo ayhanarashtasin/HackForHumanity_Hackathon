@@ -31,7 +31,7 @@ async function fetchJson(path, signal) {
 function endpointCard(place, boundaries, catalogue, progress) {
   if (!place) return null;
   const area = catalogue.areas?.find((item) => item.id === place.pcode);
-  const location = catalogue.locations.find((item) => item.pcode === place.pcode);
+  const location = catalogue.locations.find((item) => item.pcode === (place.weatherFrom?.id ?? place.pcode));
   const pid = area?.parentPid ?? location?.pid
     ?? boundaries?.features.find((item) => containsPoint(item.geometry, place.lon, place.lat))?.properties.pid;
   return pid ? routeParent(pid, [place.lon, place.lat], catalogue, progress) : null;
@@ -68,7 +68,9 @@ function mergeEndpoints(parents, routeData, boundaries, catalogue) {
       result.push({ ...shared, progress: 1, areas: [...shared.areas], places: [...shared.places] });
     }
   }
-  const sorted = result.sort((a, b) => a.progress - b.progress);
+  // A boundary can first match at the exact endpoint too. Keep the selected endpoint last/first when progress ties.
+  const endpointOrder = (card) => card.progress === 0 && card.id === startId ? -1 : card.progress === 1 && card.id === endId ? 1 : 0;
+  const sorted = result.sort((a, b) => a.progress - b.progress || endpointOrder(a) - endpointOrder(b));
   if (startId && sorted[0]?.id === startId) sorted[0].endpointPlace = routeData.places.start;
   if (endId && sorted.length > 1 && sorted.at(-1).id === endId) sorted.at(-1).endpointPlace = routeData.places.end;
   return sorted;

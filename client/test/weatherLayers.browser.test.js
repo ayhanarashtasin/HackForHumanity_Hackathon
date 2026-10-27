@@ -10,6 +10,7 @@ test('multiple weather layers render together, compare on hover, persist in link
   const page = await browser.newPage({ viewport: { width: 1506, height: 900 }, hasTouch: true, reducedMotion: 'reduce' });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (/Maximum update depth exceeded/.test(message.text())) errors.push(message.text()); });
   const catalogue = JSON.parse(await readFile(new URL('../public/data/locations.json', import.meta.url), 'utf8'));
   const now = Date.now();
   const series = { temp: [32, 32], hi: [39, 39], hiMax: [39, 39], rf: [2, 2], rfMax: [2, 2], ws: [20, 20], wsMax: [20, 20], wd: [90, 90], ts: [2, 2] };

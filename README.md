@@ -8,7 +8,7 @@
 
 **Bangladesh-focused weather intelligence and occupation-aware alerts.**
 
-AkashSathi, meaning "sky companion," helps people understand how local weather may affect their work and daily activities. Developed for HackForHumanity, it combines an interactive weather map, English and Bangla guidance, an anonymous alert inbox, and optional messaging integrations for farmers, fishermen, construction workers, vendors, students, and rickshaw pullers.
+AkashSathi, meaning "sky companion," helps people understand how local weather may affect their work, travel, and daily activities. Developed for HackForHumanity, it combines an interactive weather map, road-route forecasts, river-level observations, flood-shelter and hospital lookup, an anonymous alert inbox, and optional messaging integrations. English and Bangla guidance supports farmers, fishermen, construction workers, vendors, students and the general public, and rickshaw pullers and manual labourers.
 
 **8 divisions · 64 districts · 544 BMD forecast locations · বাংলা / English**
 
@@ -44,12 +44,14 @@ The same forecast can mean protecting a farmer's harvest, postponing exposed roo
 
 | Capability | Description |
 | --- | --- |
-| Interactive weather map | Temperature, computed heat index, rainfall, wind, and thunderstorm potential, with selectable indicators, radar and satellite playback, location search, and fullscreen exploration. |
-| Route-weather planning | A dedicated road-route map with an alternative when available, arrival-time forecasts, division/district/upazila summaries, nearby lightning checks, and a destination outlook. |
+| Interactive weather map | Display temperature, computed heat index, rainfall, wind, and thunderstorm potential together; choose a weather color layer or no weather colors. Independent radar, satellite, lightning, and storm overlays, playback, place search, fullscreen, and shareable views are supported. |
+| Route-weather planning | A dedicated road-route map with an alternative when available, arrival-time forecasts, division/district/upazila summaries, nearby lightning checks, a destination outlook, and hospitals along the road. |
+| River levels and flood shelters | FloodSense shows cached FFWC gauge readings, danger-level comparisons, nearby DDM-listed shelters, freshness warnings, and a separate demo view at `/flood/demo`. |
+| Hospital lookup | Hospitals along a route on the website and Telegram, plus `/hospital` for the three nearest mapped hospitals. Available phone numbers, directions, and English/Bangla names come from a committed OpenStreetMap dataset with supplementary official government contacts. |
 | Occupation-aware alerts | Scenario-based guidance using a subscriber's occupation, selected areas, activity, and work context. Cards include severity, evidence, source, validity, and recommended actions. |
-| Anonymous profiles | Browser-based registration without an account, name, email address, or phone number. Profiles support editing, pausing, deletion, and temporary activity changes. |
+| Anonymous profiles | Browser-based registration without an account, name, email address, or phone number. Profiles support editing, pause/resume, deletion, temporary activity changes, and marking inbox alerts read. |
 | Optional external delivery | Telegram, WhatsApp, and SMS copies of inbox alerts, with verified connections, quiet hours, delivery limits, and retries. |
-| Telegram weather reports | English and Bangla weather commands, including `/route start to destination`, interactive report buttons, and a scheduled morning forecast for connected profiles. |
+| Telegram reports | English and Bangla forecasts, lightning and storm reports, river levels, nearby school flood shelters, hospitals, and road-trip weather. Interactive report buttons and a scheduled morning forecast are also supported. |
 | Administrator dashboard | Alert previews, manual declarations, messages, withdrawals, severity holds, hazard switches, delivery health, and isolated demo audiences. |
 | Bilingual interface | Persistent বাংলা / English switching across public and admin screens, localized dates and numbers, and a self-hosted Bengali font with responsive text layouts. |
 | Cached forecasts and history | Background collection, persisted snapshots, per-source freshness indicators, and compact district-level forecast history. |
@@ -69,7 +71,7 @@ GitHub renders the following Mermaid diagrams directly.
 ```mermaid
 flowchart TB
     subgraph Browser["Browser application"]
-        UI["React + Vite<br/>Landing · Map · Routes · Alerts · Admin"]
+        UI["React + Vite<br/>Landing · Map · Routes · Flood · Alerts · Admin"]
         MAP["MapLibre GL JS"]
         UI --> MAP
     end
@@ -87,6 +89,8 @@ flowchart TB
     ML["Optional Python / FastAPI<br/>Rain confidence + OpenCV storm tracking"]
     WEATHER["BMD forecasts + Open-Meteo"]
     EXTRA["Optional Xweather + official BMD bulletins"]
+    FLOOD["FFWC river gauges + DDM shelters"]
+    HOSPITALS["Local hospital dataset<br/>OpenStreetMap + official contacts"]
     HIMAWARI["JMA Himawari-9<br/>NOAA Open Data / NASA GIBS"]
     TILES["OpenFreeMap + NASA GIBS tiles"]
     OSRM["Public OSRM routing service"]
@@ -98,11 +102,14 @@ flowchart TB
     API -->|"Read forecasts"| CACHE
     API <-->|"Profiles, inbox, administration"| DB
     API -->|"On-demand road geometry"| OSRM
+    HOSPITALS --> API
+    HOSPITALS --> BOT
     WEATHER --> JOBS
     JOBS --> CACHE
     JOBS -->|"Forecast and storm snapshots"| DB
     DB -->|"Restore forecast snapshots on startup"| CACHE
     EXTRA --> ENGINE
+    FLOOD --> ENGINE
     CACHE --> ENGINE
     DB -->|"Subscribers, settings, cached evidence"| ENGINE
     ENGINE -->|"Hazard events + notifications"| DB
@@ -112,7 +119,7 @@ flowchart TB
     DB --> DELIVERY
     DELIVERY --> CHANNELS
     CACHE --> BOT
-    DB -->|"Saved areas + alert state"| BOT
+    DB -->|"Saved areas, alerts, gauges + shelters"| BOT
     BOT --> TELEGRAM
 ```
 
@@ -134,7 +141,7 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-    A["Cached forecasts<br/>Storms · Lightning · Bulletins"] --> B["Normalize +<br/>check freshness"]
+    A["Cached forecasts + river gauges<br/>Storms · Lightning · Bulletins"] --> B["Normalize +<br/>check freshness"]
     B --> C["Detect hazard<br/>and maintain event"]
     C --> D["Match area<br/>and recipients"]
     D --> E["Apply occupation,<br/>activity and timing rules"]
@@ -268,6 +275,7 @@ npm run dev
 | Weather map | <http://localhost:5173/map> |
 | Route-weather planner | <http://localhost:5173/route> |
 | River levels and flood shelters | <http://localhost:5173/flood> |
+| Illustrative flood demo | <http://localhost:5173/flood/demo> — no FFWC key required |
 | Alert registration and inbox | <http://localhost:5173/alert> |
 | Administrator dashboard | <http://localhost:5173/admin> — requires administrator setup |
 | API health and source freshness | <http://localhost:5000/api/health> |
@@ -295,7 +303,7 @@ The server uses `ML_SERVICE_URL` to reach it. Development defaults to `http://12
 
 ## Configuration
 
-Server configuration is loaded from `server/.env`. The complete template is [`server/.env.example`](server/.env.example); validation and additional tuning options are defined in [`server/src/config/env.js`](server/src/config/env.js). Restart the backend after changing environment variables.
+Server configuration is loaded from `server/.env`. Start with [`server/.env.example`](server/.env.example); validation and additional tuning options, including route-hospital settings, are defined in [`server/src/config/env.js`](server/src/config/env.js). Restart the backend after changing environment variables.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -327,6 +335,9 @@ Server configuration is loaded from `server/.env`. The complete template is [`se
 | `DDM_SHELTER_URL` | `https://rapid.ddm.gov.bd/service/shelter_info` | Public DDM shelter page parsed for Flood shelters. |
 | `DDM_SHELTER_REFRESH_HOURS` | `24` | Shelter-list refresh interval; the previous list remains usable and is labelled stale if DDM fails. |
 | `FLOOD_MAX_SHELTERS` | `3` | Maximum shelters offered per alert area (1–5). |
+| `ROUTE_HOSPITALS` | `on` | Show hospitals on website and Telegram road-route reports; `off` hides those sections without disabling route planning. |
+| `ROUTE_HOSPITAL_RADIUS_KM` | `5` | Search radius around the road, in kilometres (1–25). |
+| `ROUTE_HOSPITAL_MAX_RESULTS` | `20` | Maximum hospitals returned along a road, spread across the trip (1–50). |
 | `ADMIN_PASSCODE` | Unconfigured placeholder | Enables administrator login with a non-placeholder passcode of at least 8 characters. |
 | `ADMIN_AUTH` | `on` | Set `off` only for local loopback demos; the bypass is ignored in production. |
 | `DELIVERY` | `on` | External delivery, the Telegram bot, and its morning-digest job. Unconfigured channels remain idle. |
@@ -359,17 +370,20 @@ This is useful for isolated API work, not an offline weather mode: map tiles sti
 | --- | --- |
 | `/` | Project introduction, division atlas, coverage information, occupation guidance, and attribution. |
 | `/map` | Weather layers, radar and satellite playback, forecast timeline, bilingual place search, and shareable map views. |
-| `/route` | Road-route search, an alternative when available, interactive route map, arrival-time weather, regional summaries, and destination outlook. |
-| `/flood` | FFWC river levels matched to upazilas, nearest DDM flood shelters, thresholds, and a clearly labelled demo view. |
+| `/route` | Road-route search, an alternative when available, interactive route map, arrival-time weather, regional summaries, destination outlook, and hospitals along the road. |
+| `/flood` | Live FFWC observations, matched areas, nearby DDM flood shelters, thresholds, and explicit missing/stale-data states. |
+| `/flood/demo` | Clearly labelled illustrative flood data. The live/demo toggle updates the URL, and the selected view survives reloads and browser Back/Forward. |
 | `/alert` | Bilingual registration, inbox, profile controls, channel connections, source coverage, and official-document references. |
 | `/admin`, `/admin/login` | Protected administration and demo tools; not linked from public navigation. |
 
 ### Occupation-aware alerts
 
+The six supported profiles are farmer, fisherman, construction worker, vendor, student/general public, and rickshaw puller/manual labourer.
+
 1. Open `/alert` and select an occupation, home/work areas, relevant activity, and language.
 2. Receive scenario-based notifications in the website inbox. Each card explains the hazard, why it applies, its validity, and the supporting data.
 3. Optionally connect a messaging channel under **Alerts on your phone**.
-4. Edit, pause, or delete the profile, or temporarily update the current activity.
+4. Mark alerts read, edit or pause/resume the profile, temporarily update the current activity, or delete the profile.
 
 An HttpOnly cookie identifies the browser; the server stores only its token hash. Profiles are not portable between devices, and clearing site data removes access to the existing profile.
 
@@ -381,33 +395,43 @@ Automatic publication is the default. Administrators can hold selected severitie
 
 `/flood` is a read-only observation view built from the same cached snapshots as the alert engine. It never calls FFWC or DDM during a page load.
 
-- **Gauge matching:** each FFWC observed gauge is matched to its upazila (or, as a fallback, its district) using the name, not a guessed coordinate. Unmatched gauges are counted and listed rather than silently dropped.
+- **Gauge matching:** the station's district and upazila names are matched first. If the upazila name cannot be matched, usable station coordinates may select the nearest upazila reference point within 35 km in the same district; otherwise the district is used. The API retains the matching method. Gauges without a known district remain unmatched and are counted and listed.
 - **Classification:** `APPROACHING` means the measured level is within **0.5 m below** FFWC's published danger level; `ABOVE` is at or above it; `SIGNIFICANTLY_ABOVE` is at least **1.0 m above**. The half-metre approach band is a project rule because FFWC does not publish an “approaching” class. Zero or missing danger levels are treated as unavailable, not as normal.
 - **One card per area:** several gauges in one upazila become one group led by the highest level; a district fallback card is dropped when upazila cards exist. The page shows only areas with `level > 0`. An empty list explicitly says it is **not an all-clear**.
 - **Alerts:** a qualifying area creates a `RIVER_FLOOD` event evaluated by scenario `FLOOD-01`. Level 1 is `ADVISORY`; levels 2–3 are `WARNING`. The card reports FFWC's measurement and danger level and never claims that flooding has occurred or that a place is safe. Withdrawal means the gauge returned below the approach band, not that conditions are safe.
-- **Staleness:** a reading older than `FFWC_MAX_AGE_MINUTES` (default 180) can annotate an existing event but cannot create or escalate one. Only a fresh/partial snapshot with a fresh per-gauge reading can withdraw an event.
-- **Shelters:** DDM's public list is limited to `Flood` shelters with usable coordinates; the nearest three within 50 km are shown with roughly measured distance, capacity, and accessibility flags. DDM does not publish live occupancy or open/closed status, so the page tells people to check before travelling. If DDM is down, the previous list is shown and labelled stale.
+- **Staleness:** a reading older than `FFWC_MAX_AGE_MINUTES` (default 180) can annotate an existing event but cannot create or escalate one. Only a fresh/partial snapshot with a fresh per-gauge reading can withdraw an event. Telegram `/flood` reports show measurement times and warn about stale or undated readings; an unavailable classification is never described as a normal water level.
+- **Shelters:** DDM's public list is limited to `Flood` shelters with usable coordinates; by default, the nearest three within 50 km are offered. The page shows names, approximate straight-line distances from the area's reference point, and directions. The API and Telegram school-shelter report also expose listed capacity and facilities where available. DDM does not publish live occupancy or open/closed status. If DDM is down, the previous list is shown and labelled stale.
 - **Demo:** `/flood/demo` and the page's demo toggle are illustrative only. They write no events, create no notifications, and send nothing.
 
 ### Administrator setup and demo
 
 Set a strong `ADMIN_PASSCODE` in `server/.env`, restart the backend, and open `/admin`. `ADMIN_AUTH=off` is a local-only demonstration bypass and produces a startup warning.
 
-For a demonstration, use **Settings** to create a demo audience in a selected upazila, preview a weather alert or manual declaration, confirm the send, and inspect its read-only **View as** inbox. Use **History → Withdraw** to demonstrate withdrawal. Demo notifications are isolated from live subscribers and external delivery. Unsupported declarations and `CRITICAL` sends require additional confirmation; confirmed sends and withdrawals are audited.
+For a demonstration, use **Settings** to create a demo audience in a selected upazila, preview a weather alert or manual declaration, confirm the send, and inspect its read-only **View as** inbox. Use **History → Withdraw** to demonstrate withdrawal; the result reports the events and published notifications actually withdrawn, including notifications closed through an event. Demo notifications are isolated from live subscribers and external delivery. Unsupported declarations and `CRITICAL` sends require additional confirmation; confirmed sends and withdrawals are audited.
 
 ### Weather map
 
 - **Shared location:** on the map, route, and alert pages, a dismissible notice explains location use before the browser permission prompt. Choose **Use my location** to detect an area once and reuse it across these screens in this tab. Declining never blocks manual area selection. For an alert profile, only the temporary upazila code is sent; it expires after 15 minutes without updates and never replaces saved home/work areas or active Telegram following. Continuous browser following remains a separate opt-in on the alerts page.
-- **Weather layers:** temperature, heat index, rain, wind, and thunderstorm potential. District summaries appear at lower zoom levels; detailed locations appear as you zoom in.
+- **Weather layers:** temperature, heat index, rain, wind, and thunderstorm potential can be selected together. Choose one selected metric for map colors, or **None** to remove weather indicators and colors while keeping independent overlays. District summaries appear at lower zoom levels; detailed locations appear as you zoom in.
 - **Radar:** Dhaka and Rangpur BMD radar, with 10-minute frames covering the last three hours.
 - **Satellite:** Himawari-9 infrared and visible imagery via NASA GIBS; imagery is delayed, not instantaneous.
 - **Timeline:** switch between imagery playback and three-hourly forecasts for approximately four days.
-- **Route weather:** open `/route` and choose a start and destination, or explicitly use your location as the start. The server selects the shortest-distance route among the OSRM options returned, with one alternative when available; this is not a guarantee of the shortest possible road and is not weather-optimized. The page draws the road, estimates arrival-time weather, groups stops by division/district/upazila, and shows a three-day destination outlook when available. OSRM receives the selected coordinates, including precise device coordinates if you use your current location as the start.
-- **Telegram route report:** send `/route Dhaka Bandarban` (`to` and `থেকে` are optional), `/route here Sylhet` to start from a one-time location share, or `/route Bandarban` and answer "Where do you start?". Places can be divisions, districts (routed to the district town, such as Motijheel for Dhaka), upazilas, thanas, city corporations, unions, paurashavas, city wards, the route page's neighbourhoods, and common old spellings (Chittagong, Comilla, Jessore). Unknown names go to OpenStreetMap Nominatim, then to "did you mean" suggestions; ambiguous names get buttons. The reply lists the worst weather on the way and when, each district (or upazila on short trips) at the time you pass it, the destination after arrival, recent lightning checks, satellite storm cells meeting the road, active alerts on the road, and the other road when OSRM has one. Buttons plan the way back, a departure in three hours, or tomorrow at 07:00. Unions, neighbourhoods and map points use their upazila's forecast; a missing forecast is shown as ⚪, never as calm.
 - **Search and sharing:** search in English or Bangla; the URL hash preserves the map view and selected layers. Legacy `/#view=...` links redirect to `/map`.
 - **Language:** search, controls, tooltips, and area details support Bangla. Map canvas labels remain English because the hosted glyphs and WebGL text shaping do not support Bengali reliably. Delivered messages and official quotations retain their original language; Bengali copy still needs fluent-human review.
 - **Data interpretation:** grey means no data. Forecasts are not station observations, thunderstorm potential is not a detected strike, and computed heat index is not an on-site WBGT measurement.
+
+### Route weather and hospitals
+
+- **Route weather:** open `/route` and choose a start and destination, or explicitly use your location as the start. The server selects the shortest-distance route among the OSRM options returned, with one alternative when available; this is not a guarantee of the shortest possible road and is not weather-optimized. The page draws the road, estimates arrival-time weather, groups stops by division/district/upazila, and shows a three-day destination outlook when available. OSRM receives the selected coordinates, including precise device coordinates if you use your current location as the start.
+- **Telegram route report:** send `/route Dhaka Bandarban` (`to` and `থেকে` are optional), `/route here Sylhet` to start from a one-time location share, or `/route Bandarban` and answer "Where do you start?". Places can be divisions, districts (routed to the district town, such as Motijheel for Dhaka), upazilas, thanas, city corporations, unions, paurashavas, city wards, the route page's neighbourhoods, and common old spellings (Chittagong, Comilla, Jessore). Unknown names go to OpenStreetMap Nominatim, then to "did you mean" suggestions; ambiguous names get buttons. The reply lists the worst weather on the way and when, each district (or upazila on short trips) at the time you pass it, the destination after arrival, recent lightning checks, satellite storm cells meeting the road, active alerts on the road, and the other road when OSRM has one. Buttons plan the way back, a departure in three hours, or tomorrow at 07:00. Unions, neighbourhoods and map points use their upazila's forecast; a missing forecast is shown as ⚪, never as calm.
 - **Route provider:** road geometry comes from the public OSRM routing service. It can be unavailable and has no project-controlled uptime; route distances, ETAs, and sampled weather are estimates.
+
+Hospital searches read the committed [`server/data/hospitals-bd.json`](server/data/hospitals-bd.json) dataset locally. Locations and mapped contact details come from OpenStreetMap; official `gov.bd` contact pages supplement upazila health-complex records. Hospital lookup itself makes no provider request and needs no API key. Road-route geometry still requires OSRM.
+
+- **Along a road:** the website loads hospitals after the route is available, so a hospital-search failure does not block route planning. The default search covers hospitals within approximately 5 km of the road and returns up to 20, spread across the journey and listed in travel order. `ROUTE_HOSPITALS=off` hides hospital sections on website and Telegram route reports.
+- **Contact details:** the website shows available phone numbers, source links, websites, email addresses, and directions. Missing fields remain unavailable. English and Bangla names follow the selected language when the dataset contains them, with a fallback to the mapped name.
+- **Telegram:** `/route` includes hospital information and a **Hospitals / See more / Back** list with call and map links. `/hospital Badda` returns up to three nearest mapped hospitals to the selected place's reference point, ranked by straight-line distance before display rounding. A phone number only breaks an exact distance tie. Aliases are `/hospitals` and `/clinic`.
+- **Limits:** neither opening hours, emergency capacity, current phone service, road access, nor live availability are verified. Distances are estimates. A Google Maps contact button opens a name/place search rather than retrieving or verifying a number; check that the address matches before calling.
 
 ## ML and storm tracking
 
@@ -473,7 +497,7 @@ The webhook requires public HTTPS and a secret containing 16–256 characters fr
 
 ### Telegram weather commands
 
-Weather commands are available with or without a connected profile and read stored forecasts only.
+Public reports are available with or without a connected profile. Weather reports read cached forecasts, flood reports read stored FFWC/DDM snapshots, and hospital reports search the local dataset. `/route` also requests road geometry and may resolve unfamiliar place names externally. `/alerts` and location following require a linked profile.
 
 | Command | Report |
 | --- | --- |
@@ -483,16 +507,21 @@ Weather commands are available with or without a connected profile and read stor
 | `/heat [place]` | Temperature, heat index, next-24-hour peak, category, and practical guidance. |
 | `/rain [place]` | Next-24-hour total and wettest interval, plus a three-hourly timeline for the next 12 hours with rainfall probability. |
 | `/wind [place]` | Wind, gusts, and the strongest forecast gust in the next 24 hours. |
-| `/thunderstorm [place]` | Forecast thunderstorm potential and any modeled thunderstorm or hail conditions. |
+| `/thunderstorm [place]` | Latest satellite storm movement toward the area when available, followed by forecast thunderstorm potential and any modeled thunderstorm or hail conditions. |
 | `/lightning [place]` | Latest stored lightning checks and their age, not continuous strike monitoring. |
+| `/flood [place]` | FFWC river-gauge reading, measurement time, danger-level comparison, nearby DDM shelters, and a school-shelter button. Stale or undated readings are flagged; unavailable classifications are reported explicitly. Alias: `/river`. |
+| `/flood safety [place]` or `/flood_safety [place]` | Up to three nearest DDM-listed school flood shelters, with straight-line distances, listed facilities/capacity, and map links. `/flood_safety` is the clickable Telegram menu entry; `/flood` also offers a school-shelter button. |
+| `/hospital [place]` | Up to three nearest mapped hospitals, distances, available phone numbers, emergency-department labels where recorded, and map links. Aliases: `/hospitals`, `/clinic`. |
 | `/forecast [place]` | Multi-day temperature, rainfall, wind, and thunderstorm outlook. |
 | `/route start destination` | A road trip with its weather: the worst hazards and when, stops at passing time, destination outlook, lightning, storm cells and active alerts on the road, and buttons for the way back or a later departure. `to`/`থেকে` are optional; `/route here <place>` starts from a shared location. Aliases: `/trip`, `/travel`. |
 | `/alerts` | Active inbox alerts for the connected profile. |
 | `/status` | Source freshness and the alert engine's latest run. |
 
-Examples: `/heat Badda`, `/rain বাড্ডা`, `/wind Savar, Dhaka`, or `/forecast Badda bn`. Places may be upazilas, city thanas, districts, or city corporations; ambiguous names return candidates. A connected chat without a typed place uses a fresh current area, otherwise up to two saved areas. A one-time Telegram location share answers a weather report only; it does not turn on tracking. `/follow` requires explicitly sharing **Live Location** through Telegram's location attachment; edited live updates refresh a short-lived area code (15-minute expiry) for relevant personal alerts, never raw coordinates. Stop Telegram sharing or send `/unfollow` to end it. The bot cannot read GPS merely because `/update` was sent, and its checks still use cached forecasts. Aliases include `/weather`, `/thunder`, `/storm`, and `/days`.
+Examples: `/heat Badda`, `/rain বাড্ডা`, `/wind Savar, Dhaka`, `/flood Badda en`, `/flood safety Badda`, `/hospital Badda bn`, or `/forecast Badda bn`. Places may be upazilas, city thanas, districts, or city corporations; ambiguous names return candidates. A connected chat without a typed place uses a fresh current area, otherwise up to two saved areas; school-shelter lookup uses one reference area. A one-time Telegram location share answers the pending report; it does not turn on tracking. `/follow` requires explicitly sharing **Live Location** through Telegram's location attachment; edited live updates refresh a short-lived area code (15-minute expiry) for relevant personal alerts, never raw coordinates. Stop Telegram sharing or send `/unfollow` to end it. The bot cannot read GPS merely because `/update` was sent, and its checks still use cached forecasts. Aliases include `/weather`, `/thunder`, `/storm`, and `/days`.
 
 A trailing `bn` or `en` selects the language; otherwise the bot uses profile, place-script, or Telegram language preferences. Compact report headings identify forecasts, stale data carries an update-time warning, and `/status` lists source freshness and age. Missing values are never presented as zero, and "no active alert" is not an all-clear. Rain amounts prefer current Open-Meteo data because BMD rainfall units remain unconfirmed. The default request limit is 30 commands per chat per 10 minutes (`TELEGRAM_COMMAND_LIMIT`).
+
+**School shelter lookup:** `/flood safety Badda` reads the cached DDM list independently of river gauges or weather forecasts. Without a place, it uses the recent area, otherwise the first saved area, or asks for a name/location. A one-time shared position is used only for this lookup; otherwise distances use the area's reference point. Schools are identified by English/Bangla school names in the DDM flood-shelter list and ranked by distance within 50 km, not by verified safety. Fewer than three matches, stale lists, and unavailable data are reported explicitly. Opening, current vacancies, building condition, and access routes are not verified; confirm locally and do not cross floodwater. Requires a collected DDM snapshot and `DDM_SHELTERS=on`.
 
 ### Morning weather message
 
@@ -553,6 +582,7 @@ Use an appropriately registered sender ID. English SMS content is ASCII and limi
 | OpenFreeMap / OpenStreetMap | Basemap | Preserve map attribution and applicable usage terms. |
 | OSRM public routing service | Road geometry, route candidates, estimated distance, and travel time | On-demand requests disclose selected coordinates; availability and route quality are outside the project's control. Queued to about one request per second; a road search is reused for 30 minutes. |
 | OpenStreetMap Nominatim | Telegram `/route` names that are not in the bot's own place lists | Only the typed name is sent, at most one request per second, cached for a day, limited to Bangladesh; ODbL attribution in the reply; `ROUTE_GEOCODER=off` disables it. |
+| OpenStreetMap via HOT/HDX, supplemented by official `gov.bd` contact pages | Hospital locations, names, phone numbers, and other available contact details | Committed dataset, searched locally; manually refreshed using the build scripts. Missing contacts stay unavailable. Opening hours and emergency availability are not verified. |
 
 District forecasts are derived from upazila values, not separately published BMD district forecasts. Some city thanas use markers rather than their own polygons; some newer administrative areas use a nearby forecast location. The map flags these approximations, but equivalent alert coverage labeling remains a known gap. Map-rendered place labels are English; search, tooltips, and panels support Bangla.
 
@@ -577,13 +607,14 @@ The local API base is `http://localhost:5000/api`. Most JSON endpoints return `{
 | `GET` | `/api/weather/snapshot`, `/api/weather/daily` | Cached forecasts and BMD daily outlook. |
 | `GET` | `/api/weather/history?district=3026&source=bmd&days=7` | District run summaries; sources: `bmd`, `openMeteo`; lookback: 1–60 days. |
 | `POST` | `/api/weather/route` | Road-route geometry, an alternative when available, and cached weather at sampled arrival times. |
+| `POST` | `/api/weather/route/hospitals` | Local hospital search along a road supplied as `[lon, lat]` pairs; separate from route planning. Returns `disabled: true` when route-hospital listings are off, or `503` when the search fails. |
 | `GET` | `/api/radar/frames`, `/api/radar/image/:site/:file` | Radar frame index and proxied images. |
 | `GET` | `/api/satellite/frames` | Available satellite times and tile URL template. |
 | `GET` | `/api/lightning/status`, `/api/lightning/summaries`, `/api/lightning/upazila/:pcode` | Map-campaign status and results. |
 | `GET` | `/api/storms`, `/api/storms/image/:name` | Latest live storm analysis, area-arrival estimates, and the analysed frame image. |
 | `GET` | `/api/storms/demo`, `/api/storms/demo/image/:name` | Historical storm replay and saved frame images; requires the Python service. |
 | `GET` | `/api/flood/status`, `/api/flood/stations` | Cached FFWC river groups and station readings; optional `district`/`upazila` filters on `/stations`. |
-| `GET` | `/api/flood/shelters?lat=...&lon=...` | Nearest DDM shelters to a point or a known `upazila` pcode. |
+| `GET` | `/api/flood/shelters?lat=...&lon=...` | Nearest DDM shelters to valid coordinates, or `?upazila=302604` when coordinates are omitted. Missing, blank, malformed, or out-of-range coordinates return `400`. |
 | `GET` | `/api/flood/demo` | Illustrative flood preview; creates no events and sends nothing. |
 | `GET` | `/api/alerts/schema`, `/api/alerts/status` | Registration schema and monitoring status. |
 | `POST` | `/api/alerts/subscribe` | Create an anonymous browser profile. |
@@ -612,6 +643,8 @@ For example, the route endpoint accepts:
 
 Send JSON bodies with `Content-Type: application/json`. Subscriber and administrator endpoints use cookies; state-changing requests under those route groups are origin-checked. The Telegram webhook uses its own configured secret header instead.
 
+For `/api/weather/route/hospitals`, send `{"coordinates":[[90.25,23.85],[90.41,23.78]]}`: at least two and at most 20,000 finite `[longitude, latitude]` pairs. Flood-shelter coordinates must be latitude `-90` to `90` and longitude `-180` to `180`; an explicitly invalid coordinate pair is rejected even if a valid `upazila` is also supplied.
+
 The Python service is an internal API, with `GET /health`, `POST /predict`, and `/storms/*` endpoints. It should not be exposed publicly without additional access controls. See [`server/src/routes/`](server/src/routes), [`server/src/controllers/`](server/src/controllers), and [`ml-service/app.py`](ml-service/app.py) for the implemented contracts.
 
 ## Project structure
@@ -634,7 +667,7 @@ The Python service is an internal API, with `GET /health`, `POST /predict`, and 
 │   │   └── services/         API clients
 │   └── test/                 Client tests
 ├── server/
-│   ├── data/                 Generated locations and lightning coverage
+│   ├── data/                 Locations, lightning coverage, hospitals, and official contacts
 │   ├── src/
 │   │   ├── config/           Environment, database, and alert rules
 │   │   ├── controllers/      HTTP request handlers
@@ -658,7 +691,9 @@ The Python service is an internal API, with `GET /health`, `POST /predict`, and 
 │   ├── reports/              Rain-model evaluation and storm-validation reports
 │   └── tests/                Python storm/imagery tests
 ├── scripts/
-│   └── ml-service.mjs        Cross-platform Python environment and service launcher
+│   ├── ml-service.mjs        Cross-platform Python environment and service launcher
+│   ├── build-hospitals.mjs   Build the committed OpenStreetMap hospital dataset
+│   └── build-hospital-contacts.mjs  Collect official health-complex contacts
 ├── docs/                     Design, plans, provider notes, and project status
 ├── .github/workflows/ci.yml   Node tests, MongoDB integration tests, frontend build
 ├── package.json              Workspace scripts
@@ -681,10 +716,20 @@ Run these commands from the repository root.
 | `npm test` | Run client and server tests; database cases require `TEST_MONGODB_URI`. |
 | `npm run test --workspace client` | Run frontend logic tests and any explicitly enabled browser checks. |
 | `npm run test --workspace server` | Run the backend suite; set `TEST_MONGODB_URI` to include MongoDB-backed cases. |
+| `npm audit` | Check the installed dependency tree and lockfile against published advisories. |
 
 ### Committed geography
 
 Generated geography and the landing-page outline are already committed. Normal development does not need to regenerate them. Review intentional data changes in `client/public/data/` and `server/data/` together so frontend and backend area codes remain consistent.
+
+Hospital data is also committed. To intentionally refresh official contacts and rebuild the hospital dataset, run:
+
+```sh
+node scripts/build-hospital-contacts.mjs
+node scripts/build-hospitals.mjs
+```
+
+These maintenance commands contact public data sources and use a local download cache. They are not required for normal setup or hospital searches; review the resulting data before committing it.
 
 ## Testing
 
@@ -696,6 +741,23 @@ npm run build
 - Tests use the built-in Node.js test runner. `npm test` runs both workspaces; MongoDB-backed cases are skipped unless `TEST_MONGODB_URI` is set, even if the application database is running.
 - Each database-backed test file creates and removes its own randomly named `mern_test_*` database. Use a dedicated test MongoDB deployment or user with permission to create and drop those databases; never point tests at a production deployment.
 - Provider responses are mocked; tests do not spend Xweather quota or send real Telegram, WhatsApp, or SMS messages.
+
+### Latest local verification
+
+The current feature set passed the following checks before this README update:
+
+| Check | Result |
+| --- | --- |
+| Frontend logic tests | 151 passed |
+| Optional browser checks | 8 passed |
+| Backend tests, including MongoDB integration | 486 passed, none skipped |
+| Python tests | 16 passed |
+| Production frontend build | Passed |
+| Dependency audit | 0 reported vulnerabilities |
+
+The complete browser-enabled client run contains 159 tests: 151 logic tests and 8 browser checks. Regression coverage includes stale/undated flood reports, unavailable danger-level classifications, hospital distance ordering and language fallback, shelter-coordinate rejection, withdrawal totals, flood demo navigation, and empty-timeline map rendering. Counts reflect that verification run; MongoDB and browser checks must be explicitly enabled to reproduce it.
+
+Live Telegram/WhatsApp/SMS delivery, physical-device GPS, and expert validation of safety thresholds remain unverified. Passing automated tests does not establish those capabilities as validated.
 
 ### MongoDB-backed integration tests
 
@@ -731,7 +793,27 @@ After `npm run ml` has installed the service dependencies, stop it if needed and
 
 ### Optional browser checks
 
-The client also includes browser checks for fullscreen behavior, route maps, weather layers, and indicator interactions. They are skipped unless `UI_BASE_URL` points to a running Vite development server and `PLAYWRIGHT_MODULE` resolves to an available Playwright installation. `PLAYWRIGHT_EXECUTABLE_PATH` can select an installed Chromium-compatible browser. Playwright is not a declared project dependency; with those variables configured, run `npm run test --workspace client`.
+The eight browser checks cover flood live/demo separation and deep links, responsive navigation, fullscreen behavior, map inspection, route-map interactions, route-search cancellation, storm playback, and weather-layer selection/persistence. They are skipped unless `UI_BASE_URL` points to a running **Vite development server** and `PLAYWRIGHT_MODULE` is the file URL of an available Playwright `index.mjs`. Some map checks import source modules for instrumentation, so use `npm run dev:client` rather than the production preview server for the full suite.
+
+Start the client in one terminal, then run tests from the repository root in another. Replace the example module/browser paths with your installed paths. `PLAYWRIGHT_EXECUTABLE_PATH` is optional when Playwright already finds a compatible installed browser; Playwright is not a declared project dependency.
+
+**macOS / Linux / Git Bash**
+
+```sh
+export UI_BASE_URL=http://localhost:5173
+export PLAYWRIGHT_MODULE=file:///absolute/path/to/playwright/index.mjs
+export PLAYWRIGHT_EXECUTABLE_PATH=/absolute/path/to/chromium
+npm run test --workspace client -- --test-concurrency=2
+```
+
+**Windows PowerShell**
+
+```powershell
+$env:UI_BASE_URL = 'http://localhost:5173'
+$env:PLAYWRIGHT_MODULE = 'file:///C:/path/to/playwright/index.mjs'
+$env:PLAYWRIGHT_EXECUTABLE_PATH = 'C:/path/to/chrome.exe'
+npm run test --workspace client -- --test-concurrency=2
+```
 
 For verification history and remaining gaps, see [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md). Automated tests do not replace live-provider, accessibility, language, or expert threshold validation.
 
@@ -744,7 +826,7 @@ The [GitHub Actions workflow](.github/workflows/ci.yml) runs on pushes to `main`
 The frontend and API are separate deployment artifacts. The Express application does **not** serve `client/dist`, and `vite preview` is for local inspection, not production hosting.
 
 1. Install locked dependencies with `npm ci` and build the frontend with `npm run build`.
-2. Host `client/dist` on a static host or web server. Configure SPA fallback to `index.html` for `/map`, `/route`, `/alert`, `/admin`, and `/admin/login`.
+2. Host `client/dist` on a static host or web server. Configure SPA fallback to `index.html` for `/map`, `/route`, `/flood`, `/flood/demo`, `/alert`, `/admin`, and `/admin/login`.
 3. Run the backend with `npm start` under a process manager or managed Node.js service with persistent MongoDB access.
 4. Prefer one public origin, routing `/api/*` to Express. Frontend requests default to relative `/api` paths; a separate API origin requires `VITE_API_URL` at build time, the correct allowed origin, and a compatible credentialed-cookie setup.
 5. Set `NODE_ENV=production`, `CLIENT_ORIGIN`, `PUBLIC_URL`, a strong `ADMIN_PASSCODE`, and the correct `TRUST_PROXY` value. Keep `ADMIN_AUTH=on` and terminate public traffic with HTTPS.
@@ -758,7 +840,7 @@ GitHub renders this README and its architecture diagrams without running the app
 
 ### Vercel frontend + Render backend
 
-The root [`vercel.json`](vercel.json) deploys **only the React frontend**. It proxies `/api/*` to `https://akashsathi.onrender.com/api/*`, preserving the API prefix, and rewrites `/map`, `/route`, `/alert`, and `/admin/*` to `index.html`. These page-specific rewrites leave `/data`, `/fonts`, and built assets untouched; update them if adding a new frontend route. It also disables Vercel's external-rewrite caching for API responses. This configuration does not use Vercel Services or service bindings: the Node backend and any Python service remain hosted separately on Render.
+The root [`vercel.json`](vercel.json) deploys **only the React frontend**. It proxies `/api/*` to `https://akashsathi.onrender.com/api/*`, preserving the API prefix, and rewrites `/map`, `/route`, `/alert`, `/flood` and its subpaths (including `/flood/demo`), and `/admin/*` to `index.html`. These page-specific rewrites leave `/data`, `/fonts`, and built assets untouched; update them if adding a new frontend route. It also disables Vercel's external-rewrite caching for API responses. This configuration does not use Vercel Services or service bindings: the Node backend and any Python service remain hosted separately on Render.
 
 1. Import the repository into Vercel, or update the existing project's settings. Keep **Root Directory at the repository root**, not `client`, and use **Node.js 22.x**. Do not accept the auto-detected three-service configuration.
 2. The committed configuration selects Vite, installs with `npm ci --include=dev`, builds with `npm run build`, and publishes `client/dist`. Remove conflicting dashboard overrides or make them match these values.
@@ -773,7 +855,7 @@ After deployment, check:
 
 - `https://akashsathi.onrender.com/api/health` responds with JSON and a connected database.
 - `<your-vercel-origin>/api/health` returns the same API response, not frontend HTML.
-- Direct visits and refreshes on `/map`, `/route`, `/alert`, and `/admin/login` work, and static map data/fonts still load.
+- Direct visits and refreshes on `/map`, `/route`, `/flood`, `/flood/demo`, `/alert`, and `/admin/login` work, and static map data/fonts still load. `/flood/demo` remains visibly labelled as demo after reloading.
 - An alert profile and an admin login survive a page refresh; cookies remain `HttpOnly` and `Secure` in production.
 - Weather source timestamps continue updating and configured messaging jobs run on Render.
 
@@ -783,7 +865,7 @@ Render Free services sleep after idle periods, which stops the in-process collec
 
 - **Secrets:** `server/.env` is ignored by Git. Example placeholders are treated as unconfigured credentials. Never expose provider secrets in frontend code, screenshots, issues, or logs; rotate any exposed credential.
 - **Anonymous profiles:** subscriber tokens use HttpOnly cookies and SHA-256 hashes at rest. Profiles store selected area codes rather than exact user coordinates; no name or email is required.
-- **Location boundaries:** map and alert matching happen locally; a fresh device position may be retained in this tab's `sessionStorage` and reused for up to 15 minutes. Only an area code is stored in the alert profile. Choosing current location as a route start deliberately sends precise coordinates through the API to OSRM. Telegram-shared coordinates are processed to an area code, not stored as raw profile coordinates.
+- **Location boundaries:** map and alert matching happen locally; a fresh device position may be retained in this tab's `sessionStorage` and reused for up to 15 minutes. Only an area code is stored in the alert profile. Choosing current location as a route start deliberately sends precise coordinates through the API to OSRM, including Telegram `/route here`. Telegram school-shelter lookup can use a shared point for that request; other area-based reports resolve it to an area. Raw shared coordinates are not stored in the subscriber profile.
 - **Request protection:** origin checks, JSON body restrictions, signup rate limits, a honeypot, subscriber caps, and administrator login limits reduce misuse. Rate-limit state is process-local; horizontal deployments need an additional shared or edge-level strategy.
 - **Administrator access:** the dashboard uses a shared passcode, not a full multi-user authorization system. Use a long random passcode and appropriate network restrictions.
 - **Channel ownership:** Telegram links are one-time and expire after 15 minutes. WhatsApp and SMS require explicit consent and a six-digit verification code, with expiry, attempt limits, and request throttling.
@@ -797,7 +879,7 @@ Render Free services sleep after idle periods, which stops the in-process collec
 - BMD rainfall units are unconfirmed; leave `ALERT_BMD_RAIN_VERIFIED=off` until independently verified. Some BMD gust values are lower than mean wind; bot reports compensate, but the alert engine still uses published gusts.
 - Lightning sampling is intermittent and can miss events. Populated Xweather strike, threat, and summary payloads require live validation; threat matching currently uses representative points rather than full administrative polygons.
 - River-port, fleet C-90, and unfamiliar bulletin layouts may be reference-only. Official-warning classification still needs validation against live warning documents.
-- FFWC access depends on a project key and site headers and can change without notice. A gauge that cannot be matched by name is reported as unmatched, not assigned to a guessed area. The half-metre approach band and one-metre level-3 line are prototype project rules, not FFWC classes.
+- FFWC access depends on a project key and site headers and can change without notice. Some gauges use a nearby upazila reference point or district fallback; these matches do not establish flood conditions across that whole area. Gauges without a known district remain unmatched. The half-metre approach band and one-metre level-3 line are prototype project rules, not FFWC classes.
 - DDM flood shelters are locations and facility flags only; occupancy and open/closed state are not published. A cached list surviving a DDM outage is labelled stale and can still be outdated.
 - Flood alerts report observed river levels, not forecast flooding, road conditions, or evacuation instructions. They need domain review alongside other prototype thresholds.
 - Some planned scenarios, precise approximate-coverage labels, profile recovery, and rule-editing tools are incomplete.
@@ -807,6 +889,7 @@ Render Free services sleep after idle periods, which stops the in-process collec
 - MapLibre produces a large production chunk, and software-rendered WebGL may be slow without GPU acceleration.
 - Rain-confidence labels are experimental and provider-specific; storm-motion estimates are based on delayed imagery, a fixed cloud-height assumption, and straight-line projections. They need broader seasonal and live validation.
 - Public OSRM availability is not guaranteed, arrival weather is sampled, and selecting the shortest returned option does not prove it is the shortest or safest possible journey.
+- Hospital records are a manually refreshed snapshot, not a live healthcare directory. Listed phones, opening hours, emergency capacity, and access routes may be missing or outdated. Nearby school shelters are selected by names in DDM's list, not by a verified building-type or safety assessment.
 
 See [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md) for the detailed implementation gaps and invariants to preserve.
 
@@ -826,6 +909,10 @@ See [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md) for the det
 | Rain confidence or storms are unavailable | Check `[ml]` startup output, Python 3.12+, service `/health`, model files, `ML_SERVICE_URL`, and access to NOAA/GIBS. The main application continues without the service. |
 | Flood page shows no live data | Set a valid `FFWC_API_KEY`, keep `FFWC_ENABLED=on`, run the alert engine once, and check `/api/flood/status`. `UNAVAILABLE` means no usable snapshot, not a normal river. Demo mode needs no key. |
 | Flood shelters are missing or marked stale | Confirm `DDM_SHELTERS=on` and that `rapid.ddm.gov.bd` is reachable. The list is cached for 24 hours; a failed refresh keeps the last list as stale. A shelter more than 50 km from the alert area is intentionally omitted. |
+| `/flood/demo` opens the wrong page or fails on reload | Deploy the current client router and `vercel.json` together; other static hosts need SPA fallback for both `/flood` and `/flood/demo`. |
+| Shelter API returns `400` | Supply both non-empty numeric `lat` and `lon` within geographic ranges, or omit both and use a known `upazila` pcode. A valid pcode does not override explicitly invalid coordinates. |
+| Hospitals are missing from a route | Check `ROUTE_HOSPITALS`, the configured search radius, and that `server/data/hospitals-bd.json` is included in the backend deployment. A failed search is distinct from no mapped hospitals; route planning still works. |
+| Browser checks skip or cannot launch | Start the Vite development server; set `UI_BASE_URL` and `PLAYWRIGHT_MODULE`. If Playwright's expected browser revision is absent, use an existing compatible browser through `PLAYWRIGHT_EXECUTABLE_PATH`. |
 | Python install fails on long Windows paths | Use a shorter checkout path or enable Windows long-path support; then recreate only the service virtual environment and rerun `npm run ml`. |
 | Route search fails | Confirm connectivity to the public OSRM service and choose distinct locations within the supported Bangladesh region. Weather can remain unavailable even when a road route is found. |
 
@@ -861,4 +948,5 @@ No project `LICENSE` file is currently included. Do not assume an open-source li
 - Administrative boundaries: OCHA/HDX COD-AB, CC BY-IGO.
 - Basemap: OpenFreeMap, © OpenMapTiles, and © OpenStreetMap contributors.
 - Road routing: OSRM, using OpenStreetMap data.
+- Hospital locations: © OpenStreetMap contributors via HOT/HDX, ODbL 1.0; supplementary health-complex contacts come from official Government of Bangladesh websites.
 - Bengali font: Noto Sans Bengali, distributed under the SIL Open Font License; see [`client/public/fonts/OFL.txt`](client/public/fonts/OFL.txt).

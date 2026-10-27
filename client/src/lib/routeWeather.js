@@ -25,7 +25,7 @@ export function compactRoute(coordinates, minKm = 0.1) {
 // A hospital's name and place line in the page language when OpenStreetMap has it in that language, else the name as mapped (never
 // translated). Mirrors server/src/services/hospitals.js hospitalLabels, so the website and Telegram agree.
 export function hospitalLabels(hospital, lang) {
-  const name = lang === 'bn' ? hospital.nameBn || hospital.nameEn || hospital.name : hospital.nameEn || hospital.nameBn || hospital.name;
+  const name = lang === 'bn' ? hospital.nameBn || hospital.nameEn || hospital.name : hospital.nameEn || hospital.name || hospital.nameBn;
   const area = lang === 'bn' ? hospital.areaBn || hospital.area : hospital.area || hospital.areaBn;
   return { name: name || null, area: area || null };
 }

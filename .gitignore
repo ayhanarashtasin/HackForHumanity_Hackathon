@@ -1,7 +1,10 @@
 # Dependencies and build output
 node_modules/
 dist/
+build/
+.cache/
 coverage/
+.nyc_output/
 playwright-report/
 test-results/
 blob-report/
@@ -12,26 +15,59 @@ blob-report/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .coverage
+.coverage.*
 htmlcov/
 
-# Secrets: only the *.example files are committed
+# Local environment and private credentials; keep shareable environment templates
 .env
 .env.*
 !.env.example
+!.env.*.example
+*.key
+*.pem
+*.p12
+*.pfx
 
-# Logs, OS and editor noise
+# Logs, temporary files, backups and merge leftovers
 *.log
+*.log.*
+logs/
+*.pid
+*.pid.lock
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+*.swp
+*.swo
+*~
+
+# OS and editor noise
 .DS_Store
+._*
 Thumbs.db
+desktop.ini
 .vscode/
 .idea/
 
 # Cached source downloads (the generated outputs in client/public/data and server/data ARE committed)
 scripts/.cache/
 
+# Presentation binaries and archives
+*.pptx
+*.zip
+docs/alert-architecture-animated/
+docs/Thunder Lightning architecture.png
+
 # Local assistant tooling and session notes: not part of the project
 .agents/
 .claude/
+.codex/
 .playwright-mcp/
+.archify/
 /memory.md
+/Thunderstorm_architecture.md

@@ -2,12 +2,27 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { NEIGHBOURHOODS, placesFor } from '../src/lib/neighbourhoods.js';
-import { areasAlongRoute } from '../src/lib/routeAreas.js';
+import { areasAlongRoute, districtTown } from '../src/lib/routeAreas.js';
 import { resolveSelection } from '../src/lib/series.js';
 
 const square = (west, south, east, north) => ({
   type: 'Polygon',
   coordinates: [[[west, south], [east, south], [east, north], [west, north], [west, south]]],
+});
+
+test('district route endpoints use their towns, not the district boundary centres', () => {
+  const catalogue = JSON.parse(readFileSync(new URL('../public/data/locations.json', import.meta.url), 'utf8'));
+  for (const district of catalogue.districts) {
+    const town = districtTown(district.pcode, catalogue);
+    assert.ok(town, district.name);
+    assert.equal(town.district, district.pcode);
+    assert.ok(Number.isFinite(town.lat) && Number.isFinite(town.lon));
+  }
+  for (const [code, name] of [['3026', 'Motijheel'], ['5081', 'Boalia'], ['2015', 'Kotwali'], ['2019', 'Comilla Adarsha Sadar'], ['2003', 'Bandarban Sadar'], ['3067', 'Narayanganj Sadar']]) {
+    assert.equal(districtTown(code, catalogue).name, name);
+  }
+  assert.equal(districtTown('unknown', catalogue), null);
+  assert.equal(catalogue.districts.find(item => item.pcode === '3026').lon, 90.2506, 'map label positions are unchanged');
 });
 
 test('route areas are reported in travel order with their existing parent upazila', () => {

@@ -148,21 +148,15 @@ export async function getFloodStations(req, res) {
 }
 
 export async function getFloodShelters(req, res) {
-  const nowMs = Date.now();
-  const shelter = await shelterContext(nowMs);
+  const { lat: rawLat, lon: rawLon, upazila } = req.query;
+  const location = rawLat === undefined && rawLon === undefined ? locationByPcode.get(upazila) : null;
+  const lat = location?.lat ?? (typeof rawLat === 'string' && rawLat.trim() ? Number(rawLat) : Number.NaN);
+  const lon = location?.lon ?? (typeof rawLon === 'string' && rawLon.trim() ? Number(rawLon) : Number.NaN);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+    return res.status(400).json({ message: 'Provide lat and lon in the ranges -90 to 90 and -180 to 180, or a known upazila pcode.' });
+  }
+  const shelter = await shelterContext(Date.now());
   const limit = Math.min(Math.max(Number(req.query.limit) || env.flood.maxShelters, 1), 10);
-  let lat = Number(req.query.lat);
-  let lon = Number(req.query.lon);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-    const location = locationByPcode.get(String(req.query.upazila ?? ''));
-    if (location) {
-      lat = location.lat;
-      lon = location.lon;
-    }
-  }
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-    return res.status(400).json({ message: 'Provide lat and lon, or a known upazila pcode.' });
-  }
   return res.json({ data: {
     status: shelter.status,
     fetchedAt: shelter.fetchedAt,

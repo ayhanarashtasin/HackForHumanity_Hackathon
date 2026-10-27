@@ -1,10 +1,12 @@
 import { env } from '../../../config/env.js';
+import { freshness } from '../../../config/alertRules.js';
 import {
   BN_MONTHS, COMPASS_WORDS, EN_MONTHS, PROVIDER_LABELS, dayWord, localizeDigits, whenText,
 } from '../../alerts/messages.js';
 import {
   DHAKA_OFFSET_MS, addDays, dhakaDate, formatHm,
 } from '../../time.js';
+import { hospitalLabels } from '../../hospitals.js';
 import { parentOf } from './places.js';
 import {
   COMPASS, STEP_MS, compassIndex, dailySummaries, dayParts, freshnessOf, gustClass, hasHailCode, heatCategory, isThunderCode, laterIdx, lowOf, peakOf,
@@ -17,7 +19,7 @@ import {
 const MAX_LENGTH = 3800;
 const MAX_TIMELINE_LINES = 4;
 
-export const COMMAND_NAMES = ['update', 'heat', 'rain', 'wind', 'thunderstorm', 'lightning', 'forecast', 'route', 'alerts', 'status'];
+export const COMMAND_NAMES = ['update', 'heat', 'rain', 'wind', 'thunderstorm', 'lightning', 'flood', 'flood_safety', 'hospital', 'forecast', 'route', 'alerts', 'status'];
 
 export const esc = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 export const bold = (value) => `<b>${esc(value)}</b>`;
@@ -479,6 +481,192 @@ export function renderLightning(f, { lang, nowMs, lightning, place }) {
   return fit(lines.join('\n'));
 }
 
+// ---------- /flood (river gauge and shelters) ----------
+export function renderFlood(f, { lang, nowMs, flood, place }) {
+  const T = makeText(lang, nowMs);
+  const target = place ?? f.place;
+  const lines = [`🌊 ${bold(T.s('River water level report', 'নদীর পানির উচ্চতা প্রতিবেদন'))}`, placeTitle(target, T), ''];
+
+  if (!flood || flood.error || flood.status === 'UNAVAILABLE' || !flood.data) {
+    lines.push(T.s(
+      'River gauge data is currently unavailable from FFWC.',
+      'এফএফডব্লিউসি থেকে নদীর পানির তথ্য এই মুহূর্তে পাওয়া যাচ্ছে না।',
+    ));
+    return fit(lines.join('\n'));
+  }
+
+  const reading = flood.reading;
+  const measuredMs = reading?.wlAt ? Date.parse(reading.wlAt) : Number.NaN;
+  if (flood.status === 'STALE' || (reading && (!Number.isFinite(measuredMs) || nowMs - measuredMs > freshness.flood.maxCheckAgeMs))) {
+    lines.push(T.s(
+      '⚠️ This river reading is out of date or its measurement time is unavailable. It may not reflect current conditions.',
+      '⚠️ নদীর এই পরিমাপ পুরোনো অথবা পরিমাপের সময় জানা নেই। এটি বর্তমান অবস্থা নাও দেখাতে পারে।',
+    ), '');
+  }
+  if (!reading) {
+    lines.push(T.s(
+      'No river gauge readings are available for this area.',
+      'এই এলাকার জন্য নদীর পানির কোনো পরিমাপ পাওয়া যায়নি।',
+    ));
+  } else {
+    const statusLabel = ['ABOVE', 'SIGNIFICANTLY_ABOVE'].includes(reading.classification)
+      ? T.s('⚠️ AT OR ABOVE DANGER LEVEL', '⚠️ বিপদসীমার সমানে বা উপরে')
+      : reading.classification === 'APPROACHING'
+        ? T.s('⚡ APPROACHING DANGER LEVEL', '⚡ বিপদসীমার কাছাকাছি')
+        : reading.classification === 'NORMAL'
+          ? T.s('Normal water level', 'স্বাভাবিক পানির স্তর')
+          : T.s('Danger-level classification unavailable', 'বিপদসীমার শ্রেণিবিন্যাস পাওয়া যায়নি');
+
+    const gaugeInfo = reading.river
+      ? `${reading.stationName} (${reading.river})`
+      : reading.stationName;
+
+    lines.push(bold(statusLabel));
+    if (Number.isFinite(measuredMs)) lines.push(T.s(`Measured: ${T.when(measuredMs)}`, `পরিমাপের সময়: ${T.when(measuredMs)}`));
+    lines.push(T.s(
+      `Gauge: ${esc(gaugeInfo)}`,
+      `পয়েন্ট: ${esc(gaugeInfo)}`,
+    ));
+
+    const diff = reading.aboveDangerM;
+    const diffText = diff !== null && diff !== undefined
+      ? (diff >= 0
+        ? T.s(`+${T.n(diff, 2)} m above danger level`, `বিপদসীমার +${T.n(diff, 2)} মিটার উপরে`)
+        : T.s(`${T.n(Math.abs(diff), 2)} m below danger level`, `বিপদসীমার ${T.n(Math.abs(diff), 2)} মিটার নিচে`))
+      : '';
+
+    lines.push(T.s(
+      `Water level: ${bold(`${T.n(reading.waterLevelM, 2)} m`)} (Danger level: ${T.n(reading.dangerLevelM, 2)} m${diffText ? ` · ${diffText}` : ''})`,
+      `পানির উচ্চতা: ${bold(`${T.n(reading.waterLevelM, 2)} মি.`)} (বিপদসীমা: ${T.n(reading.dangerLevelM, 2)} মি.${diffText ? ` · ${diffText}` : ''})`,
+    ));
+
+    if (reading.rainfall24hMm !== null && reading.rainfall24hMm !== undefined) {
+      lines.push(T.s(
+        `24h rainfall: ${T.mm(reading.rainfall24hMm)}`,
+        `২৪ ঘণ্টায় বৃষ্টি: ${T.mm(reading.rainfall24hMm)}`,
+      ));
+    }
+
+    if (reading.distanceKm !== undefined && reading.distanceKm !== null && reading.distanceKm > 1) {
+      lines.push(italic(T.s(
+        `Nearest gauge (~${T.n(reading.distanceKm, 0)} km away)`,
+        `নিকটবর্তী পরিমাপ পয়েন্ট (~${T.n(reading.distanceKm, 0)} কিমি দূরে)`,
+      )));
+    }
+  }
+
+  const shelters = flood.shelters ?? [];
+  if (shelters.length > 0) {
+    lines.push('', bold(T.s('Nearest DDM emergency shelters:', 'নিকটবর্তী ডিডিএম আশ্রয়কেন্দ্র:')));
+    for (const s of shelters.slice(0, 3)) {
+      const dist = s.distanceKm !== null && s.distanceKm !== undefined ? ` (~${T.n(s.distanceKm, 1)} km)` : '';
+      const flags = [];
+      if (s.safeWater) flags.push(T.s('Water', 'পানি'));
+      if (s.womenToilet || s.womenSpace) flags.push(T.s('Women', 'নারী'));
+      if (s.disabledFriendly) flags.push(T.s('Access', 'প্রতিবন্ধী বান্ধব'));
+      const facilities = flags.length ? ` · ${flags.join(', ')}` : '';
+      lines.push(`• ${esc(s.name)}${dist}${facilities}`);
+    }
+  }
+
+  lines.push('', italic(T.s(
+    'Observed FFWC river gauge reading.',
+    'এফএফডব্লিউসি-র মাপা নদীর পানির উচ্চতা।',
+  )));
+
+  return fit(lines.join('\n').trimEnd());
+}
+
+// ---------- /flood safety (DDM-listed school shelters, not a live safety ranking) ----------
+export function renderFloodSafety(place, { lang, nowMs, shelters, sharedPoint = false }) {
+  const T = makeText(lang, nowMs);
+  const lines = [
+    `🏫 ${bold(T.s('Nearest school flood shelters', 'নিকটবর্তী স্কুল বন্যা আশ্রয়কেন্দ্র'))}`,
+    placeTitle(place, T),
+    '',
+    italic(T.s(
+      'DDM-listed locations only. Opening, current vacancies, building and route conditions are not verified. Confirm with local authorities before travelling. Do not cross floodwater.',
+      'শুধু ডিডিএমের তালিকাভুক্ত স্থান। খোলা আছে কিনা, বর্তমানে জায়গা খালি আছে কিনা, ভবন ও পথের অবস্থা যাচাই করা হয়নি। যাওয়ার আগে স্থানীয় কর্তৃপক্ষের সঙ্গে নিশ্চিত করুন। বন্যার পানি পার হবেন না।',
+    )),
+    '',
+  ];
+  if (shelters?.disabled) {
+    lines.push(T.s('DDM shelter lookup is switched off.', 'ডিডিএম আশ্রয়কেন্দ্র অনুসন্ধান বন্ধ আছে।'));
+  } else if (!shelters || shelters.status === 'UNAVAILABLE') {
+    lines.push(T.s('The DDM school shelter list is unavailable right now.', 'ডিডিএমের স্কুল আশ্রয়কেন্দ্রের তালিকা এখন পাওয়া যাচ্ছে না।'));
+  } else {
+    if (shelters.status === 'STALE') lines.push(T.s('⚠ The shelter list is out of date; a previously stored list is shown.', '⚠ আশ্রয়কেন্দ্রের তালিকা পুরোনো; আগের সংরক্ষিত তালিকা দেখানো হচ্ছে।'));
+    if (shelters.fetchedAt && Number.isFinite(+new Date(shelters.fetchedAt))) {
+      lines.push(T.s(`List checked: ${T.when(+new Date(shelters.fetchedAt))}`, `তালিকা দেখা হয়েছে: ${T.when(+new Date(shelters.fetchedAt))}`));
+    }
+    lines.push(T.s(
+      `Up to 3 nearest listed schools within 50 km. Straight-line distances from ${sharedPoint ? 'your shared location' : 'the selected area’s reference point, not your exact location'}.`,
+      `${sharedPoint ? 'আপনার পাঠানো অবস্থান' : 'নির্বাচিত এলাকার কেন্দ্রবিন্দু, আপনার সঠিক অবস্থান নয়'} থেকে সরলরেখায় ৫০ কিমির মধ্যে সর্বোচ্চ ৩টি নিকটবর্তী তালিকাভুক্ত স্কুল।`,
+    ), '');
+    const schools = (shelters.shelters ?? []).slice(0, 3);
+    if (!schools.length) lines.push(T.s('No DDM-listed school flood shelter was found within 50 km of this point.', 'এই অবস্থানের ৫০ কিমির মধ্যে ডিডিএমের তালিকাভুক্ত কোনো স্কুল বন্যা আশ্রয়কেন্দ্র পাওয়া যায়নি।'));
+    for (const [index, school] of schools.entries()) {
+      const distance = Number.isFinite(school.distanceKm) ? ` · ~${T.n(school.distanceKm, 1)} ${T.s('km', 'কিমি')}` : '';
+      lines.push(`${bold(`${T.n(index + 1)}. ${String(school.name).slice(0, 200)}`)}${distance}`);
+      const address = [school.union, school.upazila, school.district].filter(Boolean).join(', ');
+      if (address) lines.push(esc(address.slice(0, 180)));
+      if (Number.isFinite(school.capacity)) lines.push(T.s(`Listed capacity: ${T.n(school.capacity)} people (not live vacancies)`, `তালিকাভুক্ত ধারণক্ষমতা: ${T.n(school.capacity)} জন (বর্তমান খালি জায়গা নয়)`));
+      const facilities = [school.safeWater && T.s('Water', 'পানি'), (school.womenSpace || school.womenToilet) && T.s('Women’s facilities', 'নারীদের সুবিধা'), school.disabledFriendly && T.s('Accessible facilities', 'প্রতিবন্ধী বান্ধব সুবিধা')].filter(Boolean);
+      if (facilities.length) lines.push(`${T.s('Listed facilities', 'তালিকাভুক্ত সুবিধা')}: ${facilities.join(', ')}`);
+      if (school.mapsUrl) lines.push(`<a href="${esc(school.mapsUrl).replace(/"/g, '&quot;')}">${T.s('Map / directions', 'মানচিত্র / দিকনির্দেশনা')}</a>`);
+      lines.push('');
+    }
+  }
+  return fit(lines.join('\n').trimEnd());
+}
+
+// ---------- /hospital (top 3 nearest hospitals) ----------
+export function renderHospitalReport(place, { lang, nowMs, hospitals = [] }) {
+  const T = makeText(lang, nowMs);
+  const lines = [
+    `🏥 ${bold(T.s('Top 3 Nearest Hospitals', 'নিকটবর্তী ৩টি হাসপাতাল'))}`,
+    placeTitle(place, T),
+    '',
+  ];
+
+  if (!hospitals.length) {
+    lines.push(T.s(
+      'No hospital contact information is available for this location.',
+      'এই এলাকার জন্য কোনো হাসপাতালের যোগাযোগের তথ্য পাওয়া যায়নি।',
+    ));
+    return fit(lines.join('\n'));
+  }
+
+  for (let i = 0; i < hospitals.length; i += 1) {
+    const hospital = hospitals[i];
+    const labels = hospitalLabels(hospital, T.L);
+    const name = labels.name || T.s('Hospital', 'হাসপাতাল');
+    const area = labels.area ? ` (${esc(labels.area)})` : '';
+    const dist = Number.isFinite(hospital.distanceKm) ? ` · ~${T.n(hospital.distanceKm, 1)} ${T.s('km', 'কিমি')}` : '';
+
+    let phoneText;
+    if (hospital.phoneDial) {
+      const emergency = hospital.phoneEmergency ? T.s(' (Emergency)', ' (জরুরি বিভাগ)') : '';
+      phoneText = `<a href="tel:${esc(hospital.phoneDial)}">${esc(hospital.phone)}</a>${emergency}`;
+    } else {
+      phoneText = T.s('Number not available', 'নম্বর পাওয়া যায়নি');
+    }
+
+    const map = hospital.mapsUrl ? ` · <a href="${esc(hospital.mapsUrl)}">${T.s('Map', 'মানচিত্র')}</a>` : '';
+
+    lines.push(`${bold(`${T.n(i + 1)}. ${esc(name)}`)}${area}${dist}`);
+    lines.push(`  📞 ${T.s('Tel', 'ফোন')}: ${phoneText}${map}`);
+    lines.push('');
+  }
+
+  lines.push(italic(T.s(
+    'From OpenStreetMap & official gov.bd records. Call ahead in an emergency.',
+    'ওপেনস্ট্রিটম্যাপ ও সরকারি রেকর্ড থেকে। জরুরি প্রয়োজনে আগে ফোন করুন।',
+  )));
+
+  return fit(lines.join('\n').trimEnd());
+}
+
 // ---------- /forecast ----------
 export function renderForecast(f, { lang, nowMs }) {
   const T = makeText(lang, nowMs);
@@ -567,6 +755,9 @@ const COMMAND_HELP = {
     ['wind', 'wind and gusts'],
     ['thunderstorm', 'storms on the satellite now, and the outlook'],
     ['lightning', 'lightning that was recorded'],
+    ['flood', 'river water levels and nearby shelters'],
+    ['flood_safety', 'up to 3 nearby DDM-listed school shelters'],
+    ['hospital', 'top 3 nearest hospitals and phone numbers'],
     ['forecast', 'the days ahead'],
     ['route', 'weather along a road trip'],
     ['alerts', 'your active alerts'],
@@ -581,6 +772,9 @@ const COMMAND_HELP = {
     ['wind', 'বাতাস ও দমকা হাওয়া'],
     ['thunderstorm', 'স্যাটেলাইটে এখনকার ঝড় ও পূর্বাভাস'],
     ['lightning', 'রেকর্ড হওয়া বজ্রপাত'],
+    ['flood', 'নদীর পানির উচ্চতা ও নিকটবর্তী আশ্রয়কেন্দ্র'],
+    ['flood_safety', 'নিকটবর্তী সর্বোচ্চ ৩টি ডিডিএম তালিকাভুক্ত স্কুল আশ্রয়কেন্দ্র'],
+    ['hospital', 'নিকটবর্তী ৩টি হাসপাতাল ও ফোন নম্বর'],
     ['forecast', 'আগামী দিনগুলো'],
     ['route', 'যাত্রাপথের আবহাওয়া'],
     ['alerts', 'আপনার সক্রিয় সতর্কবার্তা'],
@@ -602,8 +796,8 @@ export function renderHelp(lang, { webUrl = env.channels.publicUrl } = {}) {
       list,
       '',
       T.s(
-        'Example: /heat Badda\n/route Dhaka Bandarban · /route here Sylhet\nNo place name → recent shared area, else saved areas. /update can request a one-time location. /follow requires sharing live location.\nLanguage: add bn or en.',
-        'উদাহরণ: /heat বাড্ডা\n/route ঢাকা বান্দরবান · /route here Sylhet\nএলাকার নাম না দিলে → সাম্প্রতিক অবস্থান, না থাকলে সংরক্ষিত এলাকা। /update একবারের অবস্থান চাইতে পারে। /follow-এর জন্য লাইভ অবস্থান শেয়ার করুন।\nভাষা: শেষে bn বা en লিখুন।',
+        'Example: /heat Badda\n/flood safety Badda · /flood_safety\n/route Dhaka Bandarban · /route here Sylhet\nNo place name → recent shared area, else saved areas. /update can request a one-time location. /follow requires sharing live location.\nLanguage: add bn or en.',
+        'উদাহরণ: /heat বাড্ডা\n/flood safety বাড্ডা · /flood_safety\n/route ঢাকা বান্দরবান · /route here Sylhet\nএলাকার নাম না দিলে → সাম্প্রতিক অবস্থান, না থাকলে সংরক্ষিত এলাকা। /update একবারের অবস্থান চাইতে পারে। /follow-এর জন্য লাইভ অবস্থান শেয়ার করুন।\nভাষা: শেষে bn বা en লিখুন।',
       ),
       '',
       T.s(

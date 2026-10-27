@@ -397,7 +397,7 @@ dbTest('administrator withdrawal is recorded separately and its text is never an
   const farmer = await signUp('farmer', FARMER);
   await tick(makeSources({ rain: { 1: 9 }, pop: { 1: 80 } }));
   const event = await HazardEvent.findOne();
-  await withdrawEvent(event, { source: 'administrator', reason: 'Issued in error', nowMs: NOW + 60_000 });
+  assert.equal(await withdrawEvent(event, { source: 'administrator', reason: 'Issued in error', nowMs: NOW + 60_000 }), 1);
 
   const after = await HazardEvent.findById(event._id).lean();
   assert.equal(after.lifecycle, 'withdrawn');

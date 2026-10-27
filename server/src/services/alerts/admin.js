@@ -571,13 +571,13 @@ export async function withdraw({ batchId = null, eventId = null, reason = null }
   }
 
   let withdrawn = 0;
+  let notifications = 0;
   for (const event of events) {
-    await withdrawEvent(event, { source: 'administrator', reason: text || null, nowMs });
+    notifications += await withdrawEvent(event, { source: 'administrator', reason: text || null, nowMs });
     withdrawn += 1;
   }
 
   // A weather send publishes notifications of events the engine owns: those notifications are withdrawn, the events are left alone.
-  let notificationsOnly = 0;
   if (batchId && !events.length) {
     const now = new Date(nowMs);
     const result = await Notification.updateMany(
@@ -587,12 +587,12 @@ export async function withdraw({ batchId = null, eventId = null, reason = null }
         $push: { lifecycle: { $each: [{ at: now, type: 'withdrawn', note: `The administrator withdrew this alert. This is not an all-clear.${text ? ` Reason: ${text}` : ''}` }], $slice: -20 } },
       },
     );
-    notificationsOnly = result.modifiedCount;
+    notifications += result.modifiedCount;
   }
-  if (!withdrawn && !notificationsOnly) throw notFound('Nothing to withdraw: those alerts have already ended.');
+  if (!withdrawn && !notifications) throw notFound('Nothing to withdraw: those alerts have already ended.');
 
-  await audit({ at: new Date(nowMs), action: 'withdraw', batchId, eventKey: events[0]?.eventKey ?? null, reason: text || null, summary: `Withdrew ${withdrawn} event(s) and ${notificationsOnly} notification(s).` });
-  return { events: withdrawn, notifications: notificationsOnly };
+  await audit({ at: new Date(nowMs), action: 'withdraw', batchId, eventKey: events[0]?.eventKey ?? null, reason: text || null, summary: `Withdrew ${withdrawn} event(s) and ${notifications} notification(s).` });
+  return { events: withdrawn, notifications };
 }
 
 // Held notifications (only exist while a hold is on) that the administrator decides not to send.

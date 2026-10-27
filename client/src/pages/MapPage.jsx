@@ -133,7 +133,7 @@ export default function MapPage() {
   const tickIndex = timeline.times.length
     ? (selectedTime === null ? timeline.nowIndex : nearestIndex(timeline.times, selectedTime))
     : 0;
-  const currentTime = timeline.times[tickIndex] ?? Date.now();
+  const currentTime = useMemo(() => timeline.times[tickIndex] ?? Date.now(), [timeline, tickIndex]);
   const stepIndex = snapshot?.steps?.length ? stepIndexAt(snapshot.steps, currentTime) : 0;
 
   useEffect(() => {

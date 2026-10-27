@@ -5,7 +5,7 @@ import { findPlaces, placeById, placesForAreas } from './places.js';
 import { forecastFor } from './readings.js';
 import { answerRoute } from './routeCommand.js';
 import {
-  COMMAND_NAMES, buttonsFor, candidateButtons, renderAlerts, renderAmbiguous, renderAskPlace, renderForecast, renderHeat, renderLightning, renderNotFound, renderRain,
+  COMMAND_NAMES, buttonsFor, candidateButtons, renderAlerts, renderAmbiguous, renderAskPlace, renderFlood, renderFloodSafety, renderForecast, renderHeat, renderHospitalReport, renderLightning, renderNotFound, renderRain,
   renderStatus, renderThunderstorm, renderUpdate, renderWind,
 } from './text.js';
 
@@ -14,9 +14,12 @@ import {
 // into a reply: only the fresh current area (if any), else the saved areas, chooses where to look. /route (routeCommand.js) is the one
 // exception to "never calls out": it asks the road-route service and, for a name the bot does not know, the OpenStreetMap place search.
 // Commands whose report buttons carry one place ("r:<command>:<place id>:<language>"); /route has buttons of its own.
-export const REPORT_COMMANDS = new Set(['update', 'heat', 'rain', 'wind', 'thunderstorm', 'lightning', 'forecast']);
+export const REPORT_COMMANDS = new Set(['update', 'heat', 'rain', 'wind', 'thunderstorm', 'lightning', 'flood', 'flood_safety', 'hospital', 'forecast']);
 export const ALL_COMMANDS = new Set(COMMAND_NAMES);
-const ALIASES = new Map([['weather', 'update'], ['thunder', 'thunderstorm'], ['storm', 'thunderstorm'], ['days', 'forecast'], ['trip', 'route'], ['travel', 'route']]);
+const ALIASES = new Map([
+  ['weather', 'update'], ['thunder', 'thunderstorm'], ['storm', 'thunderstorm'], ['days', 'forecast'], ['trip', 'route'], ['travel', 'route'], ['river', 'flood'],
+  ['hospitals', 'hospital'], ['clinic', 'hospital'],
+]);
 
 // "/heat@AkshSathiBot" -> "heat"; aliases are folded in; anything that is not a weather command gives null.
 export function canonicalCommand(word) {
@@ -78,6 +81,8 @@ function pickRenderer(command) {
     case 'rain': return renderRain;
     case 'wind': return renderWind;
     case 'thunderstorm': return renderThunderstorm;
+    case 'flood': return renderFlood;
+    case 'hospital': return renderHospitalReport;
     case 'forecast': return renderForecast;
     default: return renderUpdate;
   }
@@ -87,11 +92,15 @@ function pickRenderer(command) {
 // are /route's: a pressed route button (routeIds, departure), a shared location as the start (routeFromPoint) and the end the bot already
 // knows while it waits for the other one (routeToId, routeFromId).
 export async function answerCommand({
-  command, rest = [], placeId = null, langOverride = null, chatId, languageCode = null, sharedPlace = false, nowMs = Date.now(), deps = defaultDeps,
+  command, rest = [], placeId = null, langOverride = null, chatId, languageCode = null, sharedPlace = false, sharedPoint = null, nowMs = Date.now(), deps = defaultDeps,
   routeIds = null, departure = '0', routeFromPoint = null, routeToId = null, routeFromId = null,
 }) {
   const subscriber = await deps.subscriberForChat(chatId, new Date(nowMs));
   const parsed = parseArgs(rest);
+  if (command === 'flood' && /^safety(?:\s|$)/i.test(parsed.query)) {
+    command = 'flood_safety';
+    parsed.query = parsed.query.replace(/^safety(?:\s|$)/i, '').trim();
+  }
   const lang = resolveLanguage({
     override: langOverride ?? parsed.override, subscriber, languageCode, query: parsed.query,
   });
@@ -117,18 +126,18 @@ export async function answerCommand({
     places = place ? [place] : [];
   } else if (parsed.query) {
     const { matches, total } = findPlaces(parsed.query);
-    if (!matches.length) return { messages: [{ text: renderNotFound(lang, parsed.query) }], action: 'not-found', lang };
-    if (matches.length > 1) return { messages: [{ text: renderAmbiguous(lang, matches, total, command), buttons: candidateButtons(matches, command, lang) }], action: 'ambiguous', lang };
+    if (!matches.length) return { messages: [{ text: renderNotFound(lang, parsed.query) }], action: 'not-found', lang, remember: { command } };
+    if (matches.length > 1) return { messages: [{ text: renderAmbiguous(lang, matches, total, command), buttons: candidateButtons(matches, command, lang) }], action: 'ambiguous', lang, remember: { command } };
     places = matches;
   } else {
     const current = subscriber?.currentArea?.expiresAt && +new Date(subscriber.currentArea.expiresAt) > nowMs
       ? placeById(subscriber.currentArea.upazilaPcode) : null;
-    places = current ? [current] : (subscriber ? placesForAreas(subscriber.areas, 2) : []);
+    places = current ? [current] : (subscriber ? placesForAreas(subscriber.areas, command === 'flood_safety' ? 1 : 2) : []);
   }
   // The bot remembers this question for a few minutes (telegramBot.js), so a typed place name or a shared location answers it.
-  if (!places.length) return { messages: [{ text: renderAskPlace(lang), requestLocation: true }], action: 'ask-place', lang };
+  if (!places.length) return { messages: [{ text: renderAskPlace(lang), requestLocation: true }], action: 'ask-place', lang, remember: { command } };
 
-  const ctx = deps.loadForecast({ now: nowMs });
+  const ctx = command === 'flood_safety' ? null : deps.loadForecast({ now: nowMs });
   const render = pickRenderer(command);
   let alertCount = null;
   if (command === 'update' && subscriber) {
@@ -137,16 +146,38 @@ export async function answerCommand({
 
   const messages = [];
   for (const place of places) {
+    if (command === 'flood_safety') {
+      const reference = sharedPoint ? { ...place, lat: sharedPoint.lat, lon: sharedPoint.lon } : place;
+      const shelters = deps.schoolSheltersFor
+        ? await deps.schoolSheltersFor(reference, { nowMs }).catch(() => ({ status: 'UNAVAILABLE' }))
+        : { status: 'UNAVAILABLE' };
+      messages.push({ text: renderFloodSafety(place, { lang, nowMs, shelters, sharedPoint: Boolean(sharedPoint) }) });
+      continue;
+    }
     const forecast = forecastFor(place, ctx);
     let lightning;
     if (command === 'update' || command === 'lightning') lightning = await deps.lightningFor(place, { nowMs }).catch(() => ({ pick: null, error: true }));
     // The satellite storm tracker's "right now" for /thunderstorm.
     let storm;
     if (command === 'thunderstorm' && deps.stormFor) storm = await deps.stormFor(place, { nowMs }).catch(() => ({ status: 'UNAVAILABLE', hit: null }));
+    let flood;
+    if (command === 'flood' && deps.floodFor) flood = await deps.floodFor(place, { nowMs }).catch(() => ({ status: 'UNAVAILABLE', error: true }));
+    let hospitalsList;
+    if (command === 'hospital' && deps.nearestHospitalsForPlace) {
+      hospitalsList = await deps.nearestHospitalsForPlace(place, { limit: 3 }).catch(() => []);
+    }
     const text = command === 'lightning'
       ? renderLightning(forecast, { lang, nowMs, lightning, place })
-      : render(forecast, { lang, nowMs, lightning, alertCount, storm });
-    messages.push({ text });
+      : command === 'flood'
+        ? renderFlood(forecast, { lang, nowMs, flood, place })
+        : command === 'hospital'
+          ? renderHospitalReport(place, { lang, nowMs, hospitals: hospitalsList })
+          : render(forecast, { lang, nowMs, lightning, alertCount, storm });
+    const message = { text };
+    if (command === 'flood') message.buttons = [[{
+      text: lang === 'bn' ? '🏫 নিকটবর্তী স্কুল আশ্রয়কেন্দ্র' : '🏫 Nearby school shelters', data: `r:flood_safety:${place.id}:${lang}`,
+    }]];
+    messages.push(message);
   }
   if (command === 'update') messages[0].buttons = buttonsFor(places[0], lang);
   if (command === 'update' && !placeId && !parsed.query) {
@@ -158,7 +189,10 @@ export async function answerCommand({
     if (!current) messages.push({ text: lang === 'bn' ? 'বর্তমান আবহাওয়ার জন্য অবস্থান পাঠান। এতে স্বয়ংক্রিয় অবস্থান অনুসরণ চালু হবে না।' : 'Share your location for current-area weather. This does not turn on live tracking.', requestLocation: true });
   }
   if (sharedPlace) {
-    messages[0].text = `${lang === 'bn' ? '📍 আপনি এখন যে অবস্থান পাঠিয়েছেন তার নিকটতম পূর্বাভাস এলাকার তথ্য।' : '📍 Forecast for the nearest available area to the location you just shared.'}\n${messages[0].text}`;
+    const heading = command === 'flood_safety'
+      ? (lang === 'bn' ? '📍 আপনি এখন যে অবস্থান পাঠিয়েছেন তার কাছের স্কুল আশ্রয়কেন্দ্র।' : '📍 School shelters near the location you just shared.')
+      : (lang === 'bn' ? '📍 আপনি এখন যে অবস্থান পাঠিয়েছেন তার নিকটতম পূর্বাভাস এলাকার তথ্য।' : '📍 Forecast for the nearest available area to the location you just shared.');
+    messages[0].text = `${heading}\n${messages[0].text}`;
     messages.push({ text: sharedPlace === 'live'
       ? (lang === 'bn' ? 'লাইভ অবস্থান অনুসরণ চালু আছে। থামাতে /unfollow পাঠান বা Telegram-এ শেয়ারিং বন্ধ করুন।' : 'Live location following is on. Send /unfollow or stop sharing in Telegram to end it.')
       : (lang === 'bn' ? 'এই অবস্থান শুধু এই প্রতিবেদনের জন্য ব্যবহৃত হয়েছে; সতর্কবার্তা অনুসরণ চালু হয়নি।' : 'This location was used only for this report; alert following was not enabled.'), removeKeyboard: true });

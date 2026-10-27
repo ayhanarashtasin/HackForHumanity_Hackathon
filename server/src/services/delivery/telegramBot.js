@@ -60,7 +60,7 @@ const asked = new Map();
 
 function rememberQuestion(chatId, command, nowMs, extra = {}) {
   asked.delete(chatId);
-  asked.set(chatId, { command, at: nowMs, routeTo: extra.routeTo ?? null, routeFrom: extra.routeFrom ?? null });
+  asked.set(chatId, { command: extra.command ?? command, at: nowMs, routeTo: extra.routeTo ?? null, routeFrom: extra.routeFrom ?? null });
   if (asked.size > 5000) asked.delete(asked.keys().next().value);
 }
 
@@ -134,7 +134,7 @@ async function runWeatherCommand(channels, chatId, request, { now, deps }) {
 
 // A pressed inline button: "r:<command>:<place id>:<language>", or a route's "t:<from id>:<to id>:<departure>:<language>" (routeText.js).
 // Anything that does not parse is ignored, never trusted; route ids are looked up again (an unknown one gets "this button has expired").
-const BUTTON_DATA = /^r:([a-z]+):([0-9A-Za-z]{1,24}):(bn|en)$/;
+const BUTTON_DATA = /^r:([a-z_]+):([0-9A-Za-z]{1,24}):(bn|en)$/;
 const ROUTE_BUTTON = /^t:([0-9A-Za-z]{1,24}):([0-9A-Za-z]{1,24}):(0|3|m):(bn|en)$/;
 // A route report's hospital list (routeText.js hospitalsButton / renderHospitalPage): "h:<token>:<language>" opens it in a new message,
 // "hp:<token>:<page>:<language>" turns that message to another page. Paging reads the kept list only, so it is not rate-limited.
@@ -253,7 +253,10 @@ export async function handleTelegramUpdate(update, { channels = sharedChannels()
       }, { now, deps });
     }
     const command = question?.command ?? 'update';
-    return runWeatherCommand(channels, chatId, { command, placeId: place.id, sharedPlace: live ? 'live' : 'once', languageCode: message.from?.language_code }, { now, deps });
+    return runWeatherCommand(channels, chatId, {
+      command, placeId: place.id, sharedPlace: live ? 'live' : 'once', languageCode: message.from?.language_code,
+      sharedPoint: command === 'flood_safety' ? { lat: point.latitude, lon: point.longitude } : null,
+    }, { now, deps });
   }
   if (update.edited_message) return { handled: true, action: 'ignored' };
 
@@ -311,6 +314,17 @@ export async function handleTelegramUpdate(update, { channels = sharedChannels()
     return runWeatherCommand(channels, chatId, {
       command: question.command, rest: [first, ...rest], ...pendingRoute(question), languageCode: message.from?.language_code,
     }, { now, deps });
+  }
+
+  // An unrecognized slash command should not dump the entire help manual.
+  if (first.startsWith('/') && command !== '/help') {
+    const lang = await deps.telegramLanguage(chatId);
+    await reply(
+      lang === 'bn'
+        ? 'কমান্ডটি পাওয়া যায়নি। সব কমান্ড দেখতে /help লিখুন।'
+        : 'Command not recognized. Send /help to see all commands.'
+    );
+    return { handled: true, action: 'help' };
   }
 
   await reply(renderHelp(await deps.telegramLanguage(chatId)));

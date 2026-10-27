@@ -686,6 +686,30 @@ dbTest('withdrawing a send marks it withdrawn, never an all-clear, and a second 
   assert.ok(history.automatic.length >= 1);
 });
 
+dbTest('withdrawing an administrator message counts the notifications closed through its event', async () => {
+  for (let index = 0; index < 2; index += 1) {
+    const farmer = new Client();
+    assert.equal((await farmer.call('/alerts/subscribe', { method: 'POST', body: farmerForm() })).status, 201);
+  }
+  const admin = await adminSignIn();
+  const body = {
+    mode: 'message', severity: 'ADVISORY', roles: ['farmer'], areas: { districts: ['3026'] }, hours: 6,
+    title: { en: 'Market update' }, text: { en: 'The market will open later today.' },
+  };
+  const preview = (await admin.call('/admin/preview', { method: 'POST', body })).json.data;
+  const send = await admin.call('/admin/send', { method: 'POST', body: { ...body, idempotencyKey: 'withdraw-message-001', previewToken: preview.previewToken } });
+  assert.equal(send.status, 201);
+  const sent = send.json.data.result;
+  assert.equal(sent.sent, 2);
+  const response = await admin.call(`/admin/alerts/${sent.batchId}/withdraw`, { method: 'POST', body: { reason: 'Schedule changed' } });
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.json.data, { events: 1, notifications: 2 });
+  assert.equal(await Notification.countDocuments({ batchId: sent.batchId, status: 'withdrawn' }), 2);
+  const history = (await admin.call('/admin/history')).json.data;
+  assert.equal(history.sends.find((entry) => entry.action === 'withdraw').summary, 'Withdrew 1 event(s) and 2 notification(s).');
+  assert.equal((await admin.call(`/admin/alerts/${sent.batchId}/withdraw`, { method: 'POST', body: {} })).status, 404);
+});
+
 dbTest('withdrawing an automatic (engine-detected) event by its own id cannot be repeated either', async () => {
   const farmer = new Client();
   await farmer.call('/alerts/subscribe', { method: 'POST', body: farmerForm() });
@@ -700,6 +724,7 @@ dbTest('withdrawing an automatic (engine-detected) event by its own id cannot be
   const first = await admin.call(`/admin/alerts/${eventId}/withdraw`, { method: 'POST', body: { reason: 'False positive' } });
   assert.equal(first.status, 200);
   assert.equal(first.json.data.events, 1);
+  assert.equal(first.json.data.notifications, 1);
   const event = await HazardEvent.findById(eventId).lean();
   assert.equal(event.lifecycle, 'withdrawn');
   assert.equal(event.withdrawal.reason, 'False positive');
@@ -714,6 +739,7 @@ dbTest('withdrawing an automatic (engine-detected) event by its own id cannot be
 
   const history = (await admin.call('/admin/history')).json.data;
   assert.equal(history.sends.filter((entry) => entry.action === 'withdraw').length, 1, 'only the one real withdrawal is in the audit trail');
+  assert.equal(history.sends.find((entry) => entry.action === 'withdraw').summary, 'Withdrew 1 event(s) and 1 notification(s).');
 });
 
 dbTest('a send that fails is not replayed as "already sent": the same click retries for real', async () => {

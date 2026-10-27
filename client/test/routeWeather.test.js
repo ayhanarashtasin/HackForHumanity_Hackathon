@@ -1,8 +1,16 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  compactRoute, refreshRouteWeather, routeForecastIndex, routeForecastStatus, routeMapPoint, stopWeather,
+  compactRoute, hospitalLabels, refreshRouteWeather, routeForecastIndex, routeForecastStatus, routeMapPoint, stopWeather,
 } from '../src/lib/routeWeather.js';
+
+test('hospital names use the requested language before falling back to the mapped name', () => {
+  const hospital = { name: 'Square Hospital', nameBn: 'স্কয়ার হাসপাতাল' };
+  assert.equal(hospitalLabels(hospital, 'en').name, 'Square Hospital');
+  assert.equal(hospitalLabels(hospital, 'bn').name, 'স্কয়ার হাসপাতাল');
+  assert.equal(hospitalLabels({ ...hospital, nameEn: 'Square Hospitals Ltd.' }, 'en').name, 'Square Hospitals Ltd.');
+  assert.equal(hospitalLabels({ nameBn: hospital.nameBn }, 'en').name, hospital.nameBn);
+});
 
 test('the road sent to the hospital search is thinned and rounded but keeps its ends and shape', () => {
   // 2,000 points about 11 m apart along ~22 km.

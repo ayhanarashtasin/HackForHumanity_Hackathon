@@ -17,6 +17,7 @@ test('the Render API proxy preserves /api and page rewrites leave static data an
   assert.deepEqual(config.rewrites, [
     { source: '/api/:path*', destination: 'https://akashsathi.onrender.com/api/:path*' },
     { source: '/:page(map|route|alert)', destination: '/index.html' },
+    { source: '/flood/:path*', destination: '/index.html' },
     { source: '/admin/:path*', destination: '/index.html' },
   ]);
   const apiHeaders = config.headers.find((rule) => rule.source === '/api/:path*')?.headers;

@@ -4,6 +4,7 @@ import { once } from 'node:events';
 import { after, before, test } from 'node:test';
 import mongoose from 'mongoose';
 import { app } from '../src/app.js';
+import { env } from '../src/config/env.js';
 import { resetRadarForTests } from '../src/services/bmdRadar.js';
 import { resetForTests, setSnapshot } from '../src/services/weatherStore.js';
 
@@ -47,6 +48,30 @@ function request(path, method = 'GET', body) {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 }
+
+test('shelter queries reject missing, blank, malformed and out-of-range coordinates', async () => {
+  const enabled = env.flood.sheltersEnabled;
+  env.flood.sheltersEnabled = false;
+  try {
+    for (const query of [
+      '', 'lat=&lon=', 'lat=%20&lon=90.4', 'lat=23.8&lon=', 'lat=23.8', 'lon=90.4',
+      'lat=NaN&lon=90.4', 'lat=Infinity&lon=90.4', 'lat=91&lon=90.4', 'lat=-91&lon=90.4',
+      'lat=23.8&lon=181', 'lat=23.8&lon=-181', 'lat=23.8&lat=24&lon=90.4', 'upazila=unknown',
+      'lat=&lon=&upazila=302604', 'lat=91&lon=90.4&upazila=302604',
+    ]) {
+      const response = await request(`/flood/shelters?${query}`);
+      assert.equal(response.status, 400, query);
+      assert.match((await response.json()).message, /lat and lon/);
+    }
+    for (const query of ['lat=0&lon=0', 'lat=90&lon=180', 'lat=-90&lon=-180', 'lat=23.8&lon=90.4', 'upazila=302604']) {
+      const response = await request(`/flood/shelters?${query}`);
+      assert.equal(response.status, 200, query);
+      assert.deepEqual((await response.json()).data.shelters, []);
+    }
+  } finally {
+    env.flood.sheltersEnabled = enabled;
+  }
+});
 
 test('health reports database readiness and per-source freshness, and unknown routes return JSON', async () => {
   const response = await request('/health');

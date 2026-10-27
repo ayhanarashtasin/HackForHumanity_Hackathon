@@ -7,7 +7,7 @@ test('storm layers offer live tracking and historical simulation, with playback 
   skip: !process.env.UI_BASE_URL || !process.env.PLAYWRIGHT_MODULE,
 }, async () => {
   const { chromium } = await import(process.env.PLAYWRIGHT_MODULE);
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } : {}) });
   const page = await browser.newPage({ viewport: { width: 1506, height: 724 }, reducedMotion: 'reduce' });
   const snapshot = { observedAt: new Date(Date.now() - 20 * 60_000).toISOString(), cells: [], arrivals: [] };
   let live = { enabled: true, live: snapshot };

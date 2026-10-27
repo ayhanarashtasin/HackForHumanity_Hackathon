@@ -107,7 +107,7 @@ export function indexHospitals(rows) {
 // The hospital's name and place line in the reader's language when OpenStreetMap has it in that language; otherwise the name as mapped
 // (never translated). Shared by the website and the Telegram reply.
 export function hospitalLabels(hospital, lang) {
-  const name = lang === 'bn' ? hospital.nameBn || hospital.nameEn || hospital.name : hospital.nameEn || hospital.nameBn || hospital.name;
+  const name = lang === 'bn' ? hospital.nameBn || hospital.nameEn || hospital.name : hospital.nameEn || hospital.name || hospital.nameBn;
   const area = lang === 'bn' ? hospital.areaBn || hospital.area : hospital.area || hospital.areaBn;
   return { name: name || null, area: area || null };
 }
@@ -121,6 +121,21 @@ function loadDataset() {
     }
   }
   return loaded;
+}
+
+// Nearest hospitals to a point; a phone number only breaks a tie at the exact same distance.
+export function nearestHospitals(lat, lon, limit = 3, { dataset = null } = {}) {
+  const data = dataset ?? loadDataset();
+  if (!data?.hospitals?.length || !Number.isFinite(lat) || !Number.isFinite(lon)) return [];
+  const scored = data.hospitals.map((hospital) => {
+    const dist = distanceKm([lon, lat], [hospital.lon, hospital.lat]);
+    return {
+      ...hospital,
+      distanceKm: dist,
+    };
+  });
+  scored.sort((a, b) => a.distanceKm - b.distanceKm || Boolean(b.phoneDial) - Boolean(a.phoneDial));
+  return scored.slice(0, limit).map((hospital) => ({ ...hospital, distanceKm: Math.round(hospital.distanceKm * 10) / 10 }));
 }
 
 // Points every `stepKm` along the road, always including both ends.

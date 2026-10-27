@@ -15,6 +15,9 @@ test('"/" is the landing page, "/map" the map, "/alert" the alerts, "/flood" the
   assert.equal(resolveRoute('/alert/'), 'alert');
   assert.equal(resolveRoute('/flood'), 'flood');
   assert.equal(resolveRoute('/flood/'), 'flood');
+  assert.equal(resolveRoute('/flood/demo'), 'flood');
+  assert.equal(resolveRoute('/flood/demo/'), 'flood');
+  assert.equal(resolveRoute('/flood/unknown'), 'home');
   assert.equal(resolveRoute('/admin'), 'admin');
   assert.equal(resolveRoute('/admin/login'), 'admin');
   assert.equal(resolveRoute('/admin/login/'), 'admin');

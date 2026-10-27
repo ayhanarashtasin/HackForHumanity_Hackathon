@@ -178,7 +178,7 @@ const lifecycleEntry = (type, note, at) => ({ $each: [{ at, type, note }], $slic
 
 // The notifications of an event stop being "current". `to` is the status for sent ones; held (draft) ones are discarded or marked unsent.
 async function closeNotifications(eventId, { activeTo, draftTo, type, note, reason = null, now }) {
-  await Notification.updateMany(
+  const sent = await Notification.updateMany(
     { hazardEventId: eventId, status: 'active' },
     { $set: { status: activeTo, withdrawalReason: reason }, $push: { lifecycle: lifecycleEntry(type, note, now) } },
   );
@@ -186,6 +186,7 @@ async function closeNotifications(eventId, { activeTo, draftTo, type, note, reas
     { hazardEventId: eventId, status: 'draft' },
     { $set: { status: draftTo, withdrawalReason: reason }, $push: { lifecycle: lifecycleEntry(type, note, now) } },
   );
+  return sent.modifiedCount;
 }
 
 // An event the forecast no longer shows: withdrawn by the system, never presented as an all-clear. Only when the deciding source is FRESH.
@@ -236,7 +237,7 @@ export async function expireEnded(nowMs) {
   return { events: events.modifiedCount, sent: sent.modifiedCount, held: held.modifiedCount };
 }
 
-// An explicit withdrawal (administrator, or a dated official cancellation). Recorded separately from expiry, and never an all-clear.
+// An explicit withdrawal, never an all-clear. Returns the number of sent notifications withdrawn; held drafts are discarded.
 export async function withdrawEvent(event, { source, reason, reference = null, nowMs = Date.now() }) {
   const now = new Date(nowMs);
   event.lifecycle = 'withdrawn';
@@ -250,8 +251,7 @@ export async function withdrawEvent(event, { source, reason, reference = null, n
     : source === 'system'
       ? 'The river gauge is back below the alert level, so this warning was withdrawn. This is not an all-clear.'
       : 'The administrator withdrew this alert. This is not an all-clear.';
-  await closeNotifications(event._id, { activeTo: 'withdrawn', draftTo: 'discarded', type: 'withdrawn', note: reason ? `${text} Reason: ${reason}` : text, reason, now });
-  return event;
+  return closeNotifications(event._id, { activeTo: 'withdrawn', draftTo: 'discarded', type: 'withdrawn', note: reason ? `${text} Reason: ${reason}` : text, reason, now });
 }
 
 export const newBatchId = () => `b_${randomUUID().replaceAll('-', '').slice(0, 20)}`;

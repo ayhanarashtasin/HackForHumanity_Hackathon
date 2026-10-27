@@ -17,7 +17,7 @@ const prefetchFlood = prefetchPage('flood');
 // "Data" lives in the footer and in the phone menu.
 const SECTION_LINKS = [{ id: 'features', label: 'Features' }, { id: 'who', label: "Who It's For" }];
 const MENU_ONLY_LINKS = [{ id: 'data', label: 'Data' }];
-const MENU_BREAKPOINT = 860;
+const MENU_BREAKPOINT = 1200; // Keep in sync with the navigation breakpoint in landing.css.
 
 // Track the section beneath the floating bar and the active section near the middle of the screen.
 function useNavState(headerRef) {
@@ -174,10 +174,10 @@ export function Navbar({ onLanguageChange, languageDisabled = false }) {
               {unread > 0 && <span className="nav-badge" aria-hidden="true">{badge}</span>}
             </Link>
           </li>
-          <li className="nav-cta-item">
+          <li className="nav-cta-item nav-cta-flood">
             <Link {...floodProps} className="nav-cta" aria-current={route === 'flood' ? 'page' : undefined}><Icon name="drop" size={18} />{tr('Flood')}</Link>
           </li>
-          <li className="nav-cta-item">
+          <li className="nav-cta-item nav-cta-map">
             <Link {...mapProps} className="nav-cta"><Icon name="map" size={18} />{tr('Map')}</Link>
           </li>
           <li className="nav-cta-item nav-cta-route">

@@ -259,6 +259,10 @@ test('commands: the word after the slash is folded to one command; anything else
   assert.equal(canonicalCommand('/storm'), 'thunderstorm');
   assert.equal(canonicalCommand('/weather'), 'update');
   assert.equal(canonicalCommand('/days'), 'forecast');
+  assert.equal(canonicalCommand('/flood'), 'flood');
+  assert.equal(canonicalCommand('/river'), 'flood');
+  assert.equal(canonicalCommand('/hospital'), 'hospital');
+  assert.equal(canonicalCommand('/hospitals'), 'hospital');
   for (const other of ['/start', '/stop', '/help', '/foo', 'update', '', undefined]) assert.equal(canonicalCommand(other) === null || other === 'update', true, String(other));
   assert.deepEqual([...ALL_COMMANDS].sort(), [...COMMAND_NAMES].sort());
 });
@@ -522,6 +526,136 @@ test('answers: lightning reports the recorded count, check time and search windo
   assert.match(plain(await ask('lightning', ['Badda'], {}, lightning(null, true))), /could not be read right now/);
   const forecastMissing = await ask('lightning', ['Badda'], { bmd: null, openMeteo: null }, lightning({ kind: 'none', sampledMs: NOW, radiusKm: 100 }));
   assert.match(textOf(forecastMissing), /No lightning was recorded/, 'the lightning answer does not need the forecast');
+});
+
+test('answers: flood reports river water level, danger level comparison and nearby shelters', async () => {
+  const mockFlood = (overrides = {}) => ({
+    floodFor: async () => ({
+      status: 'FRESH',
+      data: { issuedAt: new Date(NOW).toISOString(), readings: [] },
+      reading: {
+        stationName: 'Mohadevpur',
+        river: 'Atrai',
+        waterLevelM: 19.5,
+        dangerLevelM: 18.5,
+        aboveDangerM: 1.0,
+        classification: 'ABOVE',
+        level: 2,
+        wlAt: new Date(NOW).toISOString(),
+        rainfall24hMm: 45.0,
+      },
+      shelters: [
+        { name: 'Mohadevpur High School Shelter', distanceKm: 2.3, safeWater: true, disabledFriendly: true, womenToilet: true },
+      ],
+      ...overrides,
+    }),
+  });
+
+  const text = plain(await ask('flood', ['Badda'], {}, mockFlood()));
+  assert.match(text, /River water level report/);
+  assert.match(text, /AT OR ABOVE DANGER LEVEL/);
+  assert.match(text, /Mohadevpur \(Atrai\)/);
+  assert.match(text, /Water level: 19\.50 m \(Danger level: 18\.50 m · \+1\.00 m above danger level\)/);
+  assert.match(text, /24h rainfall: 45\.0 mm/);
+  assert.match(text, /Nearest DDM emergency shelters:\n• Mohadevpur High School Shelter \(~2\.3 km\) · Water, Women, Access/);
+  assert.match(text, /Observed FFWC river gauge reading\./);
+  assert.deepEqual(lintText(text), []);
+
+  const bn = plain(await ask('flood', ['Badda', 'bn'], {}, mockFlood()));
+  assert.match(bn, /নদীর পানির উচ্চতা প্রতিবেদন/);
+  assert.match(bn, /বিপদসীমার সমানে বা উপরে/);
+  assert.match(bn, /পানির উচ্চতা:/);
+  assert.match(bn, /পানি, নারী, প্রতিবন্ধী বান্ধব/);
+
+  const unavailable = plain(await ask('flood', ['Badda'], {}, { floodFor: async () => ({ status: 'UNAVAILABLE', error: true }) }));
+  assert.match(unavailable, /River gauge data is currently unavailable from FFWC\./);
+});
+
+test('answers: flood reports warn about stale or undated readings even when the snapshot is fresh', async () => {
+  const reading = {
+    stationName: 'Badda', waterLevelM: 8, dangerLevelM: 9, aboveDangerM: -1,
+    classification: 'NORMAL', level: 0, wlAt: new Date(NOW).toISOString(),
+  };
+  for (const lang of ['en', 'bn']) {
+    for (const [status, wlAt] of [
+      ['STALE', reading.wlAt], ['FRESH', new Date(NOW - 7 * 24 * 3_600_000).toISOString()],
+      ['FRESH', null], ['FRESH', 'invalid'],
+    ]) {
+      const text = plain(await ask('flood', ['Badda', lang], {}, {
+        floodFor: async () => ({ status, data: {}, reading: { ...reading, wlAt } }),
+      }));
+      assert.match(text, lang === 'bn' ? /পুরোনো|সময় জানা নেই/ : /out of date|measurement time is unavailable/, `${lang}: ${status}, ${wlAt}`);
+    }
+    const fresh = plain(await ask('flood', ['Badda', lang], {}, {
+      floodFor: async () => ({ status: 'FRESH', data: {}, reading }),
+    }));
+    assert.doesNotMatch(fresh, /out of date|measurement time is unavailable|পুরোনো|সময় জানা নেই/);
+    assert.match(fresh, lang === 'bn' ? /পরিমাপের সময়:/ : /Measured:/);
+  }
+});
+
+test('answers: unknown flood classifications never become a normal water level', async () => {
+  for (const lang of ['en', 'bn']) {
+    for (const classification of ['UNAVAILABLE', 'UNKNOWN', undefined]) {
+      const text = plain(await ask('flood', ['Badda', lang], {}, {
+        floodFor: async () => ({ status: 'FRESH', data: {}, reading: {
+          stationName: 'Badda', waterLevelM: 8, dangerLevelM: null,
+          aboveDangerM: null, classification, level: 0, wlAt: new Date(NOW).toISOString(),
+        } }),
+      }));
+      assert.match(text, lang === 'bn' ? /বিপদসীমার শ্রেণিবিন্যাস পাওয়া যায়নি/ : /Danger-level classification unavailable/);
+      assert.doesNotMatch(text, /Normal water level|স্বাভাবিক পানির স্তর/);
+    }
+  }
+});
+
+test('answers: hospital reports top 3 nearest hospitals with phone numbers and distances', async () => {
+  const mockHospitals = [
+    {
+      name: 'Mohadevpur Upazila Health Complex',
+      nameBn: 'মহাদেবপুর উপজেলা স্বাস্থ্য কমপ্লেক্স',
+      area: 'Naogaon',
+      distanceKm: 1.5,
+      phone: '+880 1711-123456',
+      phoneDial: '+8801711123456',
+      phoneEmergency: true,
+      mapsUrl: 'https://maps.google.com/?q=24.9,88.7',
+    },
+    {
+      name: 'Naogaon Sadar Hospital',
+      nameBn: 'নওগাঁ সদর হাসপাতাল',
+      area: 'Naogaon',
+      distanceKm: 14.2,
+      phone: '01712000000',
+      phoneDial: '+8801712000000',
+      phoneEmergency: false,
+      mapsUrl: 'https://maps.google.com/?q=24.8,88.9',
+    },
+    {
+      name: 'Clinic Without Phone',
+      distanceKm: 18.0,
+      phone: null,
+      phoneDial: null,
+    },
+  ];
+
+  const text = plain(await ask('hospital', ['Badda'], {}, { nearestHospitalsForPlace: async () => mockHospitals }));
+  assert.match(text, /Top 3 Nearest Hospitals/);
+  assert.match(text, /1\. Mohadevpur Upazila Health Complex \(Naogaon\) · ~1\.5 km/);
+  assert.match(text, /Tel: \+880 1711-123456 \(Emergency\) · Map/);
+  assert.match(text, /2\. Naogaon Sadar Hospital/);
+  assert.match(text, /3\. Clinic Without Phone/);
+  assert.match(text, /Number not available/);
+  assert.deepEqual(lintText(text), []);
+
+  const bn = plain(await ask('hospital', ['Badda', 'bn'], {}, { nearestHospitalsForPlace: async () => mockHospitals }));
+  assert.match(bn, /নিকটবর্তী ৩টি হাসপাতাল/);
+  assert.match(bn, /মহাদেবপুর উপজেলা স্বাস্থ্য কমপ্লেক্স/);
+  assert.match(bn, /জরুরি বিভাগ/);
+  assert.match(bn, /ফোন:/);
+
+  const empty = plain(await ask('hospital', ['Badda'], {}, { nearestHospitalsForPlace: async () => [] }));
+  assert.match(empty, /No hospital contact information is available for this location\./);
 });
 
 test('answers: the forecast lists the days ahead with rain, gusts and the thunder peak', async () => {

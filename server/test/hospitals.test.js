@@ -6,7 +6,7 @@ import { hospitalsFor } from '../src/services/delivery/botReports/data.js';
 import { HOSPITALS_PER_PAGE, renderHospitalPage, renderRouteReport } from '../src/services/delivery/botReports/routeText.js';
 import { toPlain } from '../src/services/delivery/botReports/text.js';
 import {
-  compactRoute, hospitalLabels, hospitalsAlongRoute, hospitalsInternals, indexHospitals, normalizePhone,
+  compactRoute, hospitalLabels, hospitalsAlongRoute, hospitalsInternals, indexHospitals, nearestHospitals, normalizePhone,
 } from '../src/services/hospitals.js';
 import { lintText } from '../src/services/alerts/messages.js';
 
@@ -112,11 +112,25 @@ test('names and place lines follow the page language when OpenStreetMap has them
   const both = { name: 'Square Hospital', nameEn: 'Square Hospital', nameBn: 'স্কয়ার হাসপাতাল', area: 'Dhanmondi, Dhaka', areaBn: 'ধানমন্ডি, ঢাকা' };
   assert.deepEqual(hospitalLabels(both, 'bn'), { name: 'স্কয়ার হাসপাতাল', area: 'ধানমন্ডি, ঢাকা' });
   assert.deepEqual(hospitalLabels(both, 'en'), { name: 'Square Hospital', area: 'Dhanmondi, Dhaka' });
+  assert.equal(hospitalLabels({ ...both, nameEn: null }, 'en').name, 'Square Hospital', 'the mapped English name precedes the Bangla fallback');
   const englishOnly = { name: 'Pirozpur General Hospital', nameEn: 'Pirozpur General Hospital', nameBn: null, area: 'Pirojpur Sadar, Pirojpur', areaBn: 'পিরোজপুর সদর, পিরোজপুর' };
   assert.deepEqual(hospitalLabels(englishOnly, 'bn'), { name: 'Pirozpur General Hospital', area: 'পিরোজপুর সদর, পিরোজপুর' }, 'the place line is still Bangla');
   const banglaOnly = { name: 'ঝালকাঠি সদর হাসপাতাল', nameEn: null, nameBn: 'ঝালকাঠি সদর হাসপাতাল', area: 'Jhalokati Sadar, Jhalokati', areaBn: null };
   assert.equal(hospitalLabels(banglaOnly, 'en').name, 'ঝালকাঠি সদর হাসপাতাল');
   assert.deepEqual(hospitalLabels({ name: null }, 'en'), { name: null, area: null });
+});
+
+test('nearest hospitals rank by unrounded distance, using phone availability only for an exact tie', () => {
+  const dataset = indexHospitals([
+    { id: 'far', name: 'Far Hospital', lat: 24.8, lon: 90.4, phone: '01711000000' },
+    { id: 'near-phone', name: 'Near Phone Hospital', lat: 23.8022, lon: 90.4, phone: '01711000001' },
+    { id: 'near', name: 'Nearest Hospital', lat: 23.802, lon: 90.4 },
+    { id: 'tied', name: 'Tied Hospital', lat: 23.802, lon: 90.4, phone: '01711000002' },
+  ]);
+  const found = nearestHospitals(23.8, 90.4, 4, { dataset });
+  assert.deepEqual(found.map((hospital) => hospital.id), ['tied', 'near', 'near-phone', 'far']);
+  assert.deepEqual(found.map((hospital) => hospital.distanceKm), [0.2, 0.2, 0.2, 111.2]);
+  assert.deepEqual(nearestHospitals(23.8, 90.4, 1, { dataset }).map((hospital) => hospital.id), ['tied']);
 });
 
 test('the shipped file has a Bangla place line for every hospital and no same-name twins left on one spot', () => {

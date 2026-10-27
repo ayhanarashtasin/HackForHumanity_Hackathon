@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from './Icon.jsx';
 import { errorText, useLanguage } from '../i18n/index.js';
 import { MAP } from '../i18n/map.js';
 import { requestUserLocation } from '../lib/userLocation.js';
 import { placesFor } from '../lib/neighbourhoods.js';
+import { districtTown } from '../lib/routeAreas.js';
 import { weatherApi } from '../services/weatherApi.js';
 
 // The start can be the device position. The upazila it falls in is looked up only to label the field; the route uses the exact point.
@@ -22,7 +23,14 @@ function PlaceField({ field, label, catalogue, value, onChange, onSelect }) {
     if (!catalogue) return [];
     const districts = new Map(catalogue.districts.map((district) => [district.pcode, district]));
     return [
-      ...catalogue.districts.map((district) => ({ ...district, level: 'district', kind: tr('District'), parent: tr(district.division) })),
+      ...catalogue.districts.map((district) => {
+        const town = districtTown(district.pcode, catalogue);
+        return {
+          ...district, level: 'district', kind: tr('District'), parent: tr(district.division),
+          lat: town?.lat ?? district.lat, lon: town?.lon ?? district.lon,
+          weatherFrom: town ? { level: 'upazila', id: town.pcode } : null,
+        };
+      }),
       ...catalogue.locations.map((location) => ({
         ...location, level: 'upazila', kind: tr(location.kind === 'thana' ? 'City thana' : 'Upazila'), parent: name(districts.get(location.district)),
       })),
@@ -129,9 +137,18 @@ export function RoutePlanner({ catalogue, onRoute }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [locating, setLocating] = useState(false);
-  const updateStart = (value) => { setStart(value); setError(''); onRoute(null); };
-  const updateEnd = (value) => { setEnd(value); setError(''); onRoute(null); };
-  const swap = () => { setStart(end); setEnd(start); setError(''); onRoute(null); };
+  const requestRef = useRef(null);
+  useEffect(() => () => { requestRef.current?.abort(); requestRef.current = null; }, []);
+  const resetRoute = () => {
+    requestRef.current?.abort();
+    requestRef.current = null;
+    setLoading(false);
+    setError('');
+    onRoute(null);
+  };
+  const updateStart = (value) => { setStart(value); resetRoute(); };
+  const updateEnd = (value) => { setEnd(value); resetRoute(); };
+  const swap = () => { setStart(end); setEnd(start); resetRoute(); };
   const locate = async () => {
     setLocating(true);
     setError('');
@@ -147,6 +164,8 @@ export function RoutePlanner({ catalogue, onRoute }) {
   const submit = async (event) => {
     event.preventDefault();
     if (!start || !end || loading) return;
+    const controller = new AbortController();
+    requestRef.current = controller;
     setLoading(true);
     setError('');
     try {
@@ -154,13 +173,19 @@ export function RoutePlanner({ catalogue, onRoute }) {
       const result = await weatherApi.route(
         { name: start.name, lat: start.lat, lon: start.lon },
         { name: end.name, lat: end.lat, lon: end.lon },
+        controller.signal,
       );
+      if (controller.signal.aborted) return;
       onRoute(result, { start, end, checkedAt });
     } catch (requestError) {
+      if (controller.signal.aborted) return;
       onRoute(null);
       setError(errorText(requestError.message, lang, MAP));
     } finally {
-      setLoading(false);
+      if (requestRef.current === controller) {
+        requestRef.current = null;
+        setLoading(false);
+      }
     }
   };
 

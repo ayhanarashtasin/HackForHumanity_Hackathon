@@ -3,6 +3,17 @@ import { containsPoint, forecastSelectionIn } from './locate.js';
 
 const GRID_DEGREES = 0.05;
 
+// District map centres are not destinations. Match the Telegram planner's districtTown rule: route to the town's forecast location.
+export function districtTown(districtCode, catalogue) {
+  const code = String(districtCode);
+  const fixed = { '3026': '302654', '5081': '508122' }[code]; // Dhaka: Motijheel; Rajshahi: Boalia
+  if (fixed) return catalogue.locations.find(location => location.pcode === fixed) ?? null;
+  const own = catalogue.locations.filter(location => location.district === code);
+  const sadar = own.filter(location => /\bsadar\b/i.test(location.name));
+  return sadar.find(location => !/dakshin|uttar|south|north/i.test(location.name)) ?? sadar[0]
+    ?? own.find(location => /^kotwali$/i.test(location.name)) ?? null;
+}
+
 function geometryBounds(geometry) {
   const bounds = [Infinity, Infinity, -Infinity, -Infinity];
   const visit = (coordinates) => {
