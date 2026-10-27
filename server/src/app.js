@@ -17,6 +17,9 @@ app.use(cors({ origin: env.clientOrigin, credentials: true }));
 // Telegram updates can exceed the 10 kB limit used elsewhere (a long message in Bangla is three bytes per letter), and an update that
 // is rejected is retried by Telegram. The secret header is checked before anything is done with the body.
 app.post('/api/channels/telegram/webhook', express.json({ limit: '64kb' }), telegramWebhook);
+// A long road's geometry (the client thins it first) is larger than 10 kB; only this read-only search accepts more. The body is parsed
+// here and the global parser below then leaves it alone; the request still goes through the API's usual middleware.
+app.use('/api/weather/route/hospitals', express.json({ limit: '256kb' }));
 app.use(express.json({ limit: '10kb' }));
 app.use('/api', apiRoutes);
 app.use(notFound);

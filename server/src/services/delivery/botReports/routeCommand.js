@@ -4,10 +4,11 @@ import { forecastFor } from './readings.js';
 import {
   findRoutePlaces, hereEntry, pointEntry, routePlaceById, weatherPlaceOf,
 } from './routePlaces.js';
+import { keepHospitalList } from './hospitalLists.js';
 import { buildRouteReport } from './routeReport.js';
 import {
-  candidateRouteButtons, renderRouteAsk, renderRouteAskEnd, renderRouteAskStart, renderRouteFailure, renderRouteProblem, renderRouteReport,
-  renderRouteUnclear, routeButtons,
+  candidateRouteButtons, hospitalsButton, renderRouteAsk, renderRouteAskEnd, renderRouteAskStart, renderRouteFailure, renderRouteProblem,
+  renderRouteReport, renderRouteUnclear, routeButtons,
 } from './routeText.js';
 import { makeText, renderUpdate } from './text.js';
 
@@ -133,10 +134,12 @@ async function planRoute({
   const report = await buildRouteReport({
     route, from, to, departure, departMs, nowMs, ctx, deps,
   });
-  return reply(lang, 'route', {
-    text: renderRouteReport(report, { lang, nowMs }),
-    buttons: routeButtons({ fromId: from.id, toId: to.id, departure }, lang),
-  });
+  // One message: the report with its departure buttons, and a "🏥 Hospitals" button that opens the list (kept for its page buttons).
+  const buttons = routeButtons({ fromId: from.id, toId: to.id, departure }, lang);
+  if (Array.isArray(report.hospitals) && report.hospitals.length) {
+    buttons.unshift(hospitalsButton(keepHospitalList(report, nowMs), report.hospitals.length, lang));
+  }
+  return reply(lang, 'route', { text: renderRouteReport(report, { lang, nowMs }), buttons });
 }
 
 function problemReply(lang, problems, { known = null, searchDown = false, texts = {} } = {}) {

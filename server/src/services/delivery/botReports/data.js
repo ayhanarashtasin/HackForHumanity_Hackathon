@@ -3,6 +3,7 @@ import { env } from '../../../config/env.js';
 import { HazardEvent } from '../../../models/HazardEvent.js';
 import { JobState } from '../../../models/JobState.js';
 import { geocodePlace } from '../../geocode.js';
+import { compactRoute, hospitalsAlongRoute } from '../../hospitals.js';
 import { listInbox } from '../../alerts/inbox.js';
 import { circlesCovering } from '../../alerts/lightningGate.js';
 import { effectiveLightningStatus, loadSnapshots } from '../../alerts/snapshots.js';
@@ -99,6 +100,13 @@ export async function routeHazards({
   }, { hazardType: 1, coverage: 1, validUntil: 1 }).sort({ validUntil: 1 }).limit(30).lean();
 }
 
+// Hospitals near the road the trip takes, for the Telegram route report: the same search on the same compacted road the website sends,
+// so the two list the same hospitals. null when switched off; throws when the hospital file cannot be read (the report then says
+// "unavailable", never "no hospitals").
+export async function hospitalsFor(coordinates) {
+  return hospitalsAlongRoute(compactRoute(coordinates));
+}
+
 export async function alertsFor(subscriber, nowMs = Date.now()) {
   if (!dbReady()) throw new Error('database not ready');
   return listInbox(subscriber._id, { view: 'active', now: new Date(nowMs) });
@@ -128,6 +136,7 @@ export const defaultDeps = {
   stopTelegramFollow,
   lightningFor,
   stormFor,
+  hospitalsFor,
   alertsFor,
   engineStatus,
 };

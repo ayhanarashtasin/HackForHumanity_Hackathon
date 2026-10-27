@@ -59,6 +59,7 @@ function routeDeps({ osrm = fakeOsrm(), forecast = EVERYWHERE, ...extra } = {}) 
     lightningFor: async () => ({ pick: { kind: 'none', sampledMs: NOW - 30 * 60_000, count: 0, radiusKm: 100 }, error: false }),
     stormSnapshot: async () => null,
     routeHazards: async () => [],
+    hospitalsFor: async () => [],
     geocode: async () => [],
     ...extra,
   };
@@ -402,6 +403,42 @@ test('route in Telegram: buttons plan the way back and later trips; an unknown p
   assert.equal((await handleTelegramUpdate(press('t:Nnowhere:3026:0:en'), { channels, now, deps })).action, 'route-expired');
   assert.match(channels.telegram.sent.at(-1).content.text, /This button has expired/);
   assert.equal((await handleTelegramUpdate(press('t:2003:3026:9:en'), { channels, now, deps })).action, 'ignored');
+});
+
+test('route in Telegram: hospitals sit behind a button, and See more / Back turn the same message', async () => {
+  const hospitals = Array.from({ length: 7 }, (_, i) => ({
+    id: `node/r${i}`, name: `Road Hospital ${i}`, phone: null, phoneDial: null, mapsUrl: 'https://example.test/', distanceFromRouteKm: 1, alongKm: i * 10,
+  }));
+  const deps = routeDeps({ hospitalsFor: async () => hospitals });
+  const channels = fakeChannels();
+  const edits = [];
+  channels.telegram.edit = async (args) => { edits.push(args); };
+  const now = new Date(NOW);
+
+  assert.equal((await handleTelegramUpdate(press('t:2003:3026:0:en'), { channels, now, deps })).action, 'route');
+  assert.equal(channels.telegram.sent.length, 1, 'the report alone: no long list under it');
+  const report = channels.telegram.sent[0].content;
+  assert.doesNotMatch(report.text, /Road Hospital/);
+  assert.match(report.text, /7 hospitals near this road/);
+  const open = report.buttons[0][0];
+  assert.equal(open.text, '🏥 Hospitals (7)');
+
+  assert.equal((await handleTelegramUpdate(press(open.data), { channels, now, deps })).action, 'hospitals');
+  const first = channels.telegram.sent.at(-1).content;
+  assert.deepEqual([...first.text.matchAll(/Road Hospital (\d)/g)].map((match) => match[1]), ['0', '1', '2', '3', '4']);
+  const more = first.buttons[0][0];
+  assert.equal(more.text, 'See more (2) ▸');
+
+  const tap = press(more.data);
+  tap.callback_query.message.message_id = 77;
+  assert.equal((await handleTelegramUpdate(tap, { channels, now, deps })).action, 'hospitals-page');
+  assert.equal(channels.telegram.sent.length, 2, 'See more edits the message instead of sending another');
+  assert.equal(edits[0].messageId, 77);
+  assert.deepEqual([...edits[0].content.text.matchAll(/Road Hospital (\d)/g)].map((match) => match[1]), ['5', '6']);
+  assert.deepEqual(edits[0].content.buttons, [[{ text: '◂ Back', data: more.data.replace(':1:', ':0:') }]]);
+
+  assert.equal((await handleTelegramUpdate(press('h:unknown1:en'), { channels, now, deps })).action, 'hospitals-expired');
+  assert.match(channels.telegram.sent.at(-1).content.text, /expired/);
 });
 
 test('route in Telegram: a road search shows "typing" and counts three against the chat limit', async () => {

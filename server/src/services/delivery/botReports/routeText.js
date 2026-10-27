@@ -1,4 +1,5 @@
 import { districts } from '../../geo.js';
+import { hospitalLabels } from '../../hospitals.js';
 import { heatCategory } from './readings.js';
 import {
   CONDITION, KIND_NAMES, bold, conditionEmoji, esc, fit, freshnessNote, heatName, italic, makeText, nameOf, thunderName,
@@ -194,6 +195,85 @@ function hazardLines(items, T) {
   return lines;
 }
 
+// ---------- hospitals ----------
+// The report itself only says how many hospitals the road passes, with a "🏥 Hospitals" button. The list (the same one the website shows)
+// opens in a message of its own, a few hospitals at a time; "See more" and "Back" edit that one message, so the chat never fills with a
+// long list. Each hospital: its upazila and district, where on the trip and how far off the road it is, a tappable number when one is
+// known (with its kind), a map link, and its official website. Nothing is invented.
+export const HOSPITALS_PER_PAGE = 5;
+const hospitalsTitle = (T) => bold(T.s('🏥 Hospitals along the way', '🏥 পথে হাসপাতাল'));
+
+function hospitalSummaryLines(hospitals, T) {
+  if (hospitals === null) return [hospitalsTitle(T), T.s('Hospital search is unavailable right now.', 'হাসপাতাল খোঁজা এখন সম্ভব হচ্ছে না।')];
+  if (!hospitals.length) return [hospitalsTitle(T), T.s('No mapped hospital found near this road.', 'এই পথের কাছাকাছি মানচিত্রে কোনো হাসপাতাল পাওয়া যায়নি।')];
+  const withPhone = hospitals.filter((hospital) => hospital.phoneDial).length;
+  return [hospitalsTitle(T), T.s(
+    `${T.n(hospitals.length)} hospitals near this road (${T.n(withPhone)} with a phone number). Tap 🏥 Hospitals below to see them.`,
+    `এই পথের কাছে ${T.n(hospitals.length)}টি হাসপাতাল (${T.n(withPhone)}টির ফোন নম্বর আছে)। দেখতে নিচের 🏥 হাসপাতাল বোতাম চাপুন।`,
+  )];
+}
+
+function hospitalEntry(hospital, T) {
+  const labels = hospitalLabels(hospital, T.L);
+  const name = labels.name || T.s('Name not available', 'নাম পাওয়া যায়নি');
+  const google = hospital.searchUrl ? ` (<a href="${esc(hospital.searchUrl)}">${T.s('see on Google Maps', 'Google Maps-এ দেখুন')}</a>)` : '';
+  const phone = hospital.phoneDial
+    ? `<a href="tel:${esc(hospital.phoneDial)}">${esc(hospital.phone)}</a>${hospital.phoneEmergency ? T.s(' (emergency department)', ' (জরুরি বিভাগ)') : ''}`
+    : `${T.s('Contact not available', 'যোগাযোগের নম্বর নেই')}${google}`;
+  const official = hospital.website && /\.gov\.bd(?:[/:]|$)/.test(hospital.website)
+    ? ` · <a href="${esc(hospital.website)}">${T.s('Official website', 'সরকারি ওয়েবসাইট')}</a>` : '';
+  const map = `<a href="${esc(hospital.mapsUrl)}">${T.s('Map', 'মানচিত্র')}</a>${official}`;
+  const area = labels.area ? ` (${esc(labels.area)})` : '';
+  const where = Number.isFinite(hospital.alongKm) ? `${T.s('after ~', 'প্রায় ')}${km(Math.round(hospital.alongKm), T)}${T.s('', ' যাওয়ার পর')} · ` : '';
+  return `• ${bold(name)}${area} · ${where}${km(hospital.distanceFromRouteKm, T)} ${T.s('from route', 'পথ থেকে')}\n  ${T.s('Tel', 'ফোন')}: ${phone} · ${map}`;
+}
+
+// "h:<token>:<language>" opens the list in a new message; "hp:<token>:<page>:<language>" turns that message to another page
+// (telegramBot.js HOSPITAL_BUTTON). The token names the list kept by hospitalLists.js.
+export const hospitalsButton = (token, count, lang) => {
+  const T = makeText(lang, 0);
+  return [{ text: `🏥 ${T.s('Hospitals', 'হাসপাতাল')} (${T.n(count)})`, data: `h:${token}:${T.L}` }];
+};
+
+// -> { text, buttons } for one page of the list (the page is clamped to the list). Pages count from 0.
+export function renderHospitalPage({ from, to, hospitals }, page, { token, lang, nowMs }) {
+  const T = makeText(lang, nowMs);
+  const pages = Math.max(1, Math.ceil(hospitals.length / HOSPITALS_PER_PAGE));
+  const current = Math.min(Math.max(page, 0), pages - 1);
+  const first = current * HOSPITALS_PER_PAGE;
+  const shown = hospitals.slice(first, first + HOSPITALS_PER_PAGE);
+  const range = T.s(
+    `${T.n(first + 1)}–${T.n(first + shown.length)} of ${T.n(hospitals.length)}`,
+    `${T.n(hospitals.length)}টির মধ্যে ${T.n(first + 1)}–${T.n(first + shown.length)}`,
+  );
+  const note = italic(T.s(
+    'From OpenStreetMap and official gov.bd pages; not verified for opening hours or emergency capacity. Google Maps links search by name: check the address. Call ahead.',
+    'ওপেনস্ট্রিটম্যাপ ও সরকারি gov.bd ওয়েবসাইট থেকে; খোলার সময় বা জরুরি বিভাগ যাচাই করা নয়। Google Maps লিংক নাম দিয়ে খোঁজে: ঠিকানা মিলিয়ে নিন। যাওয়ার আগে ফোন করুন।',
+  ));
+  const text = fit([
+    `${hospitalsTitle(T)} · ${esc(`${placeLabel(from, T)} → ${placeLabel(to, T)}`)}`,
+    range,
+    '',
+    shown.map((hospital) => hospitalEntry(hospital, T)).join('\n\n'),
+    '',
+    note,
+  ].join('\n'));
+
+  const turn = (target) => `hp:${token}:${target}:${T.L}`;
+  const row = [];
+  if (current > 0) row.push({ text: `◂ ${T.s('Back', 'আগের')}`, data: turn(current - 1) });
+  if (current < pages - 1) {
+    const left = hospitals.length - first - shown.length;
+    row.push({ text: `${T.s('See more', 'আরও দেখুন')} (${T.n(left)}) ▸`, data: turn(current + 1) });
+  }
+  return { text, buttons: row.length ? [row] : null };
+}
+
+export function renderHospitalsExpired(lang) {
+  const T = makeText(lang, 0);
+  return T.s('This hospital list has expired. Send /route again to see it.', 'এই হাসপাতালের তালিকার মেয়াদ শেষ। দেখতে আবার /route পাঠান।');
+}
+
 function alternativeLine(alternative, T) {
   if (!alternative) return null;
   const via = alternative.via ? T.s(` via ${esc(alternative.via.name)}`, ` (${esc(nameOf(alternative.via, 'bn'))} হয়ে)`) : '';
@@ -246,6 +326,8 @@ export function renderRouteReport(report, { lang, nowMs }) {
   if (live.length) lines.push('', ...live);
   const other = alternativeLine(report.alternative, T);
   if (other) lines.push('', other);
+
+  if (report.hospitals !== undefined) lines.push('', ...hospitalSummaryLines(report.hospitals, T));
 
   lines.push('', T.s('🟢 calm · 🟡 watch · 🟠 caution · 🔴 severe · ⚪ no forecast', '🟢 শান্ত · 🟡 নজর রাখুন · 🟠 সতর্ক থাকুন · 🔴 গুরুতর · ⚪ পূর্বাভাস নেই'));
   if ([from, to].some((item) => item.approx || item.here || item.level === 'osm')) {

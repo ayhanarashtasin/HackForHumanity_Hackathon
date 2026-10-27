@@ -17,6 +17,8 @@ export function classifyTelegram(status, body) {
   return new ChannelError('permanent', `Telegram rejected the message (HTTP ${status}).`, { code: status });
 }
 
+const inlineKeyboard = (buttons) => buttons.map((row) => row.map((button) => ({ text: button.text, callback_data: button.data })));
+
 export function createTelegramChannel({ config = env.channels.telegram, fetchImpl = fetch } = {}) {
   const configured = Boolean(config.token);
   let username = null;
@@ -54,11 +56,21 @@ export function createTelegramChannel({ config = env.channels.telegram, fetchImp
     async send({ to, content }) {
       const payload = { chat_id: String(to), text: content.text, disable_web_page_preview: true };
       if (content.parseMode) payload.parse_mode = content.parseMode;
-      if (content.buttons?.length) payload.reply_markup = { inline_keyboard: content.buttons.map((row) => row.map((button) => ({ text: button.text, callback_data: button.data }))) };
+      if (content.buttons?.length) payload.reply_markup = { inline_keyboard: inlineKeyboard(content.buttons) };
       else if (content.requestLocation) payload.reply_markup = { keyboard: [[{ text: content.locationLabel ?? '📍 Share location', request_location: true }]], resize_keyboard: true, one_time_keyboard: true };
       else if (content.removeKeyboard) payload.reply_markup = { remove_keyboard: true };
       const result = await call('sendMessage', payload);
       return { providerMessageId: result?.message_id === undefined ? null : String(result.message_id) };
+    },
+
+    // Replaces the text and inline buttons of a message the bot sent (a page of a list). content: { text, parseMode?, buttons? }.
+    async edit({ to, messageId, content }) {
+      const payload = {
+        chat_id: String(to), message_id: Number(messageId), text: content.text, disable_web_page_preview: true,
+        reply_markup: { inline_keyboard: content.buttons?.length ? inlineKeyboard(content.buttons) : [] },
+      };
+      if (content.parseMode) payload.parse_mode = content.parseMode;
+      await call('editMessageText', payload);
     },
 
     // The bot's @username builds the one-time deep link. Cached, because it does not change.

@@ -249,10 +249,12 @@ export async function buildRouteReport({
   const { shown, hidden } = pickStops(stops);
   const startsNow = departure === '0';
 
-  const [lightning, storm, hazards] = await Promise.all([
+  const [lightning, storm, hazards, hospitals] = await Promise.all([
     startsNow && deps.lightningFor ? lightningAlong(shown, deps.lightningFor, nowMs).catch(() => null) : null,
     startsNow && deps.stormSnapshot ? stormAlong(samples, deps.stormSnapshot, nowMs).catch(() => ({ status: 'UNAVAILABLE', observedAtMs: null, hit: null })) : null,
     deps.routeHazards ? hazardsAlong(samples, deps.routeHazards, { fromMs: departMs, untilMs: arriveMs }).catch(() => null) : null,
+    // undefined: no hospital section (no lookup wired, or switched off); null: the search failed; an array: what it found.
+    deps.hospitalsFor ? deps.hospitalsFor(route.coordinates).then((list) => list ?? undefined, () => null) : undefined,
   ]);
 
   const covered = samples.filter((sample) => sampleLevel(sample) !== null).length;
@@ -274,6 +276,7 @@ export async function buildRouteReport({
     lightning,
     storm,
     hazards,
+    hospitals,
     rainUnverified: Boolean(route.summary?.rainUnitUnverified),
     infos: ctx ? (ctx.base === 'bmd' ? [ctx.bmd?.info, ctx.openMeteo?.info] : [ctx.openMeteo?.info]) : [],
   };

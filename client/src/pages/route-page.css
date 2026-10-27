@@ -52,7 +52,7 @@
 .route-map-marker > span { display: grid; place-items: center; position: relative; z-index: 1; min-width: 32px; height: 32px; padding: 0 5px; border: 2px solid var(--cream); border-radius: 50%; background: var(--olive); color: var(--cream); font-weight: 750; font-size: .75rem; }
 .route-map-marker small { display: none; margin-left: -5px; padding: 7px 8px 7px 10px; border-radius: 0 8px 8px 0; background: var(--cream); color: var(--olive); font-size: .72rem; font-weight: 750; }
 .route-map-marker:is(.has-label, .is-selected, :hover, :focus-visible) small { display: block; }
-.route-map-marker.is-selected { z-index: 3; }
+.route-map-marker:is(.is-selected, :hover, :focus-visible) { z-index: 4; }
 .route-map-marker:is(:hover, .is-selected) > span { background: var(--sage); color: var(--olive); border-color: var(--cream); }
 .route-map-endpoint { display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid var(--cream); border-radius: 5px; background: var(--cream); color: var(--olive); font-size: .65rem; font-weight: 750; box-shadow: 0 2px 4px #101a1544; }
 .route-map-fullscreen-weather { position: absolute; bottom: 44px; left: 20px; display: grid; gap: 7px; max-width: calc(100% - 100px); padding: 16px; border: 1px solid rgba(232, 233, 223, .3); border-radius: 12px; background: var(--olive); font-size: .85rem; }
@@ -132,6 +132,42 @@
 .route-outlook li small { grid-column: 2 / -1; color: var(--route-muted); font-size: .65rem; }
 .route-outlook-note { display: block; margin-top: 9px; color: var(--route-muted); font-size: .7rem; }
 .route-shortest-note { margin-top: 14px; color: var(--route-muted); font-size: .65rem; line-height: 1.6; }
+
+/* Hospitals along the route */
+.route-hospitals { grid-column: 1 / -1; padding: 20px; border: 1px solid var(--route-rule); border-radius: 16px; background: var(--route-surface); }
+.route-hospitals h3 { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 1.05rem; }
+.route-hospitals-status, .route-hospitals-note { margin-top: 10px; color: var(--route-muted); font-size: .72rem; line-height: 1.6; }
+.route-hospital-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin: 14px 0 0; padding: 0; list-style: none; }
+.route-hospital-card { display: grid; gap: 8px; min-width: 0; padding: 12px; border: 1px solid var(--route-rule); border-radius: 11px; background: var(--cream); }
+.route-hospital-head { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: start; gap: 4px 8px; }
+.route-hospital-head strong { font-size: .82rem; overflow-wrap: anywhere; }
+.route-hospital-head span { grid-column: 2; color: var(--route-muted); font-size: .65rem; }
+.route-hospital-address { color: var(--route-muted); font-size: .7rem; line-height: 1.5; overflow-wrap: anywhere; }
+.route-hospital-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.route-hospital-actions a, .route-hospital-nophone { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 6px 11px; border: 1px solid var(--route-rule); border-radius: 8px; color: var(--olive); font-size: .72rem; font-weight: 650; text-decoration: none; }
+.route-hospital-call { border-color: var(--olive) !important; background: var(--olive); color: var(--cream) !important; }
+.route-hospital-actions a:hover { background: var(--sage-soft); }
+.route-hospital-call:hover { background: color-mix(in srgb, var(--olive) 85%, var(--sage)) !important; }
+.route-hospital-nophone { color: var(--route-muted); font-weight: 500; border-style: dashed; }
+.route-hospital-actions .route-hospital-google { border-color: var(--olive); }
+.route-hospital-source { color: var(--route-muted); font-size: .65rem; line-height: 1.5; }
+.route-hospital-source a { color: inherit; text-decoration: underline; }
+/* Above the weather stop markers (z-index 2), which sit on the same town centres and would otherwise swallow the hover; a weather marker
+   being pointed at or selected (z-index 4) still comes to the front. */
+.route-hospital-marker { z-index: 3; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 2px solid var(--cream); border-radius: 50%; background: #b8312b; color: #fff; box-shadow: 0 2px 6px #101a1566; }
+/* MapLibre positions the marker with an inline transform, so the hover effect scales the icon, not the marker. */
+.route-hospital-marker svg { transition: transform .15s; }
+/* Where city hospitals overlap at a wide zoom, a named one is the one under the pointer. */
+.route-hospital-marker.is-unnamed { z-index: 2; }
+.route-hospital-marker:is(:hover, :focus-visible) { z-index: 6; }
+.route-hospital-marker:is(:hover, :focus-visible) svg { transform: scale(1.15); }
+.route-hospital-tip { position: absolute; bottom: calc(100% + 7px); left: 50%; display: none; max-width: 230px; padding: 6px 9px; overflow: hidden; border-radius: 7px; background: var(--olive); color: var(--cream); box-shadow: 0 4px 12px #101a1555; font-size: .72rem; font-weight: 650; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; transform: translateX(-50%); pointer-events: none; }
+.route-hospital-tip::after { content: ''; position: absolute; top: 100%; left: 50%; border: 5px solid transparent; border-top-color: var(--olive); transform: translateX(-50%); }
+.route-hospital-marker:is(:hover, :focus-visible) .route-hospital-tip { display: block; }
+.route-hospital-popup { display: grid; gap: 5px; color: var(--olive); font-size: .75rem; line-height: 1.45; }
+.route-hospital-popup p { margin: 0; overflow-wrap: anywhere; }
+.route-hospital-popup a { color: var(--olive); font-weight: 650; }
+.route-hospital-popup-directions { margin-top: 3px; }
 
 /* Compact planner. These rules are page-local; the weather map's controls are unchanged. */
 .route-page .route-planner--page .route-panel { width: auto; margin: 0; padding: 20px; border: 1px solid var(--route-rule); border-radius: 18px; background: var(--route-surface); box-shadow: none; }

@@ -89,6 +89,14 @@ export const env = {
     geocoderEmail: (process.env.ROUTE_GEOCODER_EMAIL || '').trim(),
   },
 
+  // Hospitals along a route, from server/data/hospitals-bd.json (OpenStreetMap; rebuild with scripts/build-hospitals.mjs). Off switches the
+  // section off everywhere without changing route planning itself.
+  hospitals: {
+    enabled: process.env.ROUTE_HOSPITALS !== 'off',
+    radiusKm: numberFromEnv('ROUTE_HOSPITAL_RADIUS_KM', 5, { min: 1, max: 25 }),
+    maxResults: numberFromEnv('ROUTE_HOSPITAL_MAX_RESULTS', 20, { min: 1, max: 50 }),
+  },
+
   // Credentials stay server-side. Never log or return these values.
   xweather: {
     clientId: credentialFromEnv('XWEATHER_CLIENT_ID', 'your_client_id'),

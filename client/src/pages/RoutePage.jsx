@@ -10,7 +10,7 @@ import { containsPoint } from '../lib/locate.js';
 import { placesFor } from '../lib/neighbourhoods.js';
 import { areasAlongRoute, routeParent } from '../lib/routeAreas.js';
 import { regionWeather, routeLightning, routeRegions } from '../lib/routeHierarchy.js';
-import { refreshRouteWeather, routeForecastIndex, routeForecastStatus, routeMapPoint, stopWeather } from '../lib/routeWeather.js';
+import { compactRoute, hospitalLabels, refreshRouteWeather, routeForecastIndex, routeForecastStatus, routeMapPoint, stopWeather } from '../lib/routeWeather.js';
 import { resolveSelection } from '../lib/series.js';
 import { formatBst, formatClock, formatDay, toMs } from '../lib/time.js';
 import { loadCatalogue, weatherApi } from '../services/weatherApi.js';
@@ -171,6 +171,52 @@ function DestinationOutlook({ outlook, tr, number }) {
   );
 }
 
+const isGovSite = (url) => {
+  try { return new URL(url).hostname.endsWith('.gov.bd'); } catch { return false; }
+};
+
+function HospitalCard({ hospital, lang, tr, number }) {
+  const labels = hospitalLabels(hospital, lang);
+  const name = labels.name || tr('Name not available');
+  const address = hospital.address || labels.area || tr('Address not available');
+  return (
+    <li className="route-hospital-card">
+      <div className="route-hospital-head"><Icon name="hospital" size={18} /><strong>{name}</strong><span>{tr('After ~{n} km', { n: number(Math.round(hospital.alongKm ?? 0)) })} · {number(hospital.distanceFromRouteKm.toFixed(1))} {tr('km from route')}</span></div>
+      <p className="route-hospital-address">{address}</p>
+      <div className="route-hospital-actions">
+        {hospital.phoneDial
+          ? <a className="route-hospital-call" href={`tel:${hospital.phoneDial}`}><Icon name="phone" size={14} />{hospital.phone}{hospital.phoneEmergency && ` · ${tr('Emergency department')}`}</a>
+          : <span className="route-hospital-nophone">{tr('Contact not available')}</span>}
+        {!hospital.phoneDial && hospital.searchUrl && <a className="route-hospital-google" href={hospital.searchUrl} target="_blank" rel="noreferrer"><Icon name="search" size={14} />{tr('See the number on Google Maps')}</a>}
+        {hospital.website && <a href={hospital.website} target="_blank" rel="noreferrer"><Icon name="arrow" size={14} />{tr(isGovSite(hospital.website) ? 'Official website' : 'Website')}</a>}
+        {hospital.email && <a href={`mailto:${hospital.email}`}><Icon name="send" size={14} />{tr('Email')}</a>}
+        <a className="route-hospital-directions" href={hospital.mapsUrl} target="_blank" rel="noreferrer"><Icon name="route" size={14} />{tr('Directions')}</a>
+      </div>
+      {hospital.phoneDial && hospital.phoneSource && <small className="route-hospital-source">{tr('Number from')} <a href={hospital.phoneSource} target="_blank" rel="noreferrer">{tr(isGovSite(hospital.phoneSource) ? 'the official government website' : 'OpenStreetMap')}</a></small>}
+    </li>
+  );
+}
+
+function HospitalsSection({ state, lang, tr, number }) {
+  if (state.disabled) return null;
+  return (
+    <section className="route-hospitals" aria-label={tr('Hospitals along your route')}>
+      <p className="route-section-label">{tr('EMERGENCY')}</p>
+      <h3><Icon name="hospital" size={19} />{tr('Hospitals along your route')}</h3>
+      {state.loading && <p className="route-hospitals-status" role="status">{tr('Looking for hospitals near your route…')}</p>}
+      {!state.loading && state.error && <p className="route-hospitals-status">{tr('Hospital search is unavailable right now.')}</p>}
+      {!state.loading && !state.error && state.data?.length === 0 && <p className="route-hospitals-status">{tr('No mapped hospital found near this road.')}</p>}
+      {!state.loading && !state.error && state.data?.length > 0 && (
+        <ul className="route-hospital-list">
+          {state.data.map((hospital) => <HospitalCard key={hospital.id} hospital={hospital} lang={lang} tr={tr} number={number} />)}
+        </ul>
+      )}
+      <p className="route-hospitals-note">{tr('From OpenStreetMap. Not verified for opening hours or emergency capacity. Call ahead.')}</p>
+      {state.data?.some((hospital) => !hospital.phoneDial && hospital.searchUrl) && <p className="route-hospitals-note">{tr('The Google Maps button searches for the hospital by name; check that the address matches before you call.')}</p>}
+    </section>
+  );
+}
+
 function durationText(minutes, tr) {
   const hours = Math.floor(minutes / 60);
   return hours ? tr('{hours} h {minutes} min', { hours, minutes: minutes % 60 }) : tr('{minutes} min', { minutes });
@@ -215,6 +261,22 @@ export default function RoutePage() {
   const dailyState = usePolled(weatherApi.daily, DAILY_INTERVAL);
   const daily = dailyState.data;
   const lightningState = usePolled(weatherApi.lightningSummaries, ROUTE_INTERVAL, { enabled: Boolean(routeData) });
+  const [hospitalsState, setHospitalsState] = useState({ loading: false, error: false, data: null });
+
+  // Hospitals are fetched once per route (not polled): the road does not change while the forecast keeps refreshing. A failed or slow
+  // lookup only clears the hospital section; it must never block or retry the route itself.
+  useEffect(() => {
+    const coordinates = routeData?.result?.coordinates;
+    if (!coordinates) { setHospitalsState({ loading: false, error: false, data: null }); return undefined; }
+    const controller = new AbortController();
+    setHospitalsState({ loading: true, error: false, data: null });
+    weatherApi.routeHospitals(compactRoute(coordinates), controller.signal)
+      .then((payload) => setHospitalsState(payload?.disabled
+        ? { loading: false, error: false, data: null, disabled: true }
+        : { loading: false, error: false, data: payload?.hospitals ?? [] }))
+      .catch((error) => { if (error.name !== 'AbortError') setHospitalsState({ loading: false, error: true, data: null }); });
+    return () => controller.abort();
+  }, [routeData]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -296,7 +358,7 @@ export default function RoutePage() {
                 <p className="route-map-intro">{tr('Choose two places to see your road route and weather.')}</p>
               )}
             </div>
-            <RouteMap route={routeData?.result} otherRoute={search && alternative ? (showingAlternative ? search.result : alternative) : null} points={points} selected={selected} onSelect={index => selectPoint(index, true)} onAlternative={toggleAlternative} focusRequest={focusRequest} />
+            <RouteMap route={routeData?.result} otherRoute={search && alternative ? (showingAlternative ? search.result : alternative) : null} points={points} selected={selected} onSelect={index => selectPoint(index, true)} onAlternative={toggleAlternative} focusRequest={focusRequest} hospitals={hospitalsState.data} />
             {points[selected] && <div className="route-map-weather" aria-live="polite">
               <div className="route-map-weather-place"><span className="route-section-label">{tr(level === 'upazila' ? 'Weather when you arrive' : 'Weather along this stretch')}</span><strong>{points[selected].name}</strong><small>{formatBst(points[selected].weather.arrivalMs)}</small></div>
               <dl><div><dt><Icon name="thermometer" size={15} />{tr(level === 'upazila' ? 'Temperature' : 'Average temperature')}</dt><dd>{value(points[selected].weather.temp, number, tr('°C'), 1)}</dd></div><div><dt><Icon name="rain" size={15} />{tr(level === 'upazila' ? 'Rainfall' : 'Peak rain')}</dt><dd>{value(points[selected].weather.rf, number, ` ${tr('mm')}`, 1)}</dd></div><div><dt><Icon name="wind" size={15} />{tr(level === 'upazila' ? 'Wind' : 'Strongest wind')}</dt><dd>{value(points[selected].weather.wg, number, ` ${tr('km/h')}`)}</dd></div></dl>
@@ -337,6 +399,7 @@ export default function RoutePage() {
                 <p className="route-shortest-note">{tr('Model forecast, not station readings. Weather between sampled locations may differ. Route and ETA are estimates.')}</p>
               </section>
             )}
+            <HospitalsSection state={hospitalsState} lang={lang} tr={tr} number={number} />
           </div>
         )}
       </main>

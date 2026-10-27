@@ -103,6 +103,34 @@ test('when OSRM finds one road, routes through side points are added if they are
   assert.equal(result.routeCandidates, 2);
 });
 
+test('a failed side-road request is not cached: the next search asks again and finds the other road', async () => {
+  const route = (km, coordinates) => ({ distance: km * 1000, duration: km * 90, geometry: { coordinates } });
+  const direct = route(30, [[90.26, 23.86], [90.34, 23.825], [90.42, 23.79]]);
+  const north = route(36, [[90.26, 23.86], [90.34, 23.91], [90.42, 23.79]]);
+  let busy = true;
+  const calls = [];
+  const fetchImpl = async (url) => {
+    calls.push(url);
+    const viaCall = url.split('/driving/')[1].split('?')[0].split(';').length === 3;
+    if (viaCall && busy) return { ok: false, status: 429, json: async () => ({ message: 'Too Many Requests' }) };
+    return { ok: true, json: async () => ({ code: 'Ok', routes: viaCall ? [north] : [direct] }) };
+  };
+  const search = () => buildRouteWeather({
+    start: { name: 'Savar', lat: 23.86, lon: 90.26 },
+    end: { name: 'Dhaka', lat: 23.79, lon: 90.42 },
+    nowMs: 0,
+    forecast: { nowMs: 0, base: null, stepsMs: [] },
+    locationList: locations,
+    fetchImpl,
+  });
+  assert.deepEqual((await search()).alternatives, [], 'the road is still found while the side requests fail');
+  busy = false;
+  assert.deepEqual((await search()).alternatives.map((option) => option.distanceKm), [36]);
+  const asked = calls.length;
+  await search();
+  assert.equal(calls.length, asked, 'a complete answer is cached');
+});
+
 test('side points for extra routes lie either side of the straight line and inside Bangladesh', () => {
   const vias = routeWeatherInternals.viaPoints({ lat: 23.81, lon: 90.41 }, { lat: 22.36, lon: 91.83 });
   assert.equal(vias.length, 2);
@@ -133,4 +161,32 @@ test('route API returns a client error for missing or identical places without c
   await postRouteWeather({ body: { start, end: start } }, same);
   assert.equal(same.statusCode, 400);
   assert.match(same.body.message, /different/);
+});
+test('the shared-road share is the same as comparing every pair of points, and quick on a long trip', () => {
+  const { distanceKm, sharedFraction } = routeWeatherInternals;
+  // A 250 km road, and a second one that follows it for the first half, then swings ~3 km east.
+  const main = Array.from({ length: 2500 }, (_, i) => [90.4 + i * 0.0003, 23.8 - i * 0.0006]);
+  const other = main.map(([lon, lat], i) => [lon + (i > 1250 ? 0.03 : 0.0005 * Math.sin(i)), lat]);
+  const length = (coordinates) => coordinates.slice(1).reduce((sum, point, i) => sum + distanceKm(coordinates[i], point), 0);
+  const route = { geometry: { coordinates: other }, distance: length(other) * 1000 };
+  const road = { geometry: { coordinates: main }, distance: length(main) * 1000 };
+
+  const densify = (coordinates, stepKm) => {
+    const points = [coordinates[0]];
+    for (let i = 1; i < coordinates.length; i += 1) {
+      const [a, b] = [coordinates[i - 1], coordinates[i]];
+      const count = Math.max(1, Math.ceil(distanceKm(a, b) / stepKm));
+      for (let step = 1; step <= count; step += 1) points.push([a[0] + (b[0] - a[0]) * step / count, a[1] + (b[1] - a[1]) * step / count]);
+    }
+    return points;
+  };
+  const along = densify(other, Math.max(0.05, route.distance / 1000 / 150));
+  const roadPoints = densify(main, 0.1);
+  const expected = along.filter((point) => roadPoints.some((roadPoint) => distanceKm(point, roadPoint) <= 0.2)).length / along.length;
+
+  const started = performance.now();
+  const share = sharedFraction(route, road);
+  assert.equal(share, expected);
+  assert.ok(share > 0.4 && share < 0.6);
+  assert.ok(performance.now() - started < 200, 'no pairwise scan of every point');
 });

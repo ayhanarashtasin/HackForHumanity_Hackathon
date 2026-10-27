@@ -5,7 +5,11 @@ import { defaultDeps } from './botReports/data.js';
 import {
   REPORT_COMMANDS, answerCommand, canonicalCommand, createRateLimiter, resolveLanguage,
 } from './botReports/commands.js';
+import { hospitalList, resetHospitalListsForTests } from './botReports/hospitalLists.js';
 import { placeById, placeForPoint } from './botReports/places.js';
+import { routePlaceById } from './botReports/routePlaces.js';
+import { hospitalsInternals } from '../hospitals.js';
+import { renderHospitalPage, renderHospitalsExpired } from './botReports/routeText.js';
 import {
   commandMenu, esc, renderBusy, renderError, renderHelp, toPlain,
 } from './botReports/text.js';
@@ -74,6 +78,7 @@ export function resetBotForTests() {
   recent.clear();
   limiter.reset();
   asked.clear();
+  resetHospitalListsForTests();
 }
 
 // A reply with formatting. If Telegram refuses the markup (it should not), the same words go out as plain text instead of nothing.
@@ -131,6 +136,29 @@ async function runWeatherCommand(channels, chatId, request, { now, deps }) {
 // Anything that does not parse is ignored, never trusted; route ids are looked up again (an unknown one gets "this button has expired").
 const BUTTON_DATA = /^r:([a-z]+):([0-9A-Za-z]{1,24}):(bn|en)$/;
 const ROUTE_BUTTON = /^t:([0-9A-Za-z]{1,24}):([0-9A-Za-z]{1,24}):(0|3|m):(bn|en)$/;
+// A route report's hospital list (routeText.js hospitalsButton / renderHospitalPage): "h:<token>:<language>" opens it in a new message,
+// "hp:<token>:<page>:<language>" turns that message to another page. Paging reads the kept list only, so it is not rate-limited.
+const HOSPITALS_OPEN = /^h:([A-Za-z0-9_-]{8}):(bn|en)$/;
+const HOSPITALS_PAGE = /^hp:([A-Za-z0-9_-]{8}):(\d{1,3}):(bn|en)$/;
+
+async function showHospitals(channels, chatId, { token, page, lang, messageId = null }, now) {
+  const list = hospitalList(token, now.getTime());
+  if (!list) {
+    await replyPlain(channels, chatId, renderHospitalsExpired(lang));
+    return { handled: true, action: 'hospitals-expired' };
+  }
+  const { text, buttons } = renderHospitalPage(list, page, { token, lang, nowMs: now.getTime() });
+  if (messageId === null || !channels.telegram.edit) {
+    await sendReport(channels, chatId, { text, buttons });
+    return { handled: true, action: 'hospitals' };
+  }
+  try {
+    await channels.telegram.edit({ to: chatId, messageId, content: { text, parseMode: 'HTML', buttons } });
+  } catch {
+    // A second tap on an old button asks for the page already shown ("message is not modified"); the message is already right.
+  }
+  return { handled: true, action: 'hospitals-page' };
+}
 
 async function handleButton(update, { channels, now, deps }) {
   const query = update.callback_query;
@@ -142,6 +170,14 @@ async function handleButton(update, { channels, now, deps }) {
     await channels.telegram.answerCallbackQuery?.(query.id);
   } catch {
     // Only the spinner on the button; the reply is what matters.
+  }
+  const open = HOSPITALS_OPEN.exec(query.data);
+  if (open) return showHospitals(channels, String(chat.id), { token: open[1], page: 0, lang: open[2] }, now);
+  const turn = HOSPITALS_PAGE.exec(query.data);
+  if (turn) {
+    return showHospitals(channels, String(chat.id), {
+      token: turn[1], page: Number(turn[2]), lang: turn[3], messageId: query.message.message_id ?? null,
+    }, now);
   }
   const trip = ROUTE_BUTTON.exec(query.data);
   if (trip) {
@@ -322,6 +358,13 @@ export function startTelegramBot({ channels = sharedChannels(), log = console } 
   }
 
   async function run() {
+    // The place list and the hospital file are read once, at start, so the first /route does not wait for them.
+    try {
+      routePlaceById('');
+      hospitalsInternals.loadDataset();
+    } catch {
+      // A broken hospital file is reported by /route itself ("hospital search is unavailable").
+    }
     try {
       await telegram.getUsername();
       await registerMenu(telegram, log);

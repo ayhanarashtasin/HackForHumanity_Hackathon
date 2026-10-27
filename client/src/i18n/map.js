@@ -416,4 +416,17 @@ export const MAP = {
   'Moving {dir} at {speed} km/h': '{dir} দিকে {speed} কিমি/ঘণ্টা বেগে সরছে', 'Movement not measured yet': 'গতি এখনো মাপা যায়নি',
   'Cold cloud tops, shifted about {km} km to the ground below them for the satellite’s viewing angle. Dashed circles show where each storm may be after 30, 60 and 90 minutes of straight-line movement, with the time. This is not a lightning observation; a strong storm heading for a saved area sends a prototype storm warning.':
     'ঠান্ডা মেঘচূড়া, স্যাটেলাইটের দেখার কোণের কারণে প্রায় {km} কিমি সরিয়ে নিচের মাটির অবস্থানে দেখানো। ড্যাশ দেওয়া বৃত্ত দেখায় সোজা পথে চললে ৩০, ৬০ ও ৯০ মিনিট পরে প্রতিটি ঝড় কোথায় থাকতে পারে, সময়সহ। এটি বজ্রপাতের পর্যবেক্ষণ নয়; সংরক্ষিত এলাকার দিকে প্রবল ঝড় এগোলে পরীক্ষামূলক ঝড়ের সতর্কবার্তা পাঠানো হয়।',
+
+  // Hospitals along the route
+  'EMERGENCY': 'জরুরি', 'Hospitals along your route': 'আপনার পথে হাসপাতাল', 'Hospital': 'হাসপাতাল',
+  'Looking for hospitals near your route…': 'আপনার পথের কাছে হাসপাতাল খোঁজা হচ্ছে…',
+  'Hospital search is unavailable right now.': 'হাসপাতাল খোঁজা এখন সম্ভব হচ্ছে না।',
+  'No mapped hospital found near this road.': 'এই পথের কাছাকাছি মানচিত্রে কোনো হাসপাতাল পাওয়া যায়নি।',
+  'Name not available': 'নাম পাওয়া যায়নি', 'Address not available': 'ঠিকানা পাওয়া যায়নি', 'Contact not available': 'যোগাযোগের নম্বর নেই',
+  'See the number on Google Maps': 'Google Maps-এ নম্বর দেখুন',
+  'Official website': 'সরকারি ওয়েবসাইট', 'Website': 'ওয়েবসাইট', 'Email': 'ইমেইল', 'Emergency department': 'জরুরি বিভাগ', 'Number from': 'নম্বরের উৎস:',
+  'the official government website': 'সরকারি ওয়েবসাইট', 'OpenStreetMap': 'ওপেনস্ট্রিটম্যাপ',
+  'The Google Maps button searches for the hospital by name; check that the address matches before you call.': 'Google Maps বোতামটি নাম দিয়ে হাসপাতাল খোঁজে; ফোন করার আগে ঠিকানা মিলিয়ে নিন।',
+  'km from route': 'কিমি পথ থেকে', 'Directions': 'পথনির্দেশ', 'Tel': 'ফোন', 'After ~{n} km': 'প্রায় {n} কিমি যাওয়ার পর',
+  'From OpenStreetMap. Not verified for opening hours or emergency capacity. Call ahead.': 'ওপেনস্ট্রিটম্যাপ থেকে। খোলার সময় বা জরুরি বিভাগ যাচাই করা নয়। যাওয়ার আগে ফোন করুন।',
 };

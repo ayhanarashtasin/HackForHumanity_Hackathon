@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { AttributionControl, LngLat, LngLatBounds, MapLibreMap, Marker, NavigationControl, setWorkerUrl } from 'maplibre-gl';
+import { AttributionControl, LngLat, LngLatBounds, MapLibreMap, Marker, NavigationControl, Popup, setWorkerUrl } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Icon } from './Icon.jsx';
 import { useLanguage } from '../i18n/index.js';
 import { MAP } from '../i18n/map.js';
 import { clampToBounds } from '../lib/geometry.js';
 import { buildRouteMapStyle } from '../lib/routeMapStyle.js';
+import { hospitalLabels } from '../lib/routeWeather.js';
 import { PALETTE } from '../lib/palette.js';
 import workerUrl from '../map/maplibreWorker.js?worker&url';
 
@@ -15,13 +16,32 @@ const MIN_ZOOM = 4.5;
 const MAX_ZOOM = 18;
 const EMPTY = { type: 'FeatureCollection', features: [] };
 const feature = (coordinates, role) => ({ type: 'Feature', properties: { role }, geometry: { type: 'LineString', coordinates } });
+const escapeHtml = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-export function RouteMap({ route, otherRoute, points, selected, onSelect, onAlternative, focusRequest }) {
-  const { tr, number } = useLanguage(MAP);
+function hospitalPopupHtml(hospital, lang, tr) {
+  const labels = hospitalLabels(hospital, lang);
+  const name = escapeHtml(labels.name || tr('Name not available'));
+  const address = escapeHtml(hospital.address || labels.area || tr('Address not available'));
+  const google = hospital.searchUrl
+    ? ` · <a href="${escapeHtml(hospital.searchUrl)}" target="_blank" rel="noreferrer">${escapeHtml(tr('See the number on Google Maps'))}</a>`
+    : '';
+  const phone = hospital.phoneDial
+    ? `<a href="tel:${escapeHtml(hospital.phoneDial)}">${escapeHtml(hospital.phone)}</a>`
+    : `${escapeHtml(tr('Contact not available'))}${google}`;
+  const website = hospital.website
+    ? `<p><a href="${escapeHtml(hospital.website)}" target="_blank" rel="noreferrer">${escapeHtml(tr(/\.gov\.bd(?:[/:]|$)/.test(hospital.website) ? 'Official website' : 'Website'))}</a></p>`
+    : '';
+  return `<div class="route-hospital-popup"><strong>${name}</strong><p>${address}</p><p>${escapeHtml(tr('Tel'))}: ${phone}</p>${website}`
+    + `<a class="route-hospital-popup-directions" href="${escapeHtml(hospital.mapsUrl)}" target="_blank" rel="noreferrer">${escapeHtml(tr('Directions'))}</a></div>`;
+}
+
+export function RouteMap({ route, otherRoute, points, selected, onSelect, onAlternative, focusRequest, hospitals }) {
+  const { tr, lang, number } = useLanguage(MAP);
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const stageRef = useRef(null);
   const markersRef = useRef([]);
+  const hospitalMarkersRef = useRef([]);
   const routeRef = useRef({ route, otherRoute });
   routeRef.current = { route, otherRoute };
   const handlersRef = useRef({ onSelect, onAlternative });
@@ -108,6 +128,8 @@ export function RouteMap({ route, otherRoute, points, selected, onSelect, onAlte
       observer?.disconnect();
       markersRef.current.forEach(marker => marker.remove());
       markersRef.current = [];
+      hospitalMarkersRef.current.forEach(marker => marker.remove());
+      hospitalMarkersRef.current = [];
       map?.remove();
       mapRef.current = null;
     };
@@ -132,6 +154,30 @@ export function RouteMap({ route, otherRoute, points, selected, onSelect, onAlte
     });
     return () => markers.forEach(marker => marker.remove());
   }, [ready, route]);
+
+  useEffect(() => {
+    if (!ready) return;
+    hospitalMarkersRef.current.forEach(marker => marker.remove());
+    hospitalMarkersRef.current = (hospitals ?? []).filter(hospital => Number.isFinite(hospital.lat) && Number.isFinite(hospital.lon)).map(hospital => {
+      const element = document.createElement('button');
+      element.type = 'button';
+      element.className = `route-hospital-marker${hospitalLabels(hospital, lang).name ? '' : ' is-unnamed'}`;
+      const label = hospitalLabels(hospital, lang).name || tr('Name not available');
+      element.setAttribute('aria-label', `${tr('Hospital')}: ${label}`);
+      element.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V9a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12"/><path d="M9 21v-6h6v6"/><path d="M12 3v4M10 5h4"/></svg>';
+      // The name on hover or keyboard focus; textContent, so an OpenStreetMap name can never inject markup.
+      const tip = document.createElement('span');
+      tip.className = 'route-hospital-tip';
+      tip.setAttribute('aria-hidden', 'true');
+      tip.textContent = label;
+      element.append(tip);
+      const popup = new Popup({ offset: 14, closeButton: true, maxWidth: '240px' }).setHTML(hospitalPopupHtml(hospital, lang, tr));
+      const marker = new Marker({ element, anchor: 'bottom' }).setLngLat([hospital.lon, hospital.lat]).setPopup(popup).addTo(mapRef.current);
+      element.addEventListener('click', () => marker.togglePopup());
+      return marker;
+    });
+    return () => { hospitalMarkersRef.current.forEach(marker => marker.remove()); hospitalMarkersRef.current = []; };
+  }, [ready, hospitals, lang, tr]);
 
   useEffect(() => {
     if (!ready) return;

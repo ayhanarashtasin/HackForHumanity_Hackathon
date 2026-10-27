@@ -15,6 +15,12 @@ export const weatherApi = {
     body: JSON.stringify({ start, end }),
     signal,
   }),
+  routeHospitals: (coordinates, signal) => request('/weather/route/hospitals', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ coordinates }),
+    signal,
+  }),
   storms: (signal) => request('/storms', { signal }),
   stormDemo: (signal) => request('/storms/demo', { signal }),
 };

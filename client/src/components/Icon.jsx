@@ -41,6 +41,8 @@ const SHAPES = {
   logout: <><path d="M9 4H5v16h4M16 8l4 4-4 4M20 12H9" /></>,
   edit: <><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" /></>,
   list: <><path d="M8 6h12M8 12h12M8 18h12M4 6v.01M4 12v.01M4 18v.01" /></>,
+  hospital: <><path d="M4 21V9a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12" /><path d="M9 21v-6h6v6" /><path d="M12 3v4M10 5h4" /></>,
+  phone: <path d="M6 3h3l2 5-2.5 1.5a11 11 0 0 0 5 5L15 12l5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2z" />,
 };
 
 // Decorative by default: the text next to an icon carries the meaning.

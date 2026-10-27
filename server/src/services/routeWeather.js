@@ -122,13 +122,30 @@ function densify(coordinates, stepKm) {
   return points;
 }
 
-// Share of `route` that runs along `other` (within SAME_ROAD_KM).
+// Share of `route` that runs along `other` (within SAME_ROAD_KM). The road's points sit in a grid of cells wider than SAME_ROAD_KM, so a
+// point is compared only with the road points in its own and the eight neighbouring cells: the same answer as comparing every pair,
+// without the seconds of CPU (blocking every other request) that took on a long trip.
+const ROAD_CELL_DEG = 0.005; // ~0.55 km north-south and ~0.5 km east-west in Bangladesh, both above SAME_ROAD_KM
 function sharedFraction(route, other) {
   const coordinates = route.geometry.coordinates;
   const along = densify(coordinates, Math.max(0.05, route.distance / 1000 / 150));
-  const road = densify(other.geometry.coordinates, 0.1);
-  const shared = along.filter((point) => road.some((roadPoint) => distanceKm(point, roadPoint) <= SAME_ROAD_KM)).length;
-  return shared / along.length;
+  const cells = new Map();
+  for (const point of densify(other.geometry.coordinates, 0.1)) {
+    const key = `${Math.floor(point[1] / ROAD_CELL_DEG)}:${Math.floor(point[0] / ROAD_CELL_DEG)}`;
+    if (!cells.has(key)) cells.set(key, []);
+    cells.get(key).push(point);
+  }
+  const nearRoad = (point) => {
+    const row = Math.floor(point[1] / ROAD_CELL_DEG);
+    const col = Math.floor(point[0] / ROAD_CELL_DEG);
+    for (let dr = -1; dr <= 1; dr += 1) {
+      for (let dc = -1; dc <= 1; dc += 1) {
+        if (cells.get(`${row + dr}:${col + dc}`)?.some((roadPoint) => distanceKm(point, roadPoint) <= SAME_ROAD_KM)) return true;
+      }
+    }
+    return false;
+  };
+  return along.filter(nearRoad).length / along.length;
 }
 
 // Two points to the left and right of the straight line's midpoint. Routing through them pulls OSRM onto other roads when it found no
@@ -164,10 +181,15 @@ async function fetchRoadRoutes(start, end, fetchImpl, nowMs = Date.now()) {
   if (!direct.length) throw routeError('ROUTE_NO_ROAD', 'No road route was found between those locations.');
   const kept = direct.slice(0, MAX_ROUTES);
 
-  // A failed or empty via request only means fewer alternatives; the search itself has already succeeded.
+  // A failed or empty via request only means fewer alternatives; the search itself has already succeeded. A failed one (the public
+  // server busy or slow) is not cached, so the next search asks again instead of hiding the other road for half an hour.
+  let viaFailed = false;
   if (kept.length < MAX_ROUTES) {
     const viaRoutes = (await Promise.all(viaPoints(start, end).map((via) => (
-      requestRoutes([start, via, end], fetchImpl, { alternatives: false }).then((result) => result.routes).catch(() => [])
+      requestRoutes([start, via, end], fetchImpl, { alternatives: false }).then((result) => result.routes).catch(() => {
+        viaFailed = true;
+        return [];
+      })
     )))).flat().sort((a, b) => a.distance - b.distance);
     for (const candidate of viaRoutes) {
       if (kept.length >= MAX_ROUTES) break;
@@ -180,6 +202,7 @@ async function fetchRoadRoutes(start, end, fetchImpl, nowMs = Date.now()) {
   const snapKm = (waypoint) => (Number.isFinite(waypoint?.distance) ? Math.round(waypoint.distance / 100) / 10 : null);
   const value = { routes: kept, snap: { startKm: snapKm(waypoints[0]), endKm: snapKm(waypoints.at(-1)) } };
   cache.delete(key);
+  if (viaFailed && kept.length < MAX_ROUTES) return value;
   cache.set(key, { at: nowMs, value });
   if (cache.size > ROAD_CACHE_SIZE) cache.delete(cache.keys().next().value);
   return value;
