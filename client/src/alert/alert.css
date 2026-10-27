@@ -253,3 +253,10 @@ html:lang(bn) .alert-page :is(.alert-intro h1, .alert-head h1, .alert-saved-head
 html:lang(bn) .alert-page .alert-step-title { font-size: clamp(1.25rem, 1.1rem + 1vw, 1.7rem); }
 html:lang(bn) .alert-page .alert-saved > .alert-panel > p { font-size: .94rem; line-height: 1.7; }
 html:lang(bn) .alert-page :is(.alert-tag, .alert-channel-badge) { padding-block: 3px; }
+
+.alert-card-shelters { margin-top: 14px; }
+.alert-card-shelters h4 { margin: 0 0 6px; font-size: 0.82rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--alert-muted); }
+.alert-card-shelters ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.alert-card-shelters li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 0.9rem; line-height: 1.5; }
+.alert-card-shelters a { color: var(--olive); font-weight: 650; }
+.alert-shelter-distance { color: var(--alert-muted); font-size: 0.82rem; }

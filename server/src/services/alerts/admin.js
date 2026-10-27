@@ -29,6 +29,7 @@ import { applyAdminMessage, applyEvent, applyGenericDeclaration } from './notify
 import { HttpError, badRequest, notFound } from './errors.js';
 import { createSubscriber } from './subscribers.js';
 import { getSettings, updateSettings } from './settings.js';
+import { loadShelterSnapshot, nearestShelters, shelterSnapshotStatus } from './floodShelters.js';
 import { loadForecastInputs } from './snapshots.js';
 import { sourceRows } from './status.js';
 
@@ -38,7 +39,7 @@ const HOUR = 3_600_000;
 const PREVIEW_TTL_MS = 10 * 60_000;
 const SEND_LIMIT = { windowMs: HOUR, max: 20 };
 const SUPPORT_CHECK_MAX_AREAS = 40;
-const DECLARABLE = ['HEAVY_RAIN', 'HEAT_STRESS', 'STRONG_WIND', 'OBSERVED_LIGHTNING', 'LIGHTNING_THREAT', 'MARINE_WEATHER', 'DRY_SPELL'];
+const DECLARABLE = ['HEAVY_RAIN', 'HEAT_STRESS', 'STRONG_WIND', 'OBSERVED_LIGHTNING', 'LIGHTNING_THREAT', 'MARINE_WEATHER', 'DRY_SPELL', 'RIVER_FLOOD'];
 const LIGHTNING = ['OBSERVED_LIGHTNING', 'LIGHTNING_THREAT'];
 const districtByPcode = new Map(districts.map((district) => [district.pcode, district]));
 
@@ -231,6 +232,17 @@ function eventDocument(params, nowMs, overrides) {
   return { ...document, firstDetectedAt: now, lastConfirmedAt: now, lastUpdatedAt: now, revision: 1, ...overrides };
 }
 
+// A declared flood has no gauge behind it, but when it names exactly one upazila the cached DDM list can still say where the nearest
+// shelters are. Several areas share one event, so no single list would be right for all of them and none is attached.
+async function declaredFloodShelters(params, nowMs) {
+  if (params.hazardType !== 'RIVER_FLOOD' || !env.flood.sheltersEnabled) return null;
+  if (params.areas.all || params.areas.districts.length || params.areas.upazilas.length !== 1) return null;
+  const point = locationByPcode.get(params.areas.upazilas[0]);
+  if (!point) return null;
+  const row = await loadShelterSnapshot();
+  return { shelters: nearestShelters(row?.data?.shelters ?? [], point.lat, point.lon), shelterStatus: shelterSnapshotStatus(row, nowMs) };
+}
+
 // ---------- does current cached data support what the administrator is declaring? ----------
 const DETECTORS = { HEAVY_RAIN: detectHeavyRain, HEAT_STRESS: detectHeat, STRONG_WIND: detectWind, DRY_SPELL: detectDrySpell };
 
@@ -346,6 +358,7 @@ export async function preview(body, { nowMs = Date.now() } = {}) {
   const event = draftEvent(params, nowMs, existing);
 
   if (params.mode === 'declare') {
+    Object.assign(event.evidence, await declaredFloodShelters(params, nowMs));
     const support = await supportCheck(params, nowMs);
     const summary = await applyEvent(event, {
       nowMs, settings: {}, roles: params.roles, audience: params.audience, dryRun: true, publishNow: true, bypassCap: true, publishedBy: 'admin',
@@ -476,6 +489,7 @@ export async function send(body, { nowMs = Date.now() } = {}) {
     } else if (params.mode === 'declare') {
       const existing = await findDeclared(params);
       const now = new Date(nowMs);
+      const floodShelters = await declaredFloodShelters(params, nowMs);
       let event;
       if (existing) {
         existing.level = params.level;
@@ -486,10 +500,16 @@ export async function send(body, { nowMs = Date.now() } = {}) {
         existing.batchId = batchId;
         existing.set('evidence.roles', [...new Set([...(existing.evidence?.roles ?? []), ...params.roles])]);
         existing.set('evidence.audience', params.audience);
+        if (floodShelters) {
+          existing.set('evidence.shelters', floodShelters.shelters);
+          existing.set('evidence.shelterStatus', floodShelters.shelterStatus);
+        }
         await existing.save();
         event = existing;
       } else {
-        event = await HazardEvent.create(eventDocument(params, nowMs, { batchId }));
+        const document = eventDocument(params, nowMs, { batchId });
+        Object.assign(document.evidence, floodShelters);
+        event = await HazardEvent.create(document);
       }
       const summary = await applyEvent(event, {
         nowMs, settings: {}, roles: params.roles, audience: params.audience, publishNow: true, bypassCap: true, publishedBy: 'admin', batchId,

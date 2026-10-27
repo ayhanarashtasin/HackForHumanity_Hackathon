@@ -143,7 +143,7 @@ flowchart LR
     F --> H["Optional delivery queue"]
 ```
 
-Hazards include heavy rain, heat stress, strong wind, dry spells, lightning, marine weather, official notices, and satellite-derived storm approach. `HazardEvent` records the shared event; `Notification` records how it applies to a particular subscriber and scenario. Administrator declarations and free-text messages are explicitly distinguished from automatic detections.
+Hazards include heavy rain, heat stress, strong wind, dry spells, lightning, marine weather, official notices, satellite-derived storm approach, and observed river levels near or above FFWC danger levels. `HazardEvent` records the shared event; `Notification` records how it applies to a particular subscriber and scenario. Administrator declarations and free-text messages are explicitly distinguished from automatic detections.
 
 Key guarantees:
 
@@ -160,7 +160,7 @@ Key guarantees:
 | `Subscriber` | Anonymous profile, occupation answers, saved areas, temporary activity/current area, preferences, consent, and verified channel state. |
 | `ForecastSnapshot` | Latest normalized BMD/Open-Meteo payloads; restored into memory on startup when weather jobs are enabled. |
 | `WeatherRun` | Compact district-level run history; TTL retention defaults to 60 days. |
-| `WeatherSnapshot` | Cached provider/product queries for optional forecast, maritime, lightning, and bulletin processing. |
+| `WeatherSnapshot` | Cached provider/product queries for optional forecast, maritime, lightning, bulletin, FFWC gauge, and DDM shelter processing. |
 | `StormSnapshot` | Satellite-cell analyses retained for 30 days for later evaluation. |
 | `LightningCampaign`, `LightningSample` | Scheduled map-summary campaign, sampling status, and stored results. |
 | `HazardEvent` → `Notification` → `Delivery` | Shared hazard lifecycle → personal inbox card → external-channel delivery attempts. |
@@ -181,6 +181,8 @@ The schedules below reflect the default configuration. Available tuning options 
 | Radar / satellite indexes | Every 10 / 30 minutes. |
 | Storm analysis | Check every 2 minutes for newly published ten-minute satellite frames. |
 | Alert engine | Every 2 minutes; optional Xweather forecast/maritime refreshes are due approximately every 3 / 6 hours. |
+| FFWC river gauges | Checked within alert cycles, at most every 30 minutes; a failed refresh retries after 10 minutes. |
+| DDM flood shelters | Cached for 24 hours and refreshed alongside a successful FFWC fetch. |
 | Official bulletins | Checked within alert cycles, at most every 30 minutes after a completed check. |
 | Lightning map campaign | 07:00, 15:00, and 23:00 Asia/Dhaka, with campaign and quota limits. |
 | External alert delivery | Every 30 seconds. |
@@ -200,7 +202,7 @@ Alert and delivery jobs use database leases to coordinate workers. Forecast cach
 | Messaging | Telegram Bot API, WhatsApp Business Cloud API, Twilio or a configurable HTTP SMS gateway |
 | Tooling | npm workspaces, Node.js test runner, concurrently |
 
-The frontend uses plain CSS and a lightweight History API router rather than a routing framework. Map, route, alert, and administrator pages are lazy-loaded. Visual tokens and weather-color conventions are documented in [`docs/design.md`](docs/design.md).
+The frontend uses plain CSS and a lightweight History API router rather than a routing framework. Map, route, alert, flood, and administrator pages are lazy-loaded. Visual tokens and weather-color conventions are documented in [`docs/design.md`](docs/design.md).
 
 ## Getting started
 
@@ -265,6 +267,7 @@ npm run dev
 | Landing page | <http://localhost:5173> |
 | Weather map | <http://localhost:5173/map> |
 | Route-weather planner | <http://localhost:5173/route> |
+| River levels and flood shelters | <http://localhost:5173/flood> |
 | Alert registration and inbox | <http://localhost:5173/alert> |
 | Administrator dashboard | <http://localhost:5173/admin> — requires administrator setup |
 | API health and source freshness | <http://localhost:5000/api/health> |
@@ -273,6 +276,8 @@ npm run dev
 Vite proxies `/api` requests to the backend. Collection starts after the API connects to MongoDB; the first forecast may take time to arrive. Existing forecast snapshots are restored when weather jobs are enabled.
 
 **Quota-safe development:** leave Xweather credentials unconfigured, or set both `LIGHTNING_ENABLED=off` and `ALERT_XWEATHER=off`. Adding valid credentials with the default switches enabled allows background jobs to spend the provider allowance.
+
+**FloodSense configuration:** river gauges stay off until a valid `FFWC_API_KEY` is set. The FFWC gateway also checks the `FFWC_ORIGIN`/referer values, which default to `https://ffwc.gov.bd`. Without a key, `/flood` shows an unavailable state; `/flood/demo` still works. DDM shelter matching is independent and can be disabled with `DDM_SHELTERS=off`.
 
 Generated boundaries and location catalogues are already committed. Geography builds are not required for normal setup.
 
@@ -311,6 +316,17 @@ Server configuration is loaded from `server/.env`. The complete template is [`se
 | `ALERT_XWEATHER` | `on` | Alert-engine Xweather requests, when credentials are present. |
 | `ALERT_BULLETINS` | `on` | Official BMD bulletin checks within the alert engine. |
 | `ALERT_BMD_RAIN_VERIFIED` | `off` | Enables BMD rainfall amounts for thresholds only after their units have been verified. |
+| `FFWC_ENABLED` | `on` | Enables FFWC river-gauge collection; requires `FFWC_API_KEY`. |
+| `FFWC_API_KEY` | Unconfigured placeholder | FFWC gateway key issued for this project; kept server-side. Without it, flood collection stays quiet. |
+| `FFWC_API_URL` | `https://api.ffwc.gov.bd` | FFWC API base URL. |
+| `FFWC_ORIGIN` | `https://ffwc.gov.bd` | Origin/Referer the FFWC gateway expects; the API uses it for both headers. |
+| `FFWC_REFRESH_MINUTES` | `30` | Gauge refresh interval when the alert engine runs; failed refreshes retry after 10 minutes. |
+| `FFWC_MAX_AGE_MINUTES` | `180` | A reading older than this cannot create or escalate a flood alert. |
+| `FFWC_TIMEOUT_MS` | `15000` | Timeout for each FFWC request. |
+| `DDM_SHELTERS` | `on` | Enables the DDM flood-shelter list and nearest-shelter matching. |
+| `DDM_SHELTER_URL` | `https://rapid.ddm.gov.bd/service/shelter_info` | Public DDM shelter page parsed for Flood shelters. |
+| `DDM_SHELTER_REFRESH_HOURS` | `24` | Shelter-list refresh interval; the previous list remains usable and is labelled stale if DDM fails. |
+| `FLOOD_MAX_SHELTERS` | `3` | Maximum shelters offered per alert area (1–5). |
 | `ADMIN_PASSCODE` | Unconfigured placeholder | Enables administrator login with a non-placeholder passcode of at least 8 characters. |
 | `ADMIN_AUTH` | `on` | Set `off` only for local loopback demos; the bypass is ignored in production. |
 | `DELIVERY` | `on` | External delivery, the Telegram bot, and its morning-digest job. Unconfigured channels remain idle. |
@@ -344,6 +360,7 @@ This is useful for isolated API work, not an offline weather mode: map tiles sti
 | `/` | Project introduction, division atlas, coverage information, occupation guidance, and attribution. |
 | `/map` | Weather layers, radar and satellite playback, forecast timeline, bilingual place search, and shareable map views. |
 | `/route` | Road-route search, an alternative when available, interactive route map, arrival-time weather, regional summaries, and destination outlook. |
+| `/flood` | FFWC river levels matched to upazilas, nearest DDM flood shelters, thresholds, and a clearly labelled demo view. |
 | `/alert` | Bilingual registration, inbox, profile controls, channel connections, source coverage, and official-document references. |
 | `/admin`, `/admin/login` | Protected administration and demo tools; not linked from public navigation. |
 
@@ -359,6 +376,18 @@ An HttpOnly cookie identifies the browser; the server stores only its token hash
 The engine evaluates monitored areas every two minutes by default. Weather scenarios use cached forecasts; optional Xweather data adds hourly, maritime, WBGT, and lightning coverage. Verified, dated North Bay marine notices can generate fisherman alerts. Other bulletin products remain reference links when scope, timing, or document structure cannot be verified.
 
 Automatic publication is the default. Administrators can hold selected severities as drafts or disable individual hazard types. Stale data may annotate an existing alert but must not create, escalate, or rewrite it. Lightning alerts are always `CRITICAL`; expiry and withdrawal do not imply an all-clear.
+
+### River levels and flood shelters
+
+`/flood` is a read-only observation view built from the same cached snapshots as the alert engine. It never calls FFWC or DDM during a page load.
+
+- **Gauge matching:** each FFWC observed gauge is matched to its upazila (or, as a fallback, its district) using the name, not a guessed coordinate. Unmatched gauges are counted and listed rather than silently dropped.
+- **Classification:** `APPROACHING` means the measured level is within **0.5 m below** FFWC's published danger level; `ABOVE` is at or above it; `SIGNIFICANTLY_ABOVE` is at least **1.0 m above**. The half-metre approach band is a project rule because FFWC does not publish an “approaching” class. Zero or missing danger levels are treated as unavailable, not as normal.
+- **One card per area:** several gauges in one upazila become one group led by the highest level; a district fallback card is dropped when upazila cards exist. The page shows only areas with `level > 0`. An empty list explicitly says it is **not an all-clear**.
+- **Alerts:** a qualifying area creates a `RIVER_FLOOD` event evaluated by scenario `FLOOD-01`. Level 1 is `ADVISORY`; levels 2–3 are `WARNING`. The card reports FFWC's measurement and danger level and never claims that flooding has occurred or that a place is safe. Withdrawal means the gauge returned below the approach band, not that conditions are safe.
+- **Staleness:** a reading older than `FFWC_MAX_AGE_MINUTES` (default 180) can annotate an existing event but cannot create or escalate one. Only a fresh/partial snapshot with a fresh per-gauge reading can withdraw an event.
+- **Shelters:** DDM's public list is limited to `Flood` shelters with usable coordinates; the nearest three within 50 km are shown with roughly measured distance, capacity, and accessibility flags. DDM does not publish live occupancy or open/closed status, so the page tells people to check before travelling. If DDM is down, the previous list is shown and labelled stale.
+- **Demo:** `/flood/demo` and the page's demo toggle are illustrative only. They write no events, create no notifications, and send nothing.
 
 ### Administrator setup and demo
 
@@ -518,6 +547,8 @@ Use an appropriately registered sender ID. English SMS content is ASCII and limi
 | NASA GIBS / JMA Himawari-9 | Infrared and visible satellite imagery | Browser-loaded tiles; delayed availability. |
 | NOAA Open Data / JMA Himawari-9 | Raw band 13 data for storm tracking | ML service downloads two of ten full-disk segments (about 5.5 MB) per 10-minute frame; attribution requested, no endorsement. |
 | Xweather | Hourly forecasts, maritime conditions, WBGT, and lightning products | Optional server-side credentials; quota-controlled background requests. |
+| FFWC (`api.ffwc.gov.bd`) | Observed river levels, danger levels, station registry, and observed rainfall | Requires a project key plus the FFWC site's Origin/Referer headers. Observed data, not a forecast. Danger levels remain FFWC's; the “approaching” band is a project rule. |
+| DDM shelter list (`rapid.ddm.gov.bd`) | Flood-shelter locations and facility flags | Public page parsed as HTML. Occupancy and open/closed status are not published; list can be stale. |
 | OCHA/HDX COD-AB | Administrative boundaries | 495 upazila polygons, 12 city corporations, 64 districts, and 8 divisions in generated data; CC BY-IGO attribution. |
 | OpenFreeMap / OpenStreetMap | Basemap | Preserve map attribution and applicable usage terms. |
 | OSRM public routing service | Road geometry, route candidates, estimated distance, and travel time | On-demand requests disclose selected coordinates; availability and route quality are outside the project's control. Queued to about one request per second; a road search is reused for 30 minutes. |
@@ -551,6 +582,9 @@ The local API base is `http://localhost:5000/api`. Most JSON endpoints return `{
 | `GET` | `/api/lightning/status`, `/api/lightning/summaries`, `/api/lightning/upazila/:pcode` | Map-campaign status and results. |
 | `GET` | `/api/storms`, `/api/storms/image/:name` | Latest live storm analysis, area-arrival estimates, and the analysed frame image. |
 | `GET` | `/api/storms/demo`, `/api/storms/demo/image/:name` | Historical storm replay and saved frame images; requires the Python service. |
+| `GET` | `/api/flood/status`, `/api/flood/stations` | Cached FFWC river groups and station readings; optional `district`/`upazila` filters on `/stations`. |
+| `GET` | `/api/flood/shelters?lat=...&lon=...` | Nearest DDM shelters to a point or a known `upazila` pcode. |
+| `GET` | `/api/flood/demo` | Illustrative flood preview; creates no events and sends nothing. |
 | `GET` | `/api/alerts/schema`, `/api/alerts/status` | Registration schema and monitoring status. |
 | `POST` | `/api/alerts/subscribe` | Create an anonymous browser profile. |
 | `GET` | `/api/alerts/session` | Current session, including `profile: null` for a new visitor. |
@@ -589,7 +623,7 @@ The Python service is an internal API, with `GET /health`, `POST /predict`, and 
 │   │   ├── data/             Committed GeoJSON boundaries and location catalogue
 │   │   └── fonts/            Self-hosted Bengali font and its license
 │   ├── src/
-│   │   ├── pages/            Landing, map, route, alert, and administrator pages
+│   │   ├── pages/            Landing, map, route, flood, alert, and administrator pages
 │   │   ├── map/              MapLibre layers, imagery, and interactions
 │   │   ├── alert/            Registration, inbox, profiles, and channels
 │   │   ├── admin/            Administrator dashboard views
@@ -763,6 +797,9 @@ Render Free services sleep after idle periods, which stops the in-process collec
 - BMD rainfall units are unconfirmed; leave `ALERT_BMD_RAIN_VERIFIED=off` until independently verified. Some BMD gust values are lower than mean wind; bot reports compensate, but the alert engine still uses published gusts.
 - Lightning sampling is intermittent and can miss events. Populated Xweather strike, threat, and summary payloads require live validation; threat matching currently uses representative points rather than full administrative polygons.
 - River-port, fleet C-90, and unfamiliar bulletin layouts may be reference-only. Official-warning classification still needs validation against live warning documents.
+- FFWC access depends on a project key and site headers and can change without notice. A gauge that cannot be matched by name is reported as unmatched, not assigned to a guessed area. The half-metre approach band and one-metre level-3 line are prototype project rules, not FFWC classes.
+- DDM flood shelters are locations and facility flags only; occupancy and open/closed state are not published. A cached list surviving a DDM outage is labelled stale and can still be outdated.
+- Flood alerts report observed river levels, not forecast flooding, road conditions, or evacuation instructions. They need domain review alongside other prototype thresholds.
 - Some planned scenarios, precise approximate-coverage labels, profile recovery, and rule-editing tools are incomplete.
 - Automatic hazard withdrawals may not remain withdrawn if a later forecast creates another qualifying event; use per-hazard switches when a durable detection stop is required.
 - Messaging adapters have mocked-provider coverage, not documented live-account validation. Daily digests have no independent subscriber opt-out, and external sends are not exactly-once.
@@ -787,6 +824,8 @@ See [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md) for the det
 | Messages are not delivered | Confirm `DELIVERY=on`, valid channel credentials, verified connections, severity settings, quiet hours, alert validity, and provider responses. |
 | Morning forecast is missing | Check Telegram connection, active profile, saved area, current forecast, digest settings, quiet hours, and the send window. |
 | Rain confidence or storms are unavailable | Check `[ml]` startup output, Python 3.12+, service `/health`, model files, `ML_SERVICE_URL`, and access to NOAA/GIBS. The main application continues without the service. |
+| Flood page shows no live data | Set a valid `FFWC_API_KEY`, keep `FFWC_ENABLED=on`, run the alert engine once, and check `/api/flood/status`. `UNAVAILABLE` means no usable snapshot, not a normal river. Demo mode needs no key. |
+| Flood shelters are missing or marked stale | Confirm `DDM_SHELTERS=on` and that `rapid.ddm.gov.bd` is reachable. The list is cached for 24 hours; a failed refresh keeps the last list as stale. A shelter more than 50 km from the alert area is intentionally omitted. |
 | Python install fails on long Windows paths | Use a shorter checkout path or enable Windows long-path support; then recreate only the service virtual environment and rerun `npm run ml`. |
 | Route search fails | Confirm connectivity to the public OSRM service and choose distinct locations within the supported Bangladesh region. Weather can remain unavailable even when a road route is found. |
 

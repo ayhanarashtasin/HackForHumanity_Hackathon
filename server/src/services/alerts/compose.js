@@ -13,6 +13,7 @@ const GENERIC_ACTIONS = {
   LIGHTNING_THREAT: ['go_to_building', 'avoid_trees'],
   MARINE_WEATHER: ['check_official_forecast'],
   DRY_SPELL: ['check_forecast'],
+  RIVER_FLOOD: ['check_ffwc_bulletin', 'avoid_river_banks', 'check_shelter'],
 };
 const LIGHTNING_HAZARDS = new Set(['OBSERVED_LIGHTNING', 'LIGHTNING_THREAT']);
 
@@ -73,9 +74,9 @@ function sourceReferences(event) {
   return [{
     provider,
     product: event.source?.product ?? null,
-    observedAt: event.observedAt ?? null,
+    observedAt: event.evidence?.observedAt ?? event.observedAt ?? null,
     forecastIssuedAt: event.forecastIssuedAt ?? null,
-    url: event.official?.documentUrl ?? null,
+    url: event.official?.documentUrl ?? event.source?.url ?? null,
   }];
 }
 
@@ -89,6 +90,11 @@ function evidenceFor(event, result, area) {
     alternatives: evidence.alternatives ?? null,
     rule: evidence.rule ?? null,
     asserted: evidence.asserted ?? null,
+    observedAt: evidence.observedAt ?? null,
+    area: evidence.area ?? null,
+    stations: evidence.stations ?? null,
+    shelters: evidence.shelters ?? null,
+    shelterStatus: evidence.shelterStatus ?? null,
     // An official notice is quoted in its own words and linked, never rewritten.
     official: event.official ? { signalText: event.official.signalText ?? null, issuer: event.official.issuer ?? null, issuedAt: event.official.issuedAt ?? null, documentUrl: event.official.documentUrl ?? null } : null,
     validityAssumed: Boolean(evidence.validityAssumed),
@@ -100,6 +106,32 @@ function evidenceFor(event, result, area) {
     eventMatch: event.coverage.matchMethod,
     ...(result.evidence ?? {}),
   };
+}
+
+// DDM shelters are a list, not a live status: the card can say where they are, never that one is open or that it is a safe place.
+// The directions URL survives localizeDigits because that helper leaves http(s) tokens untouched.
+function shelterText(event, lang) {
+  if (event.hazardType !== 'RIVER_FLOOD') return '';
+  const shelters = event.evidence?.shelters ?? [];
+  // An administrator's declaration that covers several areas carries no list: saying none was found would be untrue, nothing was searched.
+  if (!shelters.length && event.origin === 'admin-declared' && !event.evidence?.shelterStatus) return '';
+  if (!shelters.length) {
+    return lang === 'bn'
+      ? 'ডিডিএমের সরকারি তালিকায় এই এলাকার কাছে কোনো আশ্রয়কেন্দ্র মেলানো যায়নি; স্থানীয় প্রশাসনের নির্দেশনা নিন।'
+      : 'No nearby DDM-listed shelter could be matched for this area; follow local authority instructions.';
+  }
+  const header = lang === 'bn'
+    ? 'নিকটতম ডিডিএম-তালিকাভুক্ত আশ্রয়কেন্দ্র (যাওয়ার আগে খোলা কিনা যাচাই করুন):'
+    : 'Nearest DDM-listed shelters (check that one is open before travelling):';
+  const stale = event.evidence?.shelterStatus === 'STALE'
+    ? (lang === 'bn' ? ' তালিকাটি পুরোনো হতে পারে।' : ' The shelter list may be out of date.')
+    : '';
+  const lines = shelters.map((shelter) => {
+    const distance = Number.isFinite(shelter.distanceKm) ? ` — ${shelter.distanceKm} km` : '';
+    const place = shelter.upazila ? `, ${shelter.upazila}` : '';
+    return `- ${shelter.name}${place}${distance}: ${shelter.mapsUrl}`;
+  });
+  return `${header}${stale}\n${lines.join('\n')}`;
 }
 
 export function composeNotification({
@@ -115,7 +147,8 @@ export function composeNotification({
   const what = describeHazard(event, { areaName: lang === 'bn' ? shortName(affectedArea, lang) : areaName, nowMs, lang });
   // Rain alerts with an ML confidence band get it as one last line; everything above it is unchanged.
   const confidence = event.hazardType === 'HEAVY_RAIN' ? confidenceLine(event.evidence?.forecastConfidence?.band, lang) : '';
-  const message = [[what, ...advice].filter(Boolean).join(' '), confidence].filter(Boolean).join('\n');
+  const shelters = shelterText(event, lang);
+  const message = [[what, ...advice].filter(Boolean).join(' '), shelters, confidence].filter(Boolean).join('\n');
 
   const reason = reasonText({
     occupation: subscriber.occupation,

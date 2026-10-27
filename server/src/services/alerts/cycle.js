@@ -5,6 +5,7 @@ import { refreshBulletins } from '../bmdBulletins.js';
 import { refreshForecasts } from '../xweatherForecast.js';
 import { refreshMaritime } from '../xweatherMaritime.js';
 import { monitoredMarineZones, runTick } from './engine.js';
+import { floodStage, refreshFloodData } from './floodSense.js';
 import { refreshLightning } from './lightningGate.js';
 import { lightningStage } from './lightningEpisodes.js';
 import { officialStage } from './officialNotices.js';
@@ -130,12 +131,35 @@ export async function runBulletins({ nowMs = Date.now(), fetchImpl = fetch } = {
   return recordJob('bulletins', () => refreshBulletins({ fetchImpl }), nowMs);
 }
 
+// FFWC is free and independent of the Xweather budget, so it refreshes even when Xweather is off. A failure is retried sooner than the
+// normal 30-minute cadence, but only the last good gauge snapshot is ever served.
+const FLOOD_RETRY = 10 * MINUTE;
+
+export async function runFlood({ nowMs = Date.now(), fetchImpl, log = console } = {}) {
+  if (!env.flood.enabled || !env.flood.apiKey) return null;
+  const last = await JobState.findOne({ key: 'flood-ffwc' }).lean();
+  const every = last?.lastStatus && !['ok', 'partial', 'FRESH', 'PARTIAL'].includes(last.lastStatus)
+    ? FLOOD_RETRY
+    : env.flood.refreshMinutes * MINUTE;
+  if (last?.lastCompletedAt && nowMs - +last.lastCompletedAt < every) return null;
+
+  const emit = typeof log === 'function' ? log : (entry) => log?.log?.(`[flood] ${JSON.stringify(entry)}`);
+  return recordJob('flood-ffwc', async () => {
+    const summary = await refreshFloodData({ fetchImpl, nowMs, log: emit });
+    return { status: summary.status === 'FRESH' ? 'ok' : summary.status === 'PARTIAL' ? 'partial' : 'error', ...summary };
+  }, nowMs);
+}
+
 export async function runAlertCycle({
-  nowMs = Date.now(), client, budget, log = console, fetchImpl,
+  nowMs = Date.now(), client, budget, log = console, fetchImpl, flood = true,
 } = {}) {
   const xweatherOn = env.alerts.xweatherEnabled && client?.hasCredentials?.();
   const fetched = xweatherOn ? await runFetchTasks({ nowMs, client, budget, log }) : null;
   const bulletins = env.alerts.bulletinsEnabled ? await runBulletins({ nowMs, fetchImpl }) : null;
-  const engine = await recordJob('alert-engine', async () => ({ status: 'ok', stats: await runTick({ nowMs, extraStages: [stormStage, lightningStage, officialStage] }) }), nowMs);
-  return { fetched, bulletins, engine };
+  const floodResult = flood ? await runFlood({ nowMs, fetchImpl, log }) : null;
+  const engine = await recordJob('alert-engine', async () => ({
+    status: 'ok',
+    stats: await runTick({ nowMs, extraStages: [stormStage, lightningStage, officialStage, floodStage] }),
+  }), nowMs);
+  return { fetched, bulletins, flood: floodResult, engine };
 }

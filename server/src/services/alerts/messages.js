@@ -12,7 +12,9 @@ export const EN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug'
 export const pick = (value, lang) => (value && typeof value === 'object' ? value[lang] ?? value.en : value);
 
 export function localizeDigits(text, lang) {
-  return lang === 'bn' ? String(text).replace(/\d/g, (digit) => BN_DIGITS[Number(digit)]) : String(text);
+  if (lang !== 'bn') return String(text);
+  // Map and source links must stay clickable: a Bengali digit inside a coordinate is no longer the same URL.
+  return String(text).split(/(https?:\/\/\S+)/g).map((part) => (/^https?:\/\//.test(part) ? part : part.replace(/\d/g, (digit) => BN_DIGITS[Number(digit)]))).join('');
 }
 
 // "{name}" placeholders. A missing parameter is a bug, so it is left visible rather than silently dropped.
@@ -59,6 +61,8 @@ export const PROVIDER_LABELS = {
   'open-meteo': { en: 'Open-Meteo forecast', bn: 'Open-Meteo পূর্বাভাস' },
   xweather: { en: 'Xweather', bn: 'Xweather' },
   himawari: { en: 'Himawari-9 satellite (JMA)', bn: 'হিমাওয়ারি-৯ স্যাটেলাইট (JMA)' },
+  ffwc: { en: 'FFWC river gauge', bn: 'এফএফডব্লিউসি নদীর পানি মাপ' },
+  ddm: { en: 'DDM shelter list', bn: 'ডিডিএম আশ্রয়কেন্দ্র তালিকা' },
   admin: { en: 'Administrator', bn: 'প্রশাসক' },
 };
 
@@ -87,6 +91,7 @@ export const HAZARD_LABELS = {
   STORM_APPROACH: { en: 'an approaching storm', bn: 'এগিয়ে আসা ঝড়' },
   MARINE_WEATHER: { en: 'rough marine weather', bn: 'উত্তাল সমুদ্র' },
   DRY_SPELL: { en: 'a dry spell', bn: 'দীর্ঘ শুষ্ক আবহাওয়া' },
+  RIVER_FLOOD: { en: 'river water near or above the danger level', bn: 'নদীর পানি বিপদসীমার কাছে বা উপরে' },
   OFFICIAL_NOTICE: { en: 'an official notice', bn: 'একটি সরকারি বিজ্ঞপ্তি' },
   ADMIN_NOTICE: { en: 'a notice', bn: 'একটি বিজ্ঞপ্তি' },
 };
@@ -139,6 +144,12 @@ const TITLES = {
     { en: 'Dangerous waters expected near {area}', bn: '{area}-এর কাছে বিপজ্জনক সমুদ্রের সম্ভাবনা' },
   ],
   DRY_SPELL: [null, { en: 'A dry spell is forecast for {area}', bn: '{area}-এ দীর্ঘ শুষ্ক আবহাওয়ার পূর্বাভাস' }],
+  RIVER_FLOOD: [
+    null,
+    { en: 'River water near the danger level in {area}', bn: '{area}-এ নদীর পানি বিপদসীমার কাছে' },
+    { en: 'River water above the danger level in {area}', bn: '{area}-এ নদীর পানি বিপদসীমার উপরে' },
+    { en: 'River water well above the danger level in {area}', bn: '{area}-এ নদীর পানি বিপদসীমার অনেক উপরে' },
+  ],
 };
 
 export function titleFor(event, areaName, lang) {
@@ -209,6 +220,43 @@ function describeStorm(event, { areaName, nowMs, lang }) {
   return `A thunderstorm cloud on the satellite image of ${image} ${moving}${reach}.${cold} This is a satellite estimate that can be about 30 km off, not a lightning observation.`;
 }
 
+// FFWC's gauge reading. "Above" is measured against FFWC's own published danger level; the half-metre "close to" band is ours and is
+// labelled as the alert rule, not as an FFWC warning. The sentence never says water has entered a village or that a place is safe.
+function describeFlood(event, { areaName, nowMs, lang }) {
+  const m = event.evidence?.metrics ?? {};
+  const station = event.evidence?.stations?.[0] ?? null;
+  const observedMs = Date.parse(event.evidence?.observedAt ?? station?.measuredAt ?? '');
+  const observed = Number.isFinite(observedMs) ? whenText(observedMs, nowMs, lang) : '';
+  const gauge = station?.name ? (station.river ? `${station.name} (${station.river})` : station.name) : areaName;
+  const count = event.evidence?.stations?.length ?? 0;
+  const above = Number.isFinite(m.aboveDangerM) ? m.aboveDangerM : null;
+  const rain = Number.isFinite(m.rainfall24hMm) && m.rainfall24hMm >= 0 ? m.rainfall24hMm : null;
+  const stale = event.dataStatus === 'STALE';
+
+  if (lang === 'bn') {
+    const measured = observed ? `${observed} নাগাদ` : 'সর্বশেষ';
+    const relation = above === null
+      ? ''
+      : above >= 0
+        ? `, যা বিপদসীমা ${withUnit(m.dangerLevelM, 'm', lang)}-এর চেয়ে ${withUnit(Math.abs(above), 'm', lang)} উপরে`
+        : `, যা বিপদসীমা ${withUnit(m.dangerLevelM, 'm', lang)}-এর চেয়ে ${withUnit(Math.abs(above), 'm', lang)} নিচে`;
+    const many = count > 1 ? ` ${count}টি নিকটবর্তী পয়েন্টের মধ্যে সর্বোচ্চটি` : '';
+    const rainfall = rain === null ? '' : ` ওই পয়েন্টে গত ২৪ ঘণ্টায় ${withUnit(rain, 'mm', lang)} বৃষ্টি রেকর্ড হয়েছে।`;
+    const delay = stale ? ' এই তথ্য হালনাগাদ হতে দেরি হচ্ছে, তাই পাঠটি দেখানো সময়ের চেয়ে পুরোনো হতে পারে।' : '';
+    return `এফএফডব্লিউসি-র${many} ${gauge} পয়েন্টে ${measured} মাপা পানির উচ্চতা ${withUnit(m.waterLevelM, 'm', lang)}${relation}। এটি নদীর পানির মাপা উচ্চতা, বন্যার পূর্বাভাস নয়।${rainfall}${delay}`;
+  }
+  const measured = observed ? `at ${observed}` : 'in the latest reading';
+  const relation = above === null
+    ? ''
+    : above >= 0
+      ? `, ${withUnit(Math.abs(above), 'm', lang)} above its published danger level of ${withUnit(m.dangerLevelM, 'm', lang)}`
+      : `, ${withUnit(Math.abs(above), 'm', lang)} below its published danger level of ${withUnit(m.dangerLevelM, 'm', lang)}`;
+  const many = count > 1 ? ` The highest of ${count} nearby gauges,` : ' The FFWC gauge at';
+  const rainfall = rain === null ? '' : ` FFWC recorded ${withUnit(rain, 'mm', lang)} of rain at this station in the last 24 hours.`;
+  const delay = stale ? ' The automatic feed is delayed, so the reading may be older than it appears.' : '';
+  return `${many} ${gauge}, measured ${withUnit(m.waterLevelM, 'm', lang)} ${measured}${relation}. This is an observed river-gauge reading, not a flood forecast.${rainfall}${delay}`;
+}
+
 // The factual sentence about the hazard (not the advice). `nowMs` anchors "today" and "tomorrow".
 export function describeHazard(event, { areaName, nowMs, lang }) {
   const m = event.evidence?.metrics ?? {};
@@ -272,6 +320,8 @@ export function describeHazard(event, { areaName, nowMs, lang }) {
           : `A lightning threat area may cover ${areaName} within the next hour (a short-range nowcast, not a prediction for one exact place).`);
     case 'STORM_APPROACH':
       return describeStorm(event, { areaName, nowMs, lang });
+    case 'RIVER_FLOOD':
+      return describeFlood(event, { areaName, nowMs, lang });
     case 'OFFICIAL_NOTICE': {
       if (event.evidence?.kind === 'withdrawal') {
         return lang === 'bn'
@@ -469,6 +519,34 @@ export const ADVICE = {
     en: 'An official warning was withdrawn, but water conditions can stay rough for some time. Check the latest official forecast before you decide to go out.',
     bn: 'একটি সরকারি সতর্কতা প্রত্যাহার হয়েছে, কিন্তু পানির অবস্থা কিছুক্ষণ উত্তাল থাকতে পারে। বের হওয়ার সিদ্ধান্তের আগে সর্বশেষ সরকারি পূর্বাভাস দেখে নিন।',
   },
+  flood_home: {
+    en: 'River water is at or near the danger level in your area. Keep away from river banks and fast water, and check the latest FFWC bulletin and local authority instructions. If water starts rising where you are, move to higher ground early; do not wait for this message to tell you it is too late. A DDM-listed shelter may not be open, so check before you travel.',
+    bn: 'আপনার এলাকায় নদীর পানি বিপদসীমার কাছে বা তার উপরে। নদীর তীর ও দ্রুত প্রবাহ থেকে দূরে থাকুন এবং এফএফডব্লিউসি-র সর্বশেষ বুলেটিন ও স্থানীয় প্রশাসনের নির্দেশনা দেখুন। আপনার আশপাশে পানি বাড়তে শুরু করলে দেরি না করে উঁচু জায়গায় যান; এই বার্তা অপেক্ষা করবেন না। ডিডিএমের তালিকাভুক্ত আশ্রয়কেন্দ্র খোলা নাও থাকতে পারে, তাই যাওয়ার আগে যাচাই করুন।',
+  },
+  flood_water: {
+    en: 'You said you are on the water. Head for the nearest bank or landing early and do not wait for the current to get stronger. A gauge reading elsewhere may not match the river where you are, so judge conditions locally.',
+    bn: 'আপনি জানিয়েছেন আপনি পানিতে আছেন। আগেভাগে নিকটতম তীর বা ঘাটের দিকে যান, স্রোত আরও বাড়ার অপেক্ষা করবেন না। অন্য জায়গার মাপ আপনার সামনের নদীর অবস্থার সঙ্গে না-ও মিলতে পারে, তাই স্থানীয় অবস্থা দেখে সিদ্ধান্ত নিন।',
+  },
+  flood_field: {
+    en: 'River water is at or near the danger level. Move livestock and stored crops to higher ground if you can do it without entering fast water. Check local authority instructions before sending anyone into a low field.',
+    bn: 'নদীর পানি বিপদসীমার কাছে বা তার উপরে। দ্রুত প্রবাহে না নামিয়েই সম্ভব হলে গবাদিপশু ও মজুত ফসল উঁচু জায়গায় সরান। নিচু জমিতে কাউকে পাঠানোর আগে স্থানীয় প্রশাসনের নির্দেশনা দেখুন।',
+  },
+  flood_boat: {
+    en: 'Secure your boat and avoid crossing the river while the level is high. Check the latest FFWC bulletin and local instructions before you plan any trip.',
+    bn: 'নৌকা বেঁধে রাখুন এবং পানি বেশি থাকা অবস্থায় নদী পার হওয়া এড়িয়ে চলুন। যাত্রার পরিকল্পনার আগে এফএফডব্লিউসি-র সর্বশেষ বুলেটিন ও স্থানীয় নির্দেশনা দেখুন।',
+  },
+  flood_site: {
+    en: 'Work near the river or on low ground can become hazardous before the town gauge shows it. Follow your site stop-work procedure and local authority instructions; this message cannot assess your site.',
+    bn: 'শহরের গেইজে বোঝার আগেই নদী বা নিচু জমির কাছে কাজ বিপজ্জনক হয়ে উঠতে পারে। আপনার সাইটের কাজ বন্ধের নিয়ম ও স্থানীয় প্রশাসনের নির্দেশনা মেনে চলুন; এই বার্তা আপনার সাইটের অবস্থা যাচাই করতে পারে না।',
+  },
+  flood_market: {
+    en: 'If this market is near the river, move goods to higher ground early and do not travel through water-covered roads. Check local authority instructions before opening.',
+    bn: 'এই বাজার নদীর কাছে হলে আগেভাগে মালপত্র উঁচু জায়গায় সরান এবং পানিতে ডুবে থাকা রাস্তা দিয়ে যাবেন না। বাজার খোলার আগে স্থানীয় প্রশাসনের নির্দেশনা দেখুন।',
+  },
+  flood_road: {
+    en: 'Avoid roads and paths covered by water: you cannot tell the depth or whether the road is damaged. Turn back and take a longer route. Check local authority instructions.',
+    bn: 'পানিতে ডুবে থাকা রাস্তা ও পথ এড়িয়ে চলুন: গভীরতা বা রাস্তা ক্ষতিগ্রস্ত কিনা বোঝা যায় না। ফিরে গিয়ে দীর্ঘ পথ নিন। স্থানীয় প্রশাসনের নির্দেশনা দেখুন।',
+  },
 };
 
 export const ACTIONS = {
@@ -508,6 +586,14 @@ export const ACTIONS = {
   leave_field: { en: 'Leave the field and go into a building', bn: 'মাঠ ছেড়ে ভবনের ভেতরে যান' },
   wait_30: { en: 'Wait at least 30 minutes after the last thunder', bn: 'শেষ বজ্রধ্বনির পর অন্তত ৩০ মিনিট অপেক্ষা করুন' },
   read_notice: { en: 'Read the original official notice', bn: 'মূল সরকারি বিজ্ঞপ্তি পড়ুন' },
+  move_livestock: { en: 'Move livestock and stored crops to higher ground', bn: 'গবাদিপশু ও মজুত ফসল উঁচু জায়গায় সরান' },
+  avoid_river_banks: { en: 'Keep away from river banks and fast water', bn: 'নদীর তীর ও দ্রুত প্রবাহ থেকে দূরে থাকুন' },
+  check_ffwc_bulletin: { en: 'Check the latest FFWC river bulletin', bn: 'এফএফডব্লিউসি-র সর্বশেষ নদীর বুলেটিন দেখুন' },
+  secure_boat: { en: 'Secure your boat and avoid crossing the river', bn: 'নৌকা বেঁধে রাখুন ও নদী পার হওয়া এড়িয়ে চলুন' },
+  protect_goods: { en: 'Move goods to higher ground', bn: 'মালপত্র উঁচু জায়গায় সরান' },
+  avoid_water_crossing: { en: 'Do not travel through water-covered roads', bn: 'পানিতে ডুবে থাকা রাস্তা দিয়ে যাবেন না' },
+  check_shelter: { en: 'Check that a DDM-listed shelter is open before travelling', bn: 'যাওয়ার আগে ডিডিএমের তালিকাভুক্ত আশ্রয়কেন্দ্র খোলা কিনা যাচাই করুন' },
+  follow_local_authority: { en: 'Follow local authority instructions', bn: 'স্থানীয় প্রশাসনের নির্দেশনা মেনে চলুন' },
 };
 
 // ---------- reasons ("why you received this") ----------

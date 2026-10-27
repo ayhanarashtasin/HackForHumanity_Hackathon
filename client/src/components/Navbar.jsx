@@ -11,6 +11,7 @@ import { useLanguage } from '../i18n/index.js';
 const prefetchMap = prefetchPage('map');
 const prefetchRoute = prefetchPage('route');
 const prefetchAlert = prefetchPage('alert');
+const prefetchFlood = prefetchPage('flood');
 
 // The logo and section links sit on the left; Alert and Map form the far-right group.
 // "Data" lives in the footer and in the phone menu.
@@ -113,6 +114,7 @@ export function Navbar({ onLanguageChange, languageDisabled = false }) {
   const mapProps = { to: '/map', onPointerEnter: prefetchMap, onFocus: prefetchMap };
   const routeProps = { to: '/route', onPointerEnter: prefetchRoute, onFocus: prefetchRoute };
   const alertProps = { to: '/alert', onPointerEnter: prefetchAlert, onFocus: prefetchAlert };
+  const floodProps = { to: '/flood', onPointerEnter: prefetchFlood, onFocus: prefetchFlood };
   const badge = number(unread > 9 ? '9+' : unread);
   const alertLabel = unread > 0 ? tr('Alerts, {n} unread', { n: unread }) : tr('Alerts');
 
@@ -139,6 +141,7 @@ export function Navbar({ onLanguageChange, languageDisabled = false }) {
                 <Icon name="bell" size={18} />{tr('Alerts')}{unread > 0 ? <span className="nav-menu-count">{tr('{n} unread', { n: unread })}</span> : null}
               </Link>
             </li>
+            <li><Link {...floodProps} aria-current={route === 'flood' ? 'page' : undefined} onClick={() => setOpen(false)}><Icon name="drop" size={18} />{tr('Flood')}</Link></li>
             <li><Link {...mapProps} onClick={() => setOpen(false)}><Icon name="map" size={18} />{tr('Map')}</Link></li>
             <li><Link {...routeProps} aria-current={route === 'route' ? 'page' : undefined} onClick={() => setOpen(false)}><Icon name="route" size={18} />{tr('Routes')}</Link></li>
           </ul>
@@ -170,6 +173,9 @@ export function Navbar({ onLanguageChange, languageDisabled = false }) {
               <span className="nav-alert-label">{tr('Alerts')}</span>
               {unread > 0 && <span className="nav-badge" aria-hidden="true">{badge}</span>}
             </Link>
+          </li>
+          <li className="nav-cta-item">
+            <Link {...floodProps} className="nav-cta" aria-current={route === 'flood' ? 'page' : undefined}><Icon name="drop" size={18} />{tr('Flood')}</Link>
           </li>
           <li className="nav-cta-item">
             <Link {...mapProps} className="nav-cta"><Icon name="map" size={18} />{tr('Map')}</Link>

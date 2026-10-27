@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from 'react';
 
-// A tiny History API router instead of a dependency. "/" is the landing page, "/map" the weather map, "/alert" the alert sign-up and inbox,
-// "/admin" (and "/admin/login") the administrator dashboard. The map keeps its shareable view in the URL hash (urlState.js), so routing
-// only looks at the path.
-export const ROUTES = { home: '/', map: '/map', route: '/route', alert: '/alert', admin: '/admin', adminLogin: '/admin/login' };
+// A tiny History API router instead of a dependency. "/" is the landing page, "/map" the weather map, "/flood" the FFWC river and DDM
+// shelter view, "/alert" the alert sign-up and inbox, and "/admin" (and "/admin/login") the administrator dashboard. The map keeps its
+// shareable view in the URL hash (urlState.js), so routing only looks at the path.
+export const ROUTES = { home: '/', map: '/map', route: '/route', alert: '/alert', flood: '/flood', admin: '/admin', adminLogin: '/admin/login' };
 const NAVIGATE_EVENT = 'akashsathi:navigate';
 
 export function resolveRoute(pathname) {
@@ -11,6 +11,7 @@ export function resolveRoute(pathname) {
   if (path === ROUTES.map) return 'map';
   if (path === ROUTES.route) return 'route';
   if (path === ROUTES.alert) return 'alert';
+  if (path === ROUTES.flood) return 'flood';
   if (path === ROUTES.admin || path === ROUTES.adminLogin) return 'admin';
   return 'home';
 }

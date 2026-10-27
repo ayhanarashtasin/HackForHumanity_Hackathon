@@ -384,6 +384,8 @@ Each provider service fetches, **validates**, and converts to one internal shape
 | `xweatherForecast.js` | `/forecasts/{lat},{lon}?filter=1hr` | `pop`, `precipMM`, `wetBulbGlobeTempC`, `feelslikeC`, wind, gust, weather code | 1 / area (verify with a longer `limit`) | align `pop` and `precipMM` to the **same** period |
 | `xweatherLightning.js` | `/lightning/summary/closest` · `/lightning/closest` · `/lightning/threats/closest` | counts · strikes · threat polygons | **1 · 10 · 10** | standard strike access = previous 5 min, ≤ 100 km |
 | `xweatherMaritime.js` | `/maritime/{lat},{lon}` (+ a forecast call at the same point for wind) | wave, swell, current, tide, surge, SST | 1 + 1 | ~6-hourly model; North Bay verified |
+| `ffwc.js` | FFWC `observed`, `observed-rainfall`, `three-days-observed-rainfall`, `stations-2025`, `update-date` | gauge level, published danger level, week/month rain | free | project key + FFWC Origin/Referer; **observation, not forecast** |
+| `floodShelters.js` | DDM `rapid.ddm.gov.bd/service/shelter_info` | Flood-shelter locations, capacity, facility flags | free | parse embedded JSON; no occupancy/open status |
 | *existing* radar / satellite | BMD / GIBS | context | free | alerts deep-link to the map; no hazard logic |
 
 **Normalised shapes**
@@ -395,6 +397,12 @@ LightningStrike { id, at, lat, lon, type: ic|cg|unknown }          // distance i
 LightningThreat { id, issuedAt, periods: [{ start, end, polygon }], movement|null }
 MarineRecord    { at, waveM, swellM, currentMps, tideM, surgeM, sstC }
 Bulletin        { product, pageUrl, documentUrl, fetchedAt, issuedAt|null, validFrom|null, validUntil|null, tz, area, signalText|null, rawText, parserStatus }
+FloodReading    { stationId, stationName, river, lat, lon, waterLevelM, dangerLevelM, highestWaterLevelM,
+                  aboveDangerM|null, classification: NORMAL|APPROACHING|ABOVE|SIGNIFICANTLY_ABOVE|UNAVAILABLE,
+                  level: 0|1|2|3, wlAt, rainfall24hMm|null, rainfall3dMm|null, rainfallMonthMm|null,
+                  normalRainfallMm|null, area: { scope, name, nameBn, upazilaPcode, districtPcode, matchMethod, distanceKm|null } }
+FloodShelter    { id, name, lat, lon, upazila, district, union, capacity|null, distanceKm,
+                  disabledFriendly, womenSpace, womenToilet, safeWater, childrenFriendly, elderlyFriendly, toilets|null }
 ```
 
 `null` means "not provided", never `0`. Units: mm, °C, km/h, % (knots × 1.852). Every value keeps its provider; timestamps carry `+06:00` or `Z`.
@@ -410,6 +418,20 @@ Bulletin        { product, pageUrl, documentUrl, fetchedAt, issuedAt|null, valid
 | `UNAVAILABLE` | Failed request, missing source, unusable data |
 
 Mapping from today's map statuses: `ok → FRESH`, `stale → STALE`, `unavailable`/`not-checked → UNAVAILABLE`.
+
+### 9.1 FloodSense: FFWC gauges + DDM shelters
+
+**Fetch.** `refreshFloodData()` calls the five FFWC endpoints in parallel. `observed` is mandatory; a failure there stores `UNAVAILABLE` and returns immediately. The registry, rainfall and update-date calls are optional and make the snapshot `PARTIAL` if they fail. `refreshFloodShelters()` is independent, cached for `DDM_SHELTER_REFRESH_HOURS` (24), and keeps the previous list as `STALE` when DDM is down.
+
+**Match.** Each observed row is normalised to an upazila (or district fallback) by its FFWC station name, not by point-in-polygon. Spellings are folded (`Chittagong`/`Chattogram`, `B. Baria`/`Brahmanbaria`, `Chapai Nawabganj`/`Chapainababganj`, and similar) before matching; an unknown name stays in `unmatched` and is never guessed. Several gauges in one upazila form one group led by the highest classification. A district-level fallback is dropped when upazila groups exist for that district.
+
+**Classify.** `APPROACHING` = `dangerLevelM - 0.5 <= waterLevelM < dangerLevelM`; `ABOVE` = `waterLevelM >= dangerLevelM`; `SIGNIFICANTLY_ABOVE` = `waterLevelM >= dangerLevelM + 1.0`. The approach band and level-3 line are **project rules [P]**, because FFWC does not publish an approach class. Missing or zero danger levels are `UNAVAILABLE`, never normal. `FFWC_MAX_AGE_MINUTES` (180) caps a reading's usability.
+
+**Alert.** One active `HazardEvent` per area/scope; scenario `FLOOD-01` gives level 1 `ADVISORY` and levels 2–3 `WARNING`. Alerts state FFWC's measurement and published danger level and must not claim flooding or safety. A stale snapshot or an old per-gauge reading may annotate but cannot create or escalate. Withdrawal requires a `FRESH`/`PARTIAL` snapshot and a fresh reading back below the approach band; the reason is `river-below-approaching-band` and is not an all-clear.
+
+**Shelters.** Only `Flood` shelters with usable Bangladesh coordinates are kept. The nearest `FLOOD_MAX_SHELTERS` (3) within 50 km of the area point are attached, with a straight-line distance and directions link. DDM does not publish occupancy or open/closed status. A saved list whose status is `UNAVAILABLE` but still has rows is displayed as `STALE`.
+
+**Public API and page.** `/api/flood/status` serves cached groups, thresholds, summary and unmatched gauges; `/api/flood/stations` serves readings; `/api/flood/shelters` serves nearest shelters; `/api/flood/demo` is illustrative and writes nothing. `/flood` polls cached data every five minutes and never triggers a provider call. Page loads do not create events.
 
 ---
 
@@ -501,6 +523,8 @@ Rule version **`prototype-1`**. Every value is tagged with its basis:
 | Lightning probe | 5 min (gate open); 60 min (baseline) | ≤ 15 min (gate open); ≤ 3 h (baseline) | same; an open episode shows "source stale" |
 | Lightning threats | 10 min | ≤ 30 min | same |
 | Bulletins | 30 min | last check ≤ 3 h and notice still in validity | same |
+| FFWC river gauges | 30 min | last check ≤ 3 h and the gauge reading ≤ 3 h old | no new or escalated flood alert; existing cards annotate "source stale" |
+| DDM shelters | 24 h | last check ≤ 24 h | previous list remains visible as `STALE`; never suppresses a gauge alert |
 
 ### 11.2 Hazard detection rules
 
@@ -513,6 +537,16 @@ Rule version **`prototype-1`**. Every value is tagged with its basis:
 | L3 "Very heavy rain" | `rain24h` ≥ 89 mm **or** `rain3h` ≥ 50 mm | [B] BMD "very heavy" = more than 88 mm per 24 h; 3 h figure [P] |
 
 `rain3h` = highest rolling 3-hour forecast total, `rain24h` = rolling 24-hour total, within the next 24 h. BMD's classes are 24-hour totals; the 3-hour figures are project-derived. Context: BMD's other bands are moderate 11–22 and moderately heavy 23–43 mm. **BMD amounts are used only after S3 confirms their unit**; until then amounts come from Xweather/Open-Meteo, and an event built from a single source is marked `single-source`.
+
+**RIVER_FLOOD** (FFWC observed level against FFWC's published danger level; one group per upazila, district fallback)
+
+| Level | Rule | Basis |
+| --- | --- | --- |
+| L1 "Approaching" | `danger - 0.5 m <= waterLevel < danger` | [P] project choice; FFWC has no approach class |
+| L2 "Above danger" | `waterLevel >= danger` | [P] FFWC danger level, applied directly |
+| L3 "Well above danger" | `waterLevel >= danger + 1.0 m` | [P] project choice for level-3 wording |
+
+`danger <= 0` or a missing level is `UNAVAILABLE`, not normal. A reading older than `FFWC_MAX_AGE_MINUTES` (default 180) cannot create or escalate. `FLOOD-01` maps L1 to `ADVISORY` and L2/L3 to `WARNING`; it never emits `CRITICAL`. Withdrawal is only from a fresh/partial snapshot with a fresh gauge back below the approach band.
 
 **HEAT_STRESS** (indicator priority: Xweather WBGT, then computed heat index, with BMD air temperature recorded as evidence)
 

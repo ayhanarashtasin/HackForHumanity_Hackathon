@@ -7,12 +7,14 @@ import { adminScreen, legacyMapUrl, resolveRoute } from '../src/lib/router.js';
 
 const area = (ring) => ring.slice(0, -1).reduce((sum, [x, y], i) => sum + (x * ring[i + 1][1] - ring[i + 1][0] * y), 0) / 2;
 
-test('"/" is the landing page, "/map" the map, "/alert" the alerts, "/admin" the administrator, and anything unknown falls back to the landing page', () => {
+test('"/" is the landing page, "/map" the map, "/alert" the alerts, "/flood" the river page, "/admin" the administrator, and anything unknown falls back to the landing page', () => {
   assert.equal(resolveRoute('/'), 'home');
   assert.equal(resolveRoute('/map'), 'map');
   assert.equal(resolveRoute('/map/'), 'map');
   assert.equal(resolveRoute('/alert'), 'alert');
   assert.equal(resolveRoute('/alert/'), 'alert');
+  assert.equal(resolveRoute('/flood'), 'flood');
+  assert.equal(resolveRoute('/flood/'), 'flood');
   assert.equal(resolveRoute('/admin'), 'admin');
   assert.equal(resolveRoute('/admin/login'), 'admin');
   assert.equal(resolveRoute('/admin/login/'), 'admin');

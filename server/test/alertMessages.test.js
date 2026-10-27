@@ -6,21 +6,22 @@ import {
 } from '../src/services/alerts/messages.js';
 import { evaluateSubscriber, scenarioIds } from '../src/services/alerts/scenarios/index.js';
 import {
-  AMTALI, BADDA, DHAKA, HOUR, NOW, SAVAR, heatEvent, lightningEvent, makeEvent, makeSubscriber, officialEvent, rainEvent, stormEvent, windEvent,
+  AMTALI, BADDA, DHAKA, HOUR, NOW, SAVAR, floodEvent, heatEvent, lightningEvent, makeEvent, makeSubscriber, officialEvent, rainEvent, stormEvent, windEvent,
 } from './support/alertFixtures.js';
 
-// Style rules from the plan (section 11): no claim that anything is safe, no "all clear", no flooding claims, no certainty.
-const BANNED = [
+// Style rules from the plan (section 11): no claim that anything is safe, no "all clear", no certainty. A flood alert may name the
+// hazard and explicitly deny that it is a flood forecast; every other alert must not claim flooding or waterlogging.
+const SAFETY_BANNED = [
   /\ball[- ]clear\b/i,
   /\b(is|are|will be|was|were)\s+safe\b/i,
   /\bsafe to\b/i,
   /\byou(?:'re| are) safe\b/i,
   /\bguarantee/i,
-  /\bflood/i,
-  /\bwaterlog/i,
   /\bno (?:risk|danger)\b/i,
   /\bdiagnos(?:ed|is) with\b/i,
 ];
+const FLOOD_BANNED = [/\bflood/i, /\bwaterlog/i];
+const bannedFor = (hazardType) => (hazardType === 'RIVER_FLOOD' ? SAFETY_BANNED : [...SAFETY_BANNED, ...FLOOD_BANNED]);
 
 const dryEvent = () => makeEvent({ hazardType: 'DRY_SPELL', level: 1, from: 0, until: 200, metrics: { dryDays: 9, meanTmaxC: 33 } });
 const marineEvent = () => makeEvent({ hazardType: 'MARINE_WEATHER', level: 2, scope: 'marine-zone', upazilas: [], marineZone: 'north_bay', metrics: { maxWaveM: 2.4, maxGustKph: 45 } });
@@ -59,6 +60,8 @@ function cases() {
     ['PUBLIC-06', makeSubscriber('fisherman', { waterBody: 'river' }, { activity: { key: 'on_water', since: NOW - HOUR, expiresAt: NOW + HOUR } }), stormEvent(3)],
     ['PUBLIC-06', makeSubscriber('vendor'), stormEvent(2, { metrics: { arrivalAtMs: NOW - 5 * 60_000, minTempC: null } })],
     ['PUBLIC-06', makeSubscriber('student_public'), stormEvent(3)],
+    ['FLOOD-01', farmer('growing'), floodEvent(2)],
+    ['FLOOD-01', makeSubscriber('student_public'), floodEvent(1)],
   ];
 }
 
@@ -81,9 +84,9 @@ test('the cases cover every implemented scenario', () => {
 });
 
 test('no alert, in either language, claims safety, says "all clear", claims flooding or promises anything', () => {
-  for (const { scenarioId, lang, content } of composeAll()) {
+  for (const { scenarioId, lang, event, content } of composeAll()) {
     for (const text of textsOf(content)) {
-      for (const pattern of BANNED) assert.doesNotMatch(text, pattern, `${scenarioId} ${lang}: "${text}"`);
+      for (const pattern of bannedFor(event.hazardType)) assert.doesNotMatch(text, pattern, `${scenarioId} ${lang}: "${text}"`);
     }
   }
 });
@@ -104,8 +107,11 @@ test('nothing is left as an unfilled {placeholder}, and every field is present a
 
 test('Bangla alerts use Bengali digits throughout', () => {
   for (const { scenarioId, content } of composeAll().filter((item) => item.lang === 'bn')) {
-    for (const text of textsOf(content)) assert.doesNotMatch(text, /[0-9]/, `${scenarioId}: ${text}`);
-    assert.match(content.message, /[ঀ-৿]/, `${scenarioId} message is Bangla`);
+    for (const text of textsOf(content)) {
+      // A source URL is not prose: localizeDigits deliberately leaves its coordinates and query digits alone so it still opens.
+      assert.doesNotMatch(text.replace(/https?:\/\/\S+/g, ''), /[0-9]/, `${scenarioId}: ${text}`);
+    }
+    assert.match(content.message, /[��?-��]/, `${scenarioId} message is Bangla`);
   }
   assert.equal(localizeDigits('15:30 and 7.5', 'bn'), '১৫:৩০ and ৭.৫');
   assert.equal(localizeDigits('15:30', 'en'), '15:30');
@@ -167,6 +173,32 @@ test('every alert names who sent it and the rule it came from', () => {
   assert.match(content.title, /^Administrator alert/);
 });
 
+test('a declared river flood reads as a declaration, never as a gauge reading, and only lists shelters it actually searched for', () => {
+  const declaredWith = (evidence) => floodEvent(1, {
+    origin: 'admin-declared', evidence: { metrics: null, observedAt: null, stations: null, shelters: undefined, shelterStatus: undefined, ...evidence },
+  });
+  const subscriber = makeSubscriber('farmer', {}, { language: 'en' });
+  const compose = (event, lang = 'en') => {
+    const entry = evaluateSubscriber({ subscriber, event, nowMs: NOW }).find((item) => item.scenario.id === 'FLOOD-01');
+    return composeNotification({ scenarioId: 'FLOOD-01', result: entry.result, event, subscriber, area: entry.area, nowMs: NOW, lang });
+  };
+
+  // Several areas: nothing was searched, so the message must not claim that no shelter exists.
+  const general = compose(declaredWith({}));
+  assert.equal(general.origin, 'admin-declared');
+  assert.match(general.message, /An administrator has declared river water near or above the danger level \(level 1\)/);
+  assert.match(general.message, /not detected from weather data/);
+  assert.doesNotMatch(general.message, /measured|gauge at|DDM-listed shelter/i);
+  assert.match(compose(declaredWith({}), 'bn').message, /নদীর পানি বিপদসীমার কাছে বা উপরে/);
+
+  // One upazila: the nearest shelters were looked up, so they are listed, and an empty search is stated.
+  const single = compose(declaredWith({ shelters: floodEvent().evidence.shelters, shelterStatus: 'FRESH' }));
+  assert.match(single.message, /Nearest DDM-listed shelters/);
+  assert.match(single.message, /Badda High School/);
+  const searched = compose(declaredWith({ shelters: [], shelterStatus: 'FRESH' }));
+  assert.match(searched.message, /No nearby DDM-listed shelter could be matched/);
+});
+
 test('administrator free messages keep the administrator\'s own words and mark a missing Bangla translation', () => {
   const event = makeEvent({ hazardType: 'ADMIN_NOTICE', level: 0, origin: 'admin-message', upazilas: [BADDA] });
   const subscriber = makeSubscriber('vendor', {}, { language: 'bn' });
@@ -193,6 +225,6 @@ test('time and window wording is relative to now and bilingual', () => {
 test('every advice sentence and action exists in both languages', () => {
   for (const [key, value] of Object.entries(ADVICE)) assert.ok(value.en && value.bn, `ADVICE.${key}`);
   for (const [key, value] of Object.entries(ACTIONS)) assert.ok(value.en && value.bn, `ACTIONS.${key}`);
-  for (const [key, value] of Object.entries(ADVICE)) for (const text of [value.en, value.bn]) for (const pattern of BANNED) assert.doesNotMatch(text, pattern, key);
+  for (const [key, value] of Object.entries(ADVICE)) for (const text of [value.en, value.bn]) for (const pattern of [...SAFETY_BANNED, ...FLOOD_BANNED]) assert.doesNotMatch(text, pattern, key);
   assert.ok(AMTALI && BADDA);
 });
