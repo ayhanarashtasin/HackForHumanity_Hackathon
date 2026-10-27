@@ -48,6 +48,7 @@ export function AlertCard({ item, onRead }) {
   const reference = item.origin === 'admin-message' ? referenceHref(item.sourceReferences?.[0]?.url) : null;
   const href = mapHref(item.affectedArea, index);
   const metrics = evidenceRows(item.evidence, tr, lang);
+  const shelters = item.evidence?.shelters ?? [];
   const startsLater = Date.parse(item.validFrom) > Date.now();
 
   const toggle = () => {
@@ -93,6 +94,25 @@ export function AlertCard({ item, onRead }) {
         <section className="alert-card-do">
           <h4>{tr('card.do')}</h4>
           <ul lang={view.lang}>{view.recommendedActions.map((action) => <li key={action.key}><Icon name="check" size={16} />{action.text}</li>)}</ul>
+        </section>
+      )}
+
+      {shelters.length > 0 && (
+        <section className="alert-card-shelters">
+          <h4>{tr('card.shelters')}</h4>
+          <ul>
+            {shelters.map((shelter) => {
+              const directions = referenceHref(shelter.mapsUrl);
+              return (
+                <li key={shelter.id}>
+                  <span>{shelter.name}{shelter.upazila ? `, ${shelter.upazila}` : ''}</span>
+                  {Number.isFinite(shelter.distanceKm) && <span className="alert-shelter-distance">{tr('card.shelterDistance', { distance: number(shelter.distanceKm, lang) })}</span>}
+                  {directions && <a href={directions} target="_blank" rel="noopener noreferrer">{tr('card.sheltersDirections')}</a>}
+                </li>
+              );
+            })}
+          </ul>
+          <p className="alert-note">{item.evidence?.shelterStatus === 'STALE' ? `${tr('card.sheltersStale')} ` : ''}{tr('card.sheltersNote')}</p>
         </section>
       )}
 

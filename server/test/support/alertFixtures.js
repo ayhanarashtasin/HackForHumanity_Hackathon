@@ -90,6 +90,33 @@ export const stormEvent = (level = 2, opts = {}) => ({
   source: { provider: 'himawari', product: 'storm-tracker', referenceId: '2026-10-11T03:45:00Z' },
 });
 
+// An FFWC gauge reading as floodStations/alertCycle build an event: observed, matched to Badda, with a shelter list.
+export const floodEvent = (level = 2, opts = {}) => {
+  const { evidence = {}, ...rest } = opts;
+  return {
+    ...makeEvent({
+      hazardType: 'RIVER_FLOOD',
+      level,
+      from: -1,
+      until: 5,
+      ...rest,
+      evidence: {
+        observedAt: new Date(NOW - HOUR).toISOString(),
+        metrics: {
+          waterLevelM: 9.6, dangerLevelM: 9.2, aboveDangerM: 0.4, rainfall24hMm: 22, rainfall3dMm: 61, rainfallMonthMm: 142, normalRainfallMm: 210,
+        },
+        area: { scope: 'upazila', name: 'Badda', upazilaPcode: BADDA, districtPcode: DHAKA, matchMethod: 'exact' },
+        stations: [{ stationId: 'SW270', name: 'Badda (Buriganga)', river: 'Buriganga', waterLevelM: 9.6, dangerLevelM: 9.2, aboveDangerM: 0.4, measuredAt: new Date(NOW - HOUR).toISOString() }],
+        shelters: [{ id: 'shelter-1', name: 'Badda High School', upazila: 'Badda', distanceKm: 2.3, mapsUrl: 'https://www.google.com/maps/dir/?api=1&destination=23.78,90.42' }],
+        shelterStatus: 'FRESH',
+        rule: { key: `RIVER_FLOOD.L${level}`, version: 'prototype-1', status: 'prototype' },
+        ...evidence,
+      },
+    }),
+    source: { provider: 'ffwc', product: 'observed', url: 'https://ffwc.gov.bd/' },
+  };
+};
+
 export const officialEvent = (kind = 'warning', opts = {}) => ({
   ...makeEvent({ hazardType: 'OFFICIAL_NOTICE', level: kind === 'warning' ? 2 : 1, from: 0, scope: 'marine-zone', upazilas: [], marineZone: 'north_bay', evidence: { kind, greatDanger: false }, ...opts }),
   source: { provider: 'bmd', product: 'fishermen-forecast', referenceId: 'synthetic-123' },

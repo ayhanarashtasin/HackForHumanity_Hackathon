@@ -35,6 +35,7 @@ export const HAZARD_NAMES = {
   STORM_APPROACH: 'Storm approaching (satellite)',
   MARINE_WEATHER: 'Rough marine weather',
   DRY_SPELL: 'Dry spell',
+  RIVER_FLOOD: 'River level',
   OFFICIAL_NOTICE: 'Official notice',
   ADMIN_NOTICE: 'Administrator notice',
 };
@@ -418,6 +419,7 @@ export const HAZARD_SWITCH_NOTES = {
   STORM_APPROACH: 'Stops new storm-approach warnings from the satellite storm tracker.',
   MARINE_WEATHER: 'Stops marine-weather events for fishermen.',
   DRY_SPELL: 'Stops dry-spell prompts for farmers.',
+  RIVER_FLOOD: 'Stops new river-level events from FFWC gauges. Existing flood alerts are left alone until you withdraw them.',
   OFFICIAL_NOTICE: 'Stops official-notice events.',
   ADMIN_NOTICE: 'Stops the notice event type used by free messages.',
 };

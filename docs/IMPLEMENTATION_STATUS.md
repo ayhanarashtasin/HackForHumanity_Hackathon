@@ -32,6 +32,20 @@ The latest local verification used Node.js **24.14.0**. [GitHub CI](../.github/w
 | **Satellite storm warnings** | **Built (prototype)** | STORM_APPROACH / PUBLIC-06 from the Himawari-9 storm tracker, Telegram only. See below. |
 | **Telegram weather commands** | **Built** | `/update`, `/heat`, `/rain`, `/wind`, `/thunderstorm`, `/lightning`, `/forecast`, `/alerts`, `/status`, with a menu and buttons. See below. |
 
+## FloodSense (27 October 2026)
+
+**Built.** `server/src/services/ffwc.js` reads FFWC's observed, observed-rainfall, three-day rainfall, station registry, and update-date endpoints with the required project key and site headers. `floodSense.js` normalises readings, matches stations to upazilas/districts, classifies levels, and creates one `RIVER_FLOOD` event per area with scenario `FLOOD-01`. `floodShelters.js` parses DDM's embedded shelter list and ranks nearest Flood shelters. The public API is `/api/flood/status`, `/api/flood/stations`, `/api/flood/shelters`, and `/api/flood/demo`; `/flood` is a lazy-loaded bilingual page with a labelled demo mode and no provider calls on load.
+
+**Rules.** `APPROACHING` is within **0.5 m below** FFWC's danger level, `ABOVE` is at/above it, and `SIGNIFICANTLY_ABOVE` is at least 1.0 m above. The approach band and level-3 line are project rules, not FFWC classes. L1 is `ADVISORY`; L2/L3 are `WARNING`. Missing or zero danger levels are `UNAVAILABLE`, never normal. Stale readings cannot create or escalate. Withdrawal requires a fresh snapshot and a fresh gauge back below the band.
+
+**Shelters.** Only Flood shelters with usable Bangladesh coordinates are kept; the nearest three within 50 km are shown. DDM does not publish occupancy or open/closed status. A failed refresh keeps the last list and reports `STALE` (`shelterSnapshotStatus`), rather than pretending no shelters exist.
+
+**Live checks.** FFWC endpoints returned 127 observed rows with 123 placeable readings and 0 unmatched after spelling aliases were fixed. DDM returned 1,950 rows, of which 771 were Flood shelters. Live alerts observed: Companiganj (Companyganj gauge) approaching by 0.23 m and Mongla approaching by 0.45 m.
+
+**Tests.** `server/test/flood.test.js` covers classification boundaries, aliases, grouping, shelter parsing, nearest-shelter ranking, and the stale-list rule. Scenario/message tests include `FLOOD-01` and allow flood wording only for `RIVER_FLOOD`. Full server and client suites pass; the client build emits a separate `FloodPage` chunk. MongoDB-backed tests still require `TEST_MONGODB_URI`.
+
+**Not verified.** No live alert delivery through Telegram/WhatsApp/SMS was triggered for a flood event. FFWC access depends on the project key and headers remaining valid. The page and messages need human review of the Bangla copy and domain review of the flood thresholds.
+
 ## What the last pass changed
 
 **Data layer.** Verified that forecasts, lightning and alerts were already collect-then-serve (no request handler calls a weather provider; the radar image proxy is the one disclosed exception). Added the missing piece: compact history (`weatherruns`, about 20 KB per run, `WEATHER_HISTORY_DAYS`), because only the latest 3–4 MB forecast was kept and every earlier run was overwritten.
@@ -186,6 +200,9 @@ Plan requirements that the code does not meet, with where they live:
 | §6.2 | Overview shows monitored areas but not circles, and no budget projection. |
 | §12 | FISH-05 and WORK-02/05 are flags inside other rules, not separate notifications; CONS-04 (rain at an open site, inspection advice, including six hours after the rain) and VEND-03 (rain at any market, one card per rain across markets via `oncePerHazard`) exist but VEND-03 has no per-market hours, it uses the 07:00-20:00 vendor default; PUBLIC-04/05 and CTX-01 are cross-cutting rather than rules; the `in_field` activity is consumed by nothing. |
 | `Area` collection | Seeded but unused by the hot path; `hasPolygon` and `coastal` do not exist. |
+| FloodSense thresholds | The 0.5 m approach band and 1.0 m level-3 line are project rules without FFWC or disaster-agency review; no flood forecast or evacuation claim is made. |
+| FloodSense matching | Station-to-upazila matching uses names and a small alias list. New FFWC spellings can appear as unmatched until an alias is added. District fallback can create a separate event if an upazila gauge disappears and later returns. |
+| Flood shelter freshness | DDM has no live occupancy/open status. A cached list surviving an outage is labelled `STALE` but can be days old. |
 | Admin preview | "Check current weather" runs detection, which can create hazard events; nothing is sent, but the preview is not audited. |
 
 ## Open unknowns
@@ -211,6 +228,7 @@ Plan requirements that the code does not meet, with where they live:
 ## Where things are
 
 - Engine: `server/src/services/alerts/` (`cycle.js`, `engine.js`, `notify.js`, `lightningEpisodes.js`, `officialNotices.js`, `scenarios/`).
+- FloodSense: `server/src/services/ffwc.js`, `server/src/services/alerts/floodSense.js`, `floodStations.js`, `floodShelters.js`, `scenarios/flood.js`; public API `server/src/controllers/floodController.js`; page `client/src/pages/FloodPage.jsx`.
 - Delivery: `server/src/services/delivery/` (`queue.js`, `linking.js`, `telegramBot.js`, `channels/`), `server/src/jobs/deliveryJob.js`, `server/src/controllers/channelController.js`.
 - History: `server/src/services/weatherHistory.js`, `server/src/models/WeatherRun.js`.
 - Client: `client/src/alert/` (including `ChannelsPanel.jsx`), `client/src/admin/`.

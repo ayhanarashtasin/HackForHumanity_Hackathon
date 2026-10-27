@@ -32,6 +32,7 @@ beforeEach(async () => {
   resetSettingsCache();
   env.alerts.xweatherEnabled = true;
   env.alerts.bulletinsEnabled = false; // Bulletin ingestion has its own mocked tests; cycles never call live providers.
+  env.flood.enabled = false; // FFWC has its own mocked unit tests; cycles never call live providers.
   env.alerts.maxForecastAreas = 10;
   env.alerts.maxMarinePoints = 4;
 });

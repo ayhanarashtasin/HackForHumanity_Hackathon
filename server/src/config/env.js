@@ -113,6 +113,23 @@ export const env = {
     assumedCostPerRequest: numberFromEnv('XWEATHER_ASSUMED_COST', 1, { min: 1 }),
   },
 
+  // FloodSense: FFWC river gauges and the DDM flood-shelter list. Both are public government services; the FFWC API needs a key header
+  // and an Origin/Referer that its gateway accepts. FFWC_ENABLED=off stops every request; without FFWC_API_KEY the flood stage stays quiet.
+  flood: {
+    enabled: process.env.FFWC_ENABLED !== 'off',
+    apiUrl: (process.env.FFWC_API_URL || 'https://api.ffwc.gov.bd').replace(/\/$/, ''),
+    apiKey: credentialFromEnv('FFWC_API_KEY', 'your_ffwc_api_key'),
+    origin: (process.env.FFWC_ORIGIN || 'https://ffwc.gov.bd').replace(/\/$/, ''),
+    timeoutMs: numberFromEnv('FFWC_TIMEOUT_MS', 15_000, { min: 1_000, max: 60_000, integer: true }),
+    refreshMinutes: numberFromEnv('FFWC_REFRESH_MINUTES', 30, { min: 5, max: 360, integer: true }),
+    // A reading older than this can annotate an existing alert but cannot create or escalate one.
+    maxAgeMinutes: numberFromEnv('FFWC_MAX_AGE_MINUTES', 180, { min: 10, max: 1_440, integer: true }),
+    sheltersEnabled: process.env.DDM_SHELTERS !== 'off',
+    shelterUrl: process.env.DDM_SHELTER_URL || 'https://rapid.ddm.gov.bd/service/shelter_info',
+    shelterRefreshHours: numberFromEnv('DDM_SHELTER_REFRESH_HOURS', 24, { min: 1, max: 168, integer: true }),
+    maxShelters: numberFromEnv('FLOOD_MAX_SHELTERS', 3, { min: 1, max: 5, integer: true }),
+  },
+
   lightning: {
     enabled: process.env.LIGHTNING_ENABLED !== 'off',
     // YYYY-MM-DD in Asia/Dhaka. Empty = the campaign starts the first day the job runs with credentials.

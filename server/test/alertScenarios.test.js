@@ -4,7 +4,7 @@ import { composeNotification } from '../src/services/alerts/compose.js';
 import { evaluateSubscriber, scenarioIds } from '../src/services/alerts/scenarios/index.js';
 import { heatClassFor, heatSeverity, heatTimingOk } from '../src/services/alerts/scenarios/helpers.js';
 import {
-  AMTALI, BADDA, DHAKA, HOUR, NOW, SAVAR, heatEvent, lightningEvent, makeEvent, makeSubscriber, officialEvent, rainEvent, windEvent,
+  AMTALI, BADDA, DHAKA, HOUR, NOW, SAVAR, floodEvent, heatEvent, lightningEvent, makeEvent, makeSubscriber, officialEvent, rainEvent, windEvent,
 } from './support/alertFixtures.js';
 
 // Runs every scenario for one subscriber and one event, returning { SCENARIO-ID: result }.
@@ -334,10 +334,26 @@ test('a farmer is matched through the field area, not just the home area', () =>
   assert.ok(run(farmer, rainEvent(1, { upazilas: [SAVAR] }))['FARM-01']);
 });
 
+test('FLOOD-01: a gauge in the approach band is advisory, at or above the danger level is a warning, and the advice fits the person', () => {
+  const farmer = makeSubscriber('farmer', { cropStage: 'growing' });
+  const approaching = run(farmer, floodEvent(1, { evidence: { metrics: { waterLevelM: 9.0, dangerLevelM: 9.2, aboveDangerM: -0.2 } } }))['FLOOD-01'];
+  assert.equal(approaching.severity, 'ADVISORY');
+  assert.equal(approaching.advice[0].key, 'flood_field');
+  assert.ok(approaching.actions.includes('move_livestock'));
+  assert.equal(run(farmer, floodEvent(2))['FLOOD-01'].severity, 'WARNING');
+  assert.equal(run(farmer, floodEvent(3))['FLOOD-01'].severity, 'WARNING', 'a river gauge never reaches CRITICAL');
+  assert.equal(run(makeSubscriber('student_public'), floodEvent(2))['FLOOD-01'].advice[0].key, 'flood_home');
+  assert.equal(run(makeSubscriber('vendor'), floodEvent(2))['FLOOD-01'].advice[0].key, 'flood_market');
+  assert.equal(run(makeSubscriber('fisherman', { waterBody: 'river' }), floodEvent(2))['FLOOD-01'].advice[0].key, 'flood_boat');
+  assert.equal(run(makeSubscriber('fisherman', { waterBody: 'river' }, { activity: { key: 'on_water' } }), floodEvent(2))['FLOOD-01'].advice[0].key, 'flood_water');
+  assert.equal(run(farmer, floodEvent(2, { until: -1 }))['FLOOD-01'], undefined, 'an expired event sends nothing');
+  assert.deepEqual(run(farmer, floodEvent(2, { upazilas: [SAVAR] })), {}, 'another area');
+});
+
 test('the catalogue rule IDs that are implemented as scenarios', () => {
   assert.deepEqual([...scenarioIds].sort(), [
     'CONS-01', 'CONS-02', 'CONS-03', 'CONS-04', 'FARM-01', 'FARM-02', 'FARM-03', 'FARM-04', 'FARM-05', 'FISH-01', 'FISH-02', 'FISH-03', 'FISH-04',
-    'PUBLIC-01', 'PUBLIC-02', 'PUBLIC-03', 'PUBLIC-06', 'VEND-01', 'VEND-02', 'VEND-03', 'WORK-01', 'WORK-03', 'WORK-04',
+    'FLOOD-01', 'PUBLIC-01', 'PUBLIC-02', 'PUBLIC-03', 'PUBLIC-06', 'VEND-01', 'VEND-02', 'VEND-03', 'WORK-01', 'WORK-03', 'WORK-04',
   ]);
 });
 

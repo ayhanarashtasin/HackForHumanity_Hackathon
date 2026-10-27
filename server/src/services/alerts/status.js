@@ -16,6 +16,8 @@ import { primarySource } from './hazards.js';
 import { getSettings } from './settings.js';
 import { monitoredAreas } from './engine.js';
 import { buildAreaForecast, loadSources, toDataStatus } from './normalize.js';
+import { loadFloodSnapshot } from './floodSense.js';
+import { loadShelterSnapshot, shelterSnapshotStatus } from './floodShelters.js';
 import {
   effectiveLightningStatus, loadForecastInputs, loadMarineInput, loadSnapshots,
 } from './snapshots.js';
@@ -36,12 +38,12 @@ export function hazardsFor(subscriber) {
   const sensitive = subscriber.isHeatSensitive ? ['HEAT_STRESS'] : [];
   // Every occupation gets the satellite storm-approach warning (PUBLIC-06).
   switch (subscriber.occupation) {
-    case 'farmer': return ['HEAVY_RAIN', 'HEAT_STRESS', 'LIGHTNING', 'STORM_APPROACH', ...(['planting', 'growing'].includes(data.cropStage) ? ['DRY_SPELL'] : [])];
-    case 'fisherman': return ['STRONG_WIND', ...(data.waterBody === 'river' ? [] : ['MARINE_WEATHER']), 'LIGHTNING', 'STORM_APPROACH', 'OFFICIAL_NOTICE', ...sensitive];
-    case 'construction': return ['HEAT_STRESS', 'STRONG_WIND', 'LIGHTNING', 'STORM_APPROACH'];
-    case 'vendor': return ['STRONG_WIND', 'HEAT_STRESS', 'STORM_APPROACH'];
-    case 'student_public': return ['HEAVY_RAIN', ...(data.outdoorPlay ? ['LIGHTNING'] : []), 'STORM_APPROACH', ...sensitive];
-    case 'rickshaw_labourer': return ['HEAT_STRESS', 'HEAVY_RAIN', 'LIGHTNING', 'STORM_APPROACH'];
+    case 'farmer': return ['HEAVY_RAIN', 'HEAT_STRESS', 'LIGHTNING', 'STORM_APPROACH', 'RIVER_FLOOD', ...(['planting', 'growing'].includes(data.cropStage) ? ['DRY_SPELL'] : [])];
+    case 'fisherman': return ['STRONG_WIND', ...(data.waterBody === 'river' ? [] : ['MARINE_WEATHER']), 'LIGHTNING', 'STORM_APPROACH', 'OFFICIAL_NOTICE', 'RIVER_FLOOD', ...sensitive];
+    case 'construction': return ['HEAT_STRESS', 'STRONG_WIND', 'LIGHTNING', 'STORM_APPROACH', 'RIVER_FLOOD'];
+    case 'vendor': return ['STRONG_WIND', 'HEAT_STRESS', 'STORM_APPROACH', 'RIVER_FLOOD'];
+    case 'student_public': return ['HEAVY_RAIN', ...(data.outdoorPlay ? ['LIGHTNING'] : []), 'STORM_APPROACH', 'RIVER_FLOOD', ...sensitive];
+    case 'rickshaw_labourer': return ['HEAT_STRESS', 'HEAVY_RAIN', 'LIGHTNING', 'STORM_APPROACH', 'RIVER_FLOOD'];
     default: return [];
   }
 }
@@ -79,6 +81,19 @@ export async function coverageFor(subscriber, nowMs = Date.now()) {
         checkedAt: checked ? dhakaIso(new Date(checked)) : null,
         provider: 'xweather',
         note: 'lightning-window',
+      });
+      continue;
+    }
+
+    if (hazard === 'RIVER_FLOOD') {
+      const { snapshot, status } = await loadFloodSnapshot(nowMs);
+      const shelter = env.flood.sheltersEnabled ? await loadShelterSnapshot() : null;
+      rows.push({
+        hazard,
+        status,
+        checkedAt: snapshot?.fetchedAt ? dhakaIso(new Date(snapshot.fetchedAt)) : null,
+        provider: 'ffwc',
+        note: shelterSnapshotStatus(shelter, nowMs) === 'STALE' ? 'shelter-list-stale' : null,
       });
       continue;
     }
@@ -129,6 +144,7 @@ const JOB_SOURCES = [
   { key: 'xweather-maritime', label: 'Xweather maritime', cadenceMinutes: 360, maxAgeMs: freshness.xweatherMaritime.maxCheckAgeMs },
   { key: 'lightning-gate', label: 'Xweather lightning', cadenceMinutes: 5, maxAgeMs: freshness.lightningProbe.baselineMaxCheckAgeMs },
   { key: 'bulletins', label: 'BMD bulletins', cadenceMinutes: 30, maxAgeMs: freshness.bulletins.maxCheckAgeMs },
+  { key: 'flood-ffwc', label: 'FFWC river gauges', cadenceMinutes: env.flood.refreshMinutes, maxAgeMs: freshness.flood.maxCheckAgeMs },
 ];
 
 export async function sourceRows(nowMs = Date.now()) {
@@ -152,9 +168,13 @@ export async function sourceRows(nowMs = Date.now()) {
   for (const source of JOB_SOURCES) {
     const state = byKey.get(source.key);
     const checked = state?.lastCompletedAt ?? null;
+    const floodOn = env.flood.enabled && Boolean(env.flood.apiKey);
     let status = 'UNAVAILABLE';
     if (source.key.startsWith('xweather') || source.key === 'lightning-gate') {
       if (!xweatherOn) status = 'UNAVAILABLE';
+      else if (checked) status = nowMs - +checked > source.maxAgeMs ? 'STALE' : (state.lastStatus === 'ok' ? 'FRESH' : 'PARTIAL');
+    } else if (source.key === 'flood-ffwc') {
+      if (!floodOn) status = 'UNAVAILABLE';
       else if (checked) status = nowMs - +checked > source.maxAgeMs ? 'STALE' : (state.lastStatus === 'ok' ? 'FRESH' : 'PARTIAL');
     } else if (checked) {
       status = nowMs - +checked > source.maxAgeMs ? 'STALE' : (state.lastStatus === 'ok' ? 'FRESH' : 'PARTIAL');
@@ -167,10 +187,22 @@ export async function sourceRows(nowMs = Date.now()) {
       cadenceMinutes: source.cadenceMinutes,
       note: source.key.startsWith('xweather') || source.key === 'lightning-gate'
         ? (xweatherOn ? null : 'not-configured')
-        : null,
+        : (source.key === 'flood-ffwc' && !floodOn ? 'not-configured' : null),
       error: state?.lastError ?? null,
     });
   }
+
+  const shelterRow = env.flood.sheltersEnabled ? await loadShelterSnapshot() : null;
+  rows.push({
+    key: 'ddm-shelters',
+    label: 'DDM flood shelters',
+    status: shelterSnapshotStatus(shelterRow, nowMs),
+    checkedAt: shelterRow?.fetchedAt ?? null,
+    cadenceMinutes: env.flood.shelterRefreshHours * 60,
+    note: env.flood.sheltersEnabled ? (shelterSnapshotStatus(shelterRow, nowMs) === 'STALE' ? 'previous-list-kept' : null) : 'not-configured',
+    error: null,
+  });
+
   return rows.map((row) => ({ ...row, checkedAt: stamp(row.checkedAt), dataTime: stamp(row.dataTime) }));
 }
 

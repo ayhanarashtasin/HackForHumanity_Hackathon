@@ -18,6 +18,8 @@ import { createAdminRoutes } from '../src/routes/adminRoutes.js';
 import { createAlertRoutes } from '../src/routes/alertRoutes.js';
 import { resetSendLimit } from '../src/services/alerts/admin.js';
 import { resetSettingsCache } from '../src/services/alerts/settings.js';
+import { saveSnapshot } from '../src/services/alerts/snapshots.js';
+import { locationByPcode } from '../src/services/geo.js';
 import { resetForTests, setSnapshot } from '../src/services/weatherStore.js';
 import { BADDA, SAVAR } from './support/alertFixtures.js';
 
@@ -571,6 +573,54 @@ dbTest('declare a hazard: everyone chosen in the area receives it, even an occup
   const again = (await admin.call('/admin/preview', { method: 'POST', body: rain })).json.data;
   assert.equal(again.totals.newRecipients, 0);
   assert.equal(again.totals.alreadySent, 2);
+});
+
+dbTest('declare a river flood: it is offered to the administrator, and the nearest cached shelters travel with it', async () => {
+  const badda = locationByPcode.get(BADDA);
+  const now = new Date();
+  await saveSnapshot({
+    provider: 'ddm',
+    product: 'flood-shelters',
+    queryKey: 'bd',
+    status: 'FRESH',
+    data: { shelters: [{ id: 'sh-1', name: 'Badda Flood Shelter', lat: badda.lat + 0.01, lon: badda.lon, upazila: 'Badda', district: 'Dhaka' }], sourceUrl: 'https://rapid.ddm.gov.bd/service/shelter_info' },
+    issuedAt: now,
+    now,
+  });
+  env.flood.sheltersEnabled = true;
+
+  const farmer = new Client();
+  await farmer.call('/alerts/subscribe', { method: 'POST', body: farmerForm() });
+  const fisherman = new Client();
+  await fisherman.call('/alerts/subscribe', { method: 'POST', body: { ...farmerForm(), occupation: 'fisherman', occupationData: { waterBody: 'river', status: 'ashore' } } });
+  const admin = await adminSignIn();
+
+  const options = (await admin.call('/admin/options')).json.data;
+  const hazard = options.hazards.find((item) => item.type === 'RIVER_FLOOD');
+  assert.deepEqual([hazard.minLevel, hazard.maxLevel, hazard.needsArea], [1, 3, true]);
+
+  const flood = { mode: 'declare', hazardType: 'RIVER_FLOOD', level: 2, hours: 4, roles: ['farmer', 'fisherman'], areas: { upazilas: [BADDA] }, audience: 'live' };
+  const preview = (await admin.call('/admin/preview', { method: 'POST', body: flood })).json.data;
+  assert.equal(preview.totals.newRecipients, 2);
+  assert.deepEqual(preview.groups.map((group) => group.scenarioId), ['FLOOD-01', 'FLOOD-01'], 'the river-flood scenario fits every role, so nobody falls back to the general notice');
+  assert.equal(preview.requires.typed, null);
+
+  const sent = await admin.call('/admin/send', { method: 'POST', body: { ...flood, idempotencyKey: 'declare-flood-0001', previewToken: preview.previewToken } });
+  assert.equal(sent.status, 201);
+  assert.equal(sent.json.data.result.sent, 2);
+
+  const event = await HazardEvent.findOne({ origin: 'admin-declared', hazardType: 'RIVER_FLOOD' }).lean();
+  assert.equal(event.level, 2);
+  assert.equal(event.evidence.shelters.length, 1);
+
+  const farmerNote = await Notification.findOne({ occupation: 'farmer' }).lean();
+  assert.equal(farmerNote.scenarioId, 'FLOOD-01');
+  assert.equal(farmerNote.origin, 'admin-declared');
+  assert.equal(farmerNote.severity, 'WARNING');
+  assert.match(farmerNote.message, /An administrator has declared river water near or above the danger level \(level 2\)/);
+  assert.match(farmerNote.message, /Badda Flood Shelter/);
+  assert.match(farmerNote.translations.bn.message, /ঘোষণা করেছেন/);
+  assert.equal((await fisherman.call('/alerts/inbox')).json.data.items[0].scenarioId, 'FLOOD-01');
 });
 
 dbTest('a free message: validated, linted, labelled as the administrator and never as BMD', async () => {

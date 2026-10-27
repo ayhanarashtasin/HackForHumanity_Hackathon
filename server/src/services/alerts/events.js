@@ -247,7 +247,9 @@ export async function withdrawEvent(event, { source, reason, reference = null, n
 
   const text = source === 'official'
     ? 'An official notice withdrew this alert. This is not an all-clear.'
-    : 'The administrator withdrew this alert. This is not an all-clear.';
+    : source === 'system'
+      ? 'The river gauge is back below the alert level, so this warning was withdrawn. This is not an all-clear.'
+      : 'The administrator withdrew this alert. This is not an all-clear.';
   await closeNotifications(event._id, { activeTo: 'withdrawn', draftTo: 'discarded', type: 'withdrawn', note: reason ? `${text} Reason: ${reason}` : text, reason, now });
   return event;
 }

@@ -46,6 +46,7 @@ export function ageText(value, lang = 'en', now = Date.now()) {
 // The measured or forecast numbers behind an alert, as labelled rows. `tr` is the page translator (key, params) -> text.
 const METRICS = {
   rain3hMm: 'mm', rain24hMm: 'mm', popPercent: 'pct', peakValueC: 'c', airTempMaxC: 'c', maxGustKph: 'kph', maxWaveM: 'm', dryDays: null, meanTmaxC: 'c', nearestKm: 'km', count: null,
+  waterLevelM: 'm', dangerLevelM: 'm', aboveDangerM: 'm', rainfall24hMm: 'mm', rainfall3dMm: 'mm', rainfallMonthMm: 'mm', normalRainfallMm: 'mm',
 };
 
 export function evidenceRows(evidence, tr, lang = 'en') {

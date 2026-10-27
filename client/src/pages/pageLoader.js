@@ -1,5 +1,6 @@
 import { loadAdminPage } from './loadAdminPage.js';
 import { loadAlertPage } from './loadAlertPage.js';
+import { loadFloodPage } from './loadFloodPage.js';
 import { loadMapPage } from './loadMapPage.js';
 import { loadRoutePage } from './loadRoutePage.js';
 
@@ -44,4 +45,4 @@ export function createPageLoader(loaders) {
 
 export const {
   isLazyPage, loadedPage, preloadPage, prefetchPage,
-} = createPageLoader({ map: loadMapPage, route: loadRoutePage, alert: loadAlertPage, admin: loadAdminPage });
+} = createPageLoader({ map: loadMapPage, route: loadRoutePage, alert: loadAlertPage, flood: loadFloodPage, admin: loadAdminPage });

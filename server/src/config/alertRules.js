@@ -8,6 +8,8 @@
 // P = project choice (no published criterion found; chosen to be conservative and explainable).
 // This file is separate from config/thresholds.js, whose values are display thresholds for map symbols, not alert rules.
 
+import { env } from './env.js';
+
 export const RULE_VERSION = 'prototype-1';
 export const RULE_STATUS = 'prototype';
 
@@ -27,6 +29,7 @@ export const HAZARD_TYPES = [
   'STORM_APPROACH',
   'MARINE_WEATHER',
   'DRY_SPELL',
+  'RIVER_FLOOD',
   'OFFICIAL_NOTICE',
   'ADMIN_NOTICE',
 ];
@@ -91,6 +94,13 @@ export const hazardRules = {
     cropStages: ['planting', 'growing'],
     repeatDays: 3,
   },
+  // FFWC publishes each gauge's danger level (dl) in metres. The margin is a project choice because "approaching" is not an official
+  // FFWC class; FFWC's own bullets remain the authority and are shown as a source link, not paraphrased into an evacuation order.
+  RIVER_FLOOD: {
+    approachingBandM: 0.5, // [P] within half a metre below the danger level
+    significantAboveM: 1.0, // [P] a metre above the danger level is the level-3 wording
+    validityHours: 6, // [P] a reading is re-checked every 30 minutes; six hours keeps a dead feed from leaving a stale warning up
+  },
 };
 
 // ---------- heat load classes (stage 3) ----------
@@ -113,6 +123,7 @@ export const freshness = {
   lightningThreat: { maxCheckAgeMs: 30 * MINUTE },
   bulletins: { maxCheckAgeMs: 3 * HOUR },
   storm: { maxImageAgeMs: hazardRules.STORM_APPROACH.maxImageAgeMinutes * MINUTE },
+  flood: { maxCheckAgeMs: env.flood.maxAgeMinutes * MINUTE },
 };
 
 // ---------- scenario timing and de-duplication ----------
@@ -150,6 +161,7 @@ export function ruleCatalogue() {
   const marine = hazardRules.MARINE_WEATHER;
   const dry = hazardRules.DRY_SPELL;
   const storm = hazardRules.STORM_APPROACH;
+  const flood = hazardRules.RIVER_FLOOD;
 
   return [
     row('HEAVY_RAIN.L1', 'HEAVY_RAIN', 1, `3 h rain >= ${rain[1].rain3hMm} mm and (probability >= ${rain[1].popMin}% or probability not available)`, ['M', 'P'], `৩ ঘণ্টায় বৃষ্টি অন্তত ${rain[1].rain3hMm} মিমি এবং বৃষ্টির সম্ভাবনা অন্তত ${rain[1].popMin}% (অথবা সম্ভাবনার তথ্য নেই)।`),
@@ -170,6 +182,10 @@ export function ruleCatalogue() {
     row('MARINE_WEATHER.WAVE', 'MARINE_WEATHER', null, `Significant wave height: level 1 >= ${marine.waveM[1]}, level 2 >= ${marine.waveM[2]}, level 3 >= ${marine.waveM[3]} m`, ['M'], `উল্লেখযোগ্য ঢেউয়ের উচ্চতা: স্তর ১ ≥ ${marine.waveM[1]}, স্তর ২ ≥ ${marine.waveM[2]}, স্তর ৩ ≥ ${marine.waveM[3]} মিটার।`),
     row('MARINE_WEATHER.GUST', 'MARINE_WEATHER', null, `Gust: level 1 >= ${marine.gustKph[1]}, level 2 >= ${marine.gustKph[2]}, level 3 >= ${marine.gustKph[3]} km/h`, ['B'], `সমুদ্র এলাকায় দমকা হাওয়া: স্তর ১ ≥ ${marine.gustKph[1]}, স্তর ২ ≥ ${marine.gustKph[2]}, স্তর ৩ ≥ ${marine.gustKph[3]} কিমি/ঘণ্টা।`),
     row('DRY_SPELL', 'DRY_SPELL', 1, `At least ${dry.minDays} consecutive forecast days below ${dry.dryDayMm} mm and mean maximum >= ${dry.meanTmaxMinC} C`, ['M', 'P'], `পূর্বাভাসে টানা অন্তত ${dry.minDays} দিন দৈনিক বৃষ্টি ${dry.dryDayMm} মিমির কম এবং গড় সর্বোচ্চ তাপমাত্রা অন্তত ${dry.meanTmaxMinC}°সে.।`),
+    row('RIVER_FLOOD.L1', 'RIVER_FLOOD', 1, `FFWC gauge measured within ${flood.approachingBandM} m below its published danger level`, ['P'], `এফএফডব্লিউসি-র মাপা পানির উচ্চতা প্রকাশিত বিপদসীমার ${flood.approachingBandM} মিটারের মধ্যে নিচে।`),
+    row('RIVER_FLOOD.L2', 'RIVER_FLOOD', 2, 'FFWC gauge measured at or above its published danger level', ['P'], 'এফএফডব্লিউসি-র মাপা পানির উচ্চতা প্রকাশিত বিপদসীমার সমান বা তার ওপরে।'),
+    row('RIVER_FLOOD.L3', 'RIVER_FLOOD', 3, `FFWC gauge measured at least ${flood.significantAboveM} m above its published danger level`, ['P'], `এফএফডব্লিউসি-র মাপা পানির উচ্চতা প্রকাশিত বিপদসীমার অন্তত ${flood.significantAboveM} মিটার ওপরে।`),
+    row('RIVER_FLOOD.LIMITS', 'RIVER_FLOOD', null, `A reading older than ${env.flood.maxAgeMinutes} minutes cannot create or escalate; withdrawn when the gauge is back below the approaching band`, ['P'], `${env.flood.maxAgeMinutes} মিনিটের বেশি পুরোনো পাঠ নতুন সতর্কবার্তা তৈরি বা বাড়াতে পারে না; পানি বিপদসীমার নিচে নামলে সতর্কবার্তা প্রত্যাহার হয়।`),
     ...Object.entries(heatClasses).map(([name, lines]) => row(
       `HEAT_CLASS.${name.toUpperCase()}`,
       'HEAT_STRESS',
